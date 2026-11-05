@@ -10,7 +10,7 @@ Todos os agentes seguem rigorosamente os padrões corporativos de desenvolviment
 
 ```mermaid
 flowchart TD
-    User([Desenvolvedor / Usuário]) --> Lead[Orquestrador Central - Antigravity]
+    User([Desenvolvedor / Usuário]) --> Lead[Orquestrador Central - Antigravity CLI / Claude Code]
 
     subgraph Backend_Layer["Camada Backend & Dados"]
         Lead -->|ABAP Cloud / RAP / Clean Core| RAP["abap-rap-dev"]
