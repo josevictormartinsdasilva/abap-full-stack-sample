@@ -163,6 +163,39 @@ No Claude Code, use `/agents` para ver os subagentes e `/mcp` para conferir a co
 
 ---
 
+## 🔑 Configuração do Token MCP (`abap-adt`)
+
+O token do servidor `abap-adt` **não é versionado**. Cada desenvolvedor configura o seu:
+
+1. Copie `.env.example` para `.env` e preencha `ABAP_ADT_TOKEN` (o `.env` está no `.gitignore`).
+2. **Claude Code**: o `.mcp.json` lê `${ABAP_ADT_TOKEN}` das variáveis de ambiente do sistema — ele **não carrega o `.env` sozinho**. Defina a variável antes de abrir o Claude Code:
+   - **Windows (PowerShell, permanente)**: `[Environment]::SetEnvironmentVariable('ABAP_ADT_TOKEN','<SEU_TOKEN>','User')` e reinicie o terminal.
+   - **Windows (sessão atual)**: `$env:ABAP_ADT_TOKEN = '<SEU_TOKEN>'` e então inicie o `claude`.
+   - **macOS / Linux (zsh, permanente)**: `echo "export ABAP_ADT_TOKEN='<SEU_TOKEN>'" >> ~/.zshrc` e abra um terminal novo (no bash, use `~/.bashrc`).
+   - **macOS / Linux (sessão atual)**: `export ABAP_ADT_TOKEN='<SEU_TOKEN>'` e então inicie o `claude`.
+   - No macOS, inicie o Claude Code **pelo terminal** (`claude`). Apps abertos pelo ícone não enxergam o `~/.zshrc`.
+3. **Antigravity**: substitua `<SEU_TOKEN>` em `.agents/mcp_config.json` apenas na sua cópia local, **sem fazer commit** desse valor.
+4. Confirme a conexão com `/mcp` (Claude Code).
+
+### ⚠️ Usando no macOS / Linux: ajuste o `fiori-mcp`
+
+O `.mcp.json` do repositório está configurado para **Windows**: o servidor `fiori-mcp` usa o wrapper `cmd /c`, que não existe no macOS/Linux. Na sua cópia local, troque o bloco `fiori-mcp` por:
+
+```json
+"fiori-mcp": {
+  "type": "stdio",
+  "command": "npx",
+  "args": ["--yes", "@sap-ux/fiori-mcp-server@1.15.19", "fiori-mcp"],
+  "env": {}
+}
+```
+
+Requer Node.js/npm instalado. Não faça commit dessa alteração, para não quebrar a configuração dos usuários Windows. O servidor `abap-adt` (HTTP em `localhost:2236`) não muda, desde que o ADT MCP esteja rodando na sua máquina.
+
+> Nunca grave o token real em arquivos versionados. O `.env` serve de referência local; o `.env.example` documenta o formato.
+
+---
+
 ## 📁 As Pastas `.agents` e `.claude`
 
 Ambas contêm a mesma configuração dos agentes; o que muda é **qual ferramenta de IA lê cada pasta**. Pastas iniciadas por ponto ficam ocultas por padrão no Explorer — ative "Itens ocultos" para vê-las.
