@@ -161,7 +161,7 @@ Quando uma nova funcionalidade completa precisa ser entregue, o **Orquestrador C
 
 No Claude Code, use `/agents` para ver os subagentes e `/mcp` para conferir a conexão dos servidores. Os prompts de exemplo acima ("Peça ao abap-rap-dev...") funcionam igual. Ao alterar uma skill, replique a mudança nas duas pastas.
 
-No Kimi Code, inicie com `kimi --agent orquestrador` (defina antes `ABAP_ADT_TOKEN` no ambiente; o `mcp.json` usa `bearerTokenEnvVar`, sem token no arquivo). Use `/mcp` para conferir os servidores. O Kimi pede confiança no workspace na primeira vez, pois o `mcp.json` do projeto executa comandos.
+No Kimi Code, inicie com `kimi --agent orquestrador`. **A flag é necessária**: o Kimi não lê o `CLAUDE.md`, que no Claude Code é o que transforma a sessão principal em orquestrador. Sem a flag, a sessão usa o agente padrão e **não aplica as regras de orquestração** (plano com aprovação, delegação, ordem backend → Fiori → QA e ATC obrigatório). Defina antes `ABAP_ADT_TOKEN` no ambiente; o `mcp.json` usa `bearerTokenEnvVar`, sem token no arquivo). Use `/mcp` para conferir os servidores. O Kimi pede confiança no workspace na primeira vez, pois o `mcp.json` do projeto executa comandos.
 
 ---
 
