@@ -10,7 +10,7 @@ Todos os agentes seguem rigorosamente os padrões corporativos de desenvolviment
 
 ```mermaid
 flowchart TD
-    User([Desenvolvedor / Usuário]) --> Lead[Orquestrador Central - Antigravity CLI / Claude Code]
+    User([Desenvolvedor / Usuário]) --> Lead[Orquestrador Central]
 
     subgraph Backend_Layer["Camada Backend & Dados"]
         Lead -->|ABAP Cloud / RAP / Clean Core| RAP["abap-rap-dev"]
@@ -152,14 +152,16 @@ Quando uma nova funcionalidade completa precisa ser entregue, o **Orquestrador C
 
 ## 🤖 Suporte a Ferramentas
 
-| Item | Antigravity | Claude Code |
-|---|---|---|
-| Instruções do orquestrador | `AGENTS.md` | `CLAUDE.md` (importa `AGENTS.md`) |
-| Subagentes | Declarados no `AGENTS.md` | `.claude/agents/*.md` |
-| Skills | `.agents/skills/*/SKILL.md` | `.claude/skills/*/SKILL.md` |
-| Servidores MCP | `.agents/mcp_config.json` | `.mcp.json` |
+| Item | Antigravity | Claude Code | Kimi Code (3.x) |
+|---|---|---|---|
+| Instruções do orquestrador | `AGENTS.md` | `CLAUDE.md` (importa `AGENTS.md`) | `.kimi-code/agents/orquestrador.md` (+ `AGENTS.md`) |
+| Subagentes | Declarados no `AGENTS.md` | `.claude/agents/*.md` | `.kimi-code/agents/*.md` |
+| Skills | `.agents/skills/*/SKILL.md` | `.claude/skills/*/SKILL.md` | `.agents/skills/*/SKILL.md` (lido nativamente) |
+| Servidores MCP | `.agents/mcp_config.json` | `.mcp.json` | `.kimi-code/mcp.json` |
 
 No Claude Code, use `/agents` para ver os subagentes e `/mcp` para conferir a conexão dos servidores. Os prompts de exemplo acima ("Peça ao abap-rap-dev...") funcionam igual. Ao alterar uma skill, replique a mudança nas duas pastas.
+
+No Kimi Code, inicie com `kimi --agent orquestrador` (defina antes `ABAP_ADT_TOKEN` no ambiente; o `mcp.json` usa `bearerTokenEnvVar`, sem token no arquivo). Use `/mcp` para conferir os servidores. O Kimi pede confiança no workspace na primeira vez, pois o `mcp.json` do projeto executa comandos.
 
 ---
 
@@ -196,7 +198,7 @@ Requer Node.js/npm instalado. Não faça commit dessa alteração, para não que
 
 ---
 
-## 📁 As Pastas `.agents` e `.claude`
+## 📁 As Pastas `.agents`, `.claude` e `.kimi-code` 
 
 Ambas contêm a mesma configuração dos agentes; o que muda é **qual ferramenta de IA lê cada pasta**. Pastas iniciadas por ponto ficam ocultas por padrão no Explorer — ative "Itens ocultos" para vê-las.
 
@@ -219,6 +221,16 @@ Ambas contêm a mesma configuração dos agentes; o que muda é **qual ferrament
 | `settings.local.json` | Permissões e preferências **locais** do usuário (não compartilhe/versione). |
 
 **Quando usar**: ao trabalhar no **Claude Code**. A sessão principal age como Orquestrador (via `CLAUDE.md`) e delega aos subagentes de `.claude/agents/`. Os MCPs vêm do `.mcp.json` da raiz.
+
+### `.kimi-code/` — Kimi Code
+
+| Conteúdo | O que é |
+|---|---|
+| `agents/<agente>.md` | Subagentes (mesmo conteúdo de `.claude/agents/`, sem o campo `skills`; cada um manda carregar a skill correspondente). |
+| `agents/orquestrador.md` | Agente principal com as regras de orquestração do `CLAUDE.md`. |
+| `mcp.json` | Servidores MCP do projeto. |
+
+As skills **não** são duplicadas: o Kimi lê `.agents/skills/` direto. Novo agente? Crie também `.kimi-code/agents/<nome>.md`.
 
 ### Os subagentes são obrigatórios?
 

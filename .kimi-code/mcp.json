@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "abap-adt": {
+      "url": "http://localhost:2236/mcp",
+      "bearerTokenEnvVar": "ABAP_ADT_TOKEN"
+    },
+    "fiori-mcp": {
+      "command": "cmd",
+      "args": ["/c", "npx", "--yes", "@sap-ux/fiori-mcp-server@1.15.19", "fiori-mcp"],
+      "startupTimeoutMs": 600000
+    }
+  }
+}
