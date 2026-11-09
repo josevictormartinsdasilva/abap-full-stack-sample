@@ -27,17 +27,7 @@
 
 | Versão | Data | Descrição | Autor |
 |---|---|---|---|
-| 1º | 31/03/2021 | Padrão de Desenvolvimento | Alexsander/Adriano |
-| 2º | 06/04/2021 | Atualização de Pendências | Jefferson Fujii |
-| 3º | 11/06/2021 | APP Fiori e Launchpad Designer | Alexsander Haas |
-| 4º | 19/07/2021 | Tabela de Parâmetros | Alexsander Haas |
-| 5º | 06/08/2021 | Estrutura dos níveis de Pacote | Alexsander Haas |
-| 6º | 10/08/2021 | Uso de BADI, Exit e Enhancement | Alexsander Haas |
-| 7º | 19/08/2021 | Objetos Reutilizáveis e CDS VH | Alexsander Haas |
-| 8º | 02/09/2021 | Adobe Forms e Smart Style | Alexsander Haas |
-| 9º | 06/10/2021 | Padrão para a SEGW | Alexsander Haas |
-| 10º | 14/01/2022 | Padrão para novos objetos | Alexsander Haas |
-| 11º | 19/01/2022 | Atualizado padrão do SPROXY | Alexsander Haas |
+| 1º | 05/11/2026 | Padrão de Desenvolvimento | José Víctor Martins da Silva |
 
 ## 2. Visão Geral
 
