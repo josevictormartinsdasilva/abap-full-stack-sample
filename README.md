@@ -152,16 +152,18 @@ Quando uma nova funcionalidade completa precisa ser entregue, o **Orquestrador C
 
 ## 🤖 Suporte a Ferramentas
 
-| Item | Antigravity | Claude Code | Kimi Code (3.x) |
-|---|---|---|---|
-| Instruções do orquestrador | `AGENTS.md` | `CLAUDE.md` (importa `AGENTS.md`) | `.kimi-code/agents/orquestrador.md` (+ `AGENTS.md`) |
-| Subagentes | Declarados no `AGENTS.md` | `.claude/agents/*.md` | `.kimi-code/agents/*.md` |
-| Skills | `.agents/skills/*/SKILL.md` | `.claude/skills/*/SKILL.md` | `.agents/skills/*/SKILL.md` (lido nativamente) |
-| Servidores MCP | `.agents/mcp_config.json` | `.mcp.json` | `.kimi-code/mcp.json` |
+| Item | Antigravity | Claude Code | Kimi Code (3.x) | Codex |
+|---|---|---|---|---|
+| Instruções do orquestrador | `AGENTS.md` | `CLAUDE.md` (importa `AGENTS.md`) | `.kimi-code/agents/orquestrador.md` (+ `AGENTS.md`) | `AGENTS.md` + `developer_instructions` em `.codex/config.toml` |
+| Subagentes | Declarados no `AGENTS.md` | `.claude/agents/*.md` | `.kimi-code/agents/*.md` | `.codex/agents/*.toml` |
+| Skills | `.agents/skills/*/SKILL.md` | `.claude/skills/*/SKILL.md` | `.agents/skills/*/SKILL.md` (lido nativamente) | `.agents/skills/*/SKILL.md` (lido nativamente) |
+| Servidores MCP | `.agents/mcp_config.json` | `.mcp.json` | `.kimi-code/mcp.json` | `.codex/config.toml` |
 
 No Claude Code, use `/agents` para ver os subagentes e `/mcp` para conferir a conexão dos servidores. Os prompts de exemplo acima ("Peça ao abap-rap-dev...") funcionam igual. Ao alterar uma skill, replique a mudança nas duas pastas.
 
 No Kimi Code, inicie com `kimi --agent orquestrador`. **A flag é necessária**: o Kimi não lê o `CLAUDE.md`, que no Claude Code é o que transforma a sessão principal em orquestrador. Sem a flag, a sessão usa o agente padrão e **não aplica as regras de orquestração** (plano com aprovação, delegação, ordem backend → Fiori → QA e ATC obrigatório). Defina antes `ABAP_ADT_TOKEN` no ambiente; o `mcp.json` usa `bearerTokenEnvVar`, sem token no arquivo). Use `/mcp` para conferir os servidores. O Kimi pede confiança no workspace na primeira vez, pois o `mcp.json` do projeto executa comandos.
+
+No Codex, abra o projeto na raiz e marque-o como confiável (o `.codex/config.toml` do projeto só é lido em projetos trusted). Defina `ABAP_ADT_TOKEN` no ambiente; o `config.toml` usa `bearer_token_env_var`. As regras de orquestração estão em `developer_instructions` (o Codex não lê o `CLAUDE.md`). Os subagentes só são acionados quando você pedir explicitamente ("use o subagente abap-rap-dev..."). Use `/mcp` e `/agent` para conferir.
 
 ---
 
@@ -198,9 +200,9 @@ Requer Node.js/npm instalado. Não faça commit dessa alteração, para não que
 
 ---
 
-## 📁 As Pastas `.agents`, `.claude` e `.kimi-code` 
+## 📁 As pastas `.agents`, `.claude`, `.kimi-code` e `.codex` 
 
-Ambas contêm a mesma configuração dos agentes; o que muda é **qual ferramenta de IA lê cada pasta**. Pastas iniciadas por ponto ficam ocultas por padrão no Explorer — ative "Itens ocultos" para vê-las.
+Todas contêm a mesma configuração dos agentes; o que muda é **qual ferramenta de IA lê cada pasta**. Pastas iniciadas por ponto ficam ocultas por padrão no Explorer — ative "Itens ocultos" para vê-las.
 
 ### `.agents/` — Antigravity
 
@@ -232,6 +234,15 @@ Ambas contêm a mesma configuração dos agentes; o que muda é **qual ferrament
 
 As skills **não** são duplicadas: o Kimi lê `.agents/skills/` direto. Novo agente? Crie também `.kimi-code/agents/<nome>.md`.
 
+### `.codex/` — Codex
+
+| Conteúdo | O que é |
+|---|---|
+| `agents/<agente>.toml` | Subagentes (mesmo conteúdo de `.kimi-code/agents/`, em formato TOML; cada um manda carregar a skill correspondente). |
+| `config.toml` | Servidores MCP, limites de subagentes e `developer_instructions` com as regras do orquestrador. |
+
+**Quando usar**: ao trabalhar no **Codex**. As skills **não** são duplicadas: o Codex lê `.agents/skills/` direto. Novo agente? Crie também `.codex/agents/<nome>.toml`.
+
 ### Os subagentes são obrigatórios?
 
 **Não.** Eles são uma opção para tarefas maiores; tarefas pequenas podem ser pedidas direto ao orquestrador (sessão principal).
@@ -252,5 +263,11 @@ No **Antigravity**, os "subagentes" são papéis declarados no `AGENTS.md` apont
 
 - **Não é preciso escolher uma pasta**: mantenha as duas no projeto; cada ferramenta usa a sua.
 - **Alterou uma skill? Replique** em `.agents/skills/` e `.claude/skills/` para que as duas ferramentas continuem com o mesmo comportamento.
-- **Novo agente?** Crie a skill nas duas pastas, o `.claude/agents/<nome>.md` e registre-o no `AGENTS.md` e no `CLAUDE.md`.
+- **Novo agente?** Crie a skill nas duas pastas, o `.claude/agents/<nome>.md`, o `.kimi-code/agents/<nome>.md`, o `.codex/agents/<nome>.toml` e registre-o no `AGENTS.md` e no `CLAUDE.md`.
 - **Padrões corporativos** (`padrao-desenvolvimento.md`, `naming-conventions.json`) ficam na raiz e são a fonte única de verdade — não duplique regras dentro das skills.
+
+---
+
+## 🤝 Contribuidores
+
+Quem contribuir deve registrar a atividade em [CONTRIBUTORS.md](CONTRIBUTORS.md) (uma linha por contribuição).
