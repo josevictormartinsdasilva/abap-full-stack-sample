@@ -7,9 +7,11 @@ description: >-
   e automações via fiori-mcp.
 ---
 
+<!-- GERADO por scripts/sync-agents.mjs — não edite; altere a fonte em .agents/ e rode o script. -->
+
 # Agente Especialista SAP Fiori Elements & SAPUI5
 
-Esta skill orienta o desenvolvimento, evolução e governança de aplicações **SAP Fiori Elements** em qualquer projeto, garantindo conformidade com os padrões oficiais SAP e com as diretrizes corporativas de [padrao-desenvolvimento.md](../../../padrao-desenvolvimento.md).
+Esta skill orienta o desenvolvimento, evolução e governança de aplicações **SAP Fiori Elements** em qualquer projeto, garantindo conformidade com os padrões oficiais SAP e com as diretrizes corporativas de [padrao-desenvolvimento.md](../../../standards/padrao-desenvolvimento.md).
 
 ---
 

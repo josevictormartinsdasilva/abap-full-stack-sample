@@ -2,7 +2,7 @@
 
 Bem-vindo ao ambiente de desenvolvimento integrado para o ecossistema SAP. Este projeto adota uma arquitetura multiagente especializada que cobre o ciclo de vida completo de desenvolvimento: desde a modelagem de dados no backend (**ABAP Cloud / RAP** e **ABAP Clássico / RICEFW**) até a interface de usuário (**SAP Fiori Elements / SAPUI5**) e a auditoria de conformidade (**ABAP Test Cockpit / ATC**).
 
-Todos os agentes seguem rigorosamente os padrões corporativos de desenvolvimento documentados em [padrao-desenvolvimento.md](padrao-desenvolvimento.md) e mapeados em [naming-conventions.json](naming-conventions.json).
+Todos os agentes seguem rigorosamente os padrões corporativos de desenvolvimento documentados em [padrao-desenvolvimento.md](standards/padrao-desenvolvimento.md) e mapeados em [naming-conventions.json](standards/naming-conventions.json).
 
 ---
 
@@ -92,10 +92,10 @@ Você não precisa decorar comandos técnicos. Basta direcionar o pedido no chat
 
 ### Exemplos para `abap-rap-dev`:
 ```text
-"Peça ao abap-rap-dev para adicionar um Value Help de clientes na entidade ZC_FS_TRAVEL usando a view padrão /DMO/I_Customer_StdVH."
+"Peça ao abap-rap-dev para adicionar um Value Help de clientes na entidade ZC_SD_ORDEM usando a view padrão I_Customer_VH."
 ```
 ```text
-"Peça ao abap-rap-dev para ocultar os campos técnicos de UUID da metadata extension ZC_FS_BOOKING e reordenar as posições de 10 em 10."
+"Peça ao abap-rap-dev para ocultar os campos técnicos de UUID da metadata extension ZC_SD_ORDEM_ITEM e reordenar as posições de 10 em 10."
 ```
 
 ### Exemplos para `fiori-elements-dev`:
@@ -116,7 +116,7 @@ Você não precisa decorar comandos técnicos. Basta direcionar o pedido no chat
 
 ### Exemplos para `abap-qa-auditor`:
 ```text
-"Peça ao abap-qa-auditor para rodar a inspeção ATC no pacote ZUI_FS_ABAP e relatar os apontamentos encontrados."
+"Peça ao abap-qa-auditor para rodar a inspeção ATC no pacote <PACOTE> e relatar os apontamentos encontrados."
 ```
 ```text
 "Peça ao abap-qa-auditor para verificar se o frontend e o backend possuem alguma pendência antes do transporte."
@@ -134,7 +134,7 @@ Quando uma nova funcionalidade completa precisa ser entregue, o **Orquestrador C
   (Plano aprovado)     (CDS/DDLX ativos)     (Page Map / Rotas)       (ATC 100% limpo)
 ```
 
-1. **Orquestrador**: Avalia o requisito, consulta [naming-conventions.json](naming-conventions.json) e submete um plano de ação para sua confirmação.
+1. **Orquestrador**: Avalia o requisito, consulta [naming-conventions.json](standards/naming-conventions.json) e submete um plano de ação para sua confirmação.
 2. **`abap-rap-dev`**: Implementa os objetos no backend, valida sintaxe (`abap_object_check`) e ativa no sistema SAP BTP.
 3. **`fiori-elements-dev`**: Atualiza o descritor `manifest.json`, sincroniza navegações e valida o linter.
 4. **`abap-qa-auditor`**: Dispara o ATC no backend, executa testes unitários e confirma que não existem desvios nem erros residuais.
@@ -143,10 +143,19 @@ Quando uma nova funcionalidade completa precisa ser entregue, o **Orquestrador C
 
 ## 📚 Documentos de Referência
 
-- **[padrao-desenvolvimento.md](padrao-desenvolvimento.md)**: Manual normativo corporativo de desenvolvimento SAP (Módulos, Pacotes, Requests, Dicionário SE11, ABAP OO, CDS, Fiori e Regras de ATC).
-- **[naming-conventions.json](naming-conventions.json)**: Mapeamento técnico estruturado em JSON com todos os prefixos e padrões de nomenclatura.
-- **[AGENTS.md](AGENTS.md)**: Declaração dos papéis e configurações dos agentes suportados pelo Antigravity.
-- **[CLAUDE.md](CLAUDE.md)**: Instruções do orquestrador para o Claude Code (importa o AGENTS.md).
+- **[standards/padrao-desenvolvimento.md](standards/padrao-desenvolvimento.md)**: Manual normativo corporativo de desenvolvimento SAP (Módulos, Pacotes, Requests, Dicionário SE11, ABAP OO, CDS, Fiori e Regras de ATC).
+- **[standards/naming-conventions.json](standards/naming-conventions.json)**: Mapeamento técnico estruturado com todos os prefixos e padrões de nomenclatura, mais o bloco `cliente` com os parâmetros do projeto.
+- **[AGENTS.md](AGENTS.md)**: Regras do orquestrador e papéis dos subagentes — fonte única para todas as ferramentas.
+- **[CLAUDE.md](CLAUDE.md)**: Importa o `AGENTS.md` e adiciona só o que é específico do Claude Code.
+
+---
+
+## 🚀 Adotando o template num projeto
+
+1. Preencha o bloco `cliente` de [standards/naming-conventions.json](standards/naming-conventions.json): empresa, sigla, pacote e variante ATC, namespace Fiori, pasta dos apps e sistema de desenvolvimento. Enquanto houver placeholders `<...>`, os agentes perguntam em vez de supor.
+2. Preencha os placeholders restantes de [standards/padrao-desenvolvimento.md](standards/padrao-desenvolvimento.md) (`<SIGLA>`, `<VARIANTE_ATC>`, `<REQUEST_OBJETOS_INICIAIS>`, `<PROJETO_CTS>` etc.) ou substitua o documento pelo padrão do cliente.
+3. Configure o token MCP (seção abaixo) e confirme a conexão com `/mcp`.
+4. **Libere os agentes apenas no sistema de desenvolvimento.** Eles criam e ativam objetos diretamente via `abap-adt`; use um usuário com autorizações restritas a DEV/sandbox.
 
 ---
 
@@ -154,16 +163,16 @@ Quando uma nova funcionalidade completa precisa ser entregue, o **Orquestrador C
 
 | Item | Antigravity | Claude Code | Kimi Code (3.x) | Codex |
 |---|---|---|---|---|
-| Instruções do orquestrador | `AGENTS.md` | `CLAUDE.md` (importa `AGENTS.md`) | `.kimi-code/agents/orquestrador.md` (+ `AGENTS.md`) | `AGENTS.md` + `developer_instructions` em `.codex/config.toml` |
-| Subagentes | Declarados no `AGENTS.md` | `.claude/agents/*.md` | `.kimi-code/agents/*.md` | `.codex/agents/*.toml` |
-| Skills | `.agents/skills/*/SKILL.md` | `.claude/skills/*/SKILL.md` | `.agents/skills/*/SKILL.md` (lido nativamente) | `.agents/skills/*/SKILL.md` (lido nativamente) |
-| Servidores MCP | `.agents/mcp_config.json` | `.mcp.json` | `.kimi-code/mcp.json` | `.codex/config.toml` |
+| Instruções do orquestrador | `AGENTS.md` | `CLAUDE.md` (importa `AGENTS.md`) | `.kimi-code/agents/orquestrador.md` (injeta `AGENTS.md`) | `AGENTS.md` (nativo) |
+| Subagentes | Declarados no `AGENTS.md` | `.claude/agents/*.md` *(gerado)* | `.kimi-code/agents/*.md` *(gerado)* | `.codex/agents/*.toml` *(gerado)* |
+| Skills | `.agents/skills/` | `.claude/skills/` *(gerado)* | `.agents/skills/` (nativo) | `.agents/skills/` (nativo) |
+| Servidores MCP | `.agents/mcp_config.json` *(gerado)* | `.mcp.json` *(gerado)* | `.kimi-code/mcp.json` *(gerado)* | `.codex/config.toml` *(gerado)* |
 
-No Claude Code, use `/agents` para ver os subagentes e `/mcp` para conferir a conexão dos servidores. Os prompts de exemplo acima ("Peça ao abap-rap-dev...") funcionam igual. Ao alterar uma skill, replique a mudança nas duas pastas.
+No Claude Code, use `/agents` para ver os subagentes e `/mcp` para conferir a conexão dos servidores.
 
-No Kimi Code, inicie com `kimi --agent orquestrador`. **A flag é necessária**: o Kimi não lê o `CLAUDE.md`, que no Claude Code é o que transforma a sessão principal em orquestrador. Sem a flag, a sessão usa o agente padrão e **não aplica as regras de orquestração** (plano com aprovação, delegação, ordem backend → Fiori → QA e ATC obrigatório). Defina antes `ABAP_ADT_TOKEN` no ambiente; o `mcp.json` usa `bearerTokenEnvVar`, sem token no arquivo). Use `/mcp` para conferir os servidores. O Kimi pede confiança no workspace na primeira vez, pois o `mcp.json` do projeto executa comandos.
+No Kimi Code, inicie com `kimi --agent orquestrador`. **A flag é necessária**: sem ela a sessão usa o agente padrão e não aplica as regras de orquestração. Defina antes `ABAP_ADT_TOKEN` no ambiente. O Kimi pede confiança no workspace na primeira vez, pois o `mcp.json` do projeto executa comandos.
 
-No Codex, abra o projeto na raiz e marque-o como confiável (o `.codex/config.toml` do projeto só é lido em projetos trusted). Defina `ABAP_ADT_TOKEN` no ambiente; o `config.toml` usa `bearer_token_env_var`. As regras de orquestração estão em `developer_instructions` (o Codex não lê o `CLAUDE.md`). Os subagentes só são acionados quando você pedir explicitamente ("use o subagente abap-rap-dev..."). Use `/mcp` e `/agent` para conferir.
+No Codex, abra o projeto na raiz e marque-o como confiável (o `.codex/config.toml` só é lido em projetos trusted). Defina `ABAP_ADT_TOKEN` no ambiente. As regras de orquestração vêm do `AGENTS.md`. Os subagentes só são acionados quando você pedir explicitamente ("use o subagente abap-rap-dev...").
 
 ---
 
@@ -172,83 +181,75 @@ No Codex, abra o projeto na raiz e marque-o como confiável (o `.codex/config.to
 O token do servidor `abap-adt` **não é versionado**. Cada desenvolvedor configura o seu:
 
 1. Copie `.env.example` para `.env` e preencha `ABAP_ADT_TOKEN` (o `.env` está no `.gitignore`).
-2. **Claude Code**: o `.mcp.json` lê `${ABAP_ADT_TOKEN}` das variáveis de ambiente do sistema — ele **não carrega o `.env` sozinho**. Defina a variável antes de abrir o Claude Code:
+2. **Claude Code, Codex e Kimi** leem `ABAP_ADT_TOKEN` das variáveis de ambiente do sistema — eles **não carregam o `.env` sozinhos**. Defina a variável antes de abrir a ferramenta:
    - **Windows (PowerShell, permanente)**: `[Environment]::SetEnvironmentVariable('ABAP_ADT_TOKEN','<SEU_TOKEN>','User')` e reinicie o terminal.
-   - **Windows (sessão atual)**: `$env:ABAP_ADT_TOKEN = '<SEU_TOKEN>'` e então inicie o `claude`.
+   - **Windows (sessão atual)**: `$env:ABAP_ADT_TOKEN = '<SEU_TOKEN>'`.
    - **macOS / Linux (zsh, permanente)**: `echo "export ABAP_ADT_TOKEN='<SEU_TOKEN>'" >> ~/.zshrc` e abra um terminal novo (no bash, use `~/.bashrc`).
-   - **macOS / Linux (sessão atual)**: `export ABAP_ADT_TOKEN='<SEU_TOKEN>'` e então inicie o `claude`.
-   - No macOS, inicie o Claude Code **pelo terminal** (`claude`). Apps abertos pelo ícone não enxergam o `~/.zshrc`.
+   - **macOS / Linux (sessão atual)**: `export ABAP_ADT_TOKEN='<SEU_TOKEN>'`.
+   - No macOS, inicie a ferramenta **pelo terminal**. Apps abertos pelo ícone não enxergam o `~/.zshrc`.
 3. **Antigravity**: substitua `<SEU_TOKEN>` em `.agents/mcp_config.json` apenas na sua cópia local, **sem fazer commit** desse valor.
-4. Confirme a conexão com `/mcp` (Claude Code).
+4. Confirme a conexão com `/mcp`.
 
-### ⚠️ Usando no macOS / Linux: ajuste o `fiori-mcp`
+> O servidor `abap-adt` (HTTP em `localhost:2236`) precisa estar rodando na sua máquina. Nunca grave o token real em arquivos versionados.
 
-O `.mcp.json` do repositório está configurado para **Windows**: o servidor `fiori-mcp` usa o wrapper `cmd /c`, que não existe no macOS/Linux. Na sua cópia local, troque o bloco `fiori-mcp` por:
+### ⚠️ Usando no macOS / Linux
 
-```json
-"fiori-mcp": {
-  "type": "stdio",
-  "command": "npx",
-  "args": ["--yes", "@sap-ux/fiori-mcp-server@1.15.19", "fiori-mcp"],
-  "env": {}
-}
+Os arquivos versionados usam o wrapper `cmd /c` para o `fiori-mcp`, que só existe no Windows. Na sua cópia local, gere a variante Unix (requer Node.js):
+
+```bash
+node scripts/sync-agents.mjs --platform=unix
 ```
 
-Requer Node.js/npm instalado. Não faça commit dessa alteração, para não quebrar a configuração dos usuários Windows. O servidor `abap-adt` (HTTP em `localhost:2236`) não muda, desde que o ADT MCP esteja rodando na sua máquina.
-
-> Nunca grave o token real em arquivos versionados. O `.env` serve de referência local; o `.env.example` documenta o formato.
+Não faça commit desse resultado: a CI espera a variante Windows.
 
 ---
 
-## 📁 As pastas `.agents`, `.claude`, `.kimi-code` e `.codex` 
+## 📁 Estrutura: fonte única + adaptadores gerados
 
-Todas contêm a mesma configuração dos agentes; o que muda é **qual ferramenta de IA lê cada pasta**. Pastas iniciadas por ponto ficam ocultas por padrão no Explorer — ative "Itens ocultos" para vê-las.
+O conteúdo (padrões, regras, skills, subagentes, MCP) é escrito **uma vez**. O script `scripts/sync-agents.mjs` gera o "envelope" que cada ferramenta de IA espera.
 
-### `.agents/` — Antigravity
+```
+AGENTS.md                       ← regras do orquestrador (fonte)
+CLAUDE.md                       ← @AGENTS.md + específico do Claude (fonte)
+standards/
+  padrao-desenvolvimento.md     ← padrão corporativo (fonte)
+  naming-conventions.json       ← prefixos + bloco "cliente" (fonte)
+.agents/
+  agents/<nome>.md              ← subagentes (fonte)
+  skills/<nome>/SKILL.md        ← skills (fonte)
+  mcp.servers.json              ← servidores MCP (fonte)
+  mcp_config.json               ← gerado (Antigravity)
+scripts/sync-agents.mjs         ← gerador
+.claude/  .codex/  .kimi-code/  .mcp.json   ← gerados
+```
 
-| Conteúdo | O que é |
-|---|---|
-| `skills/<agente>/SKILL.md` | Instruções detalhadas de cada especialista (regras, nomenclatura, fluxo de trabalho). |
-| `mcp_config.json` | Servidores MCP (`abap-adt`, `fiori-mcp`) usados pelo Antigravity. |
-| `naming-conventions.json` | Cópia do mapeamento de nomenclatura consumida pelas skills. |
+Os arquivos gerados são versionados (quem clona usa direto) e trazem o aviso `GERADO por scripts/sync-agents.mjs`. Em `.claude/settings.json` o script só gerencia `enabledMcpjsonServers` e `env.MCP_TIMEOUT`; as demais chaves (permissões etc.) podem ser editadas à mão.
 
-**Quando usar**: ao trabalhar no **Antigravity**. Os subagentes são declarados no `AGENTS.md` da raiz e cada um aponta para sua skill aqui.
+### Formato de um subagente (`.agents/agents/<nome>.md`)
 
-### `.claude/` — Claude Code
+```markdown
+---
+name: abap-rap-dev
+description: >-
+  Quando acionar este especialista (texto usado por todas as ferramentas).
+skill: abap-rap-dev
+---
 
-| Conteúdo | O que é |
-|---|---|
-| `agents/<agente>.md` | Definição de cada **subagente** (nome, descrição de quando acionar, ferramentas permitidas). Carrega a skill correspondente. |
-| `skills/<agente>/SKILL.md` | Mesmo conteúdo das skills de `.agents/skills/`. |
-| `settings.local.json` | Permissões e preferências **locais** do usuário (não compartilhe/versione). |
+Você é o **abap-rap-dev**, ...
 
-**Quando usar**: ao trabalhar no **Claude Code**. A sessão principal age como Orquestrador (via `CLAUDE.md`) e delega aos subagentes de `.claude/agents/`. Os MCPs vêm do `.mcp.json` da raiz.
+{{skill}}
 
-### `.kimi-code/` — Kimi Code
+## Fontes normativas ...
+```
 
-| Conteúdo | O que é |
-|---|---|
-| `agents/<agente>.md` | Subagentes (mesmo conteúdo de `.claude/agents/`, sem o campo `skills`; cada um manda carregar a skill correspondente). |
-| `agents/orquestrador.md` | Agente principal com as regras de orquestração do `CLAUDE.md`. |
-| `mcp.json` | Servidores MCP do projeto. |
-
-As skills **não** são duplicadas: o Kimi lê `.agents/skills/` direto. Novo agente? Crie também `.kimi-code/agents/<nome>.md`.
-
-### `.codex/` — Codex
-
-| Conteúdo | O que é |
-|---|---|
-| `agents/<agente>.toml` | Subagentes (mesmo conteúdo de `.kimi-code/agents/`, em formato TOML; cada um manda carregar a skill correspondente). |
-| `config.toml` | Servidores MCP, limites de subagentes e `developer_instructions` com as regras do orquestrador. |
-
-**Quando usar**: ao trabalhar no **Codex**. As skills **não** são duplicadas: o Codex lê `.agents/skills/` direto. Novo agente? Crie também `.codex/agents/<nome>.toml`.
+O marcador `{{skill}}` vira a instrução de carregar a skill na sintaxe de cada ferramenta (`$skill` no Codex, `/skill:skill` no Kimi). No Claude Code ele é removido, pois a skill é pré-carregada pelo campo `skills:`.
 
 ### Os subagentes são obrigatórios?
 
 **Não.** Eles são uma opção para tarefas maiores; tarefas pequenas podem ser pedidas direto ao orquestrador (sessão principal).
 
 - **Forçar um subagente**: cite o nome no pedido ("Peça ao `abap-rap-dev`...").
-- **Evitar a delegação**: diga "faça você mesmo, sem subagente". Sem instrução, o Claude Code pode delegar sozinho quando o pedido combina com a especialidade (as descrições dos agentes indicam uso proativo).
+- **Evitar a delegação**: diga "faça você mesmo, sem subagente".
 - **Regras que valem sempre** (com ou sem subagente): apresentar o plano com os nomes dos objetos para aprovação antes de criar/alterar algo no SAP, e só concluir a entrega com ATC sem erros pelo `abap-qa-auditor`.
 
 | Vale delegar | Não vale delegar |
@@ -257,14 +258,18 @@ As skills **não** são duplicadas: o Kimi lê `.agents/skills/` direto. Novo ag
 | Trabalho com muita saída (ATC, logs extensos), que fica fora do contexto principal | Consultas e dúvidas |
 | Etapas independentes, que podem rodar em paralelo | Tarefas em que o contexto da conversa importa (o subagente só conhece o que está no prompt) |
 
-No **Antigravity**, os "subagentes" são papéis declarados no `AGENTS.md` apontando para as skills; também não é obrigatório acioná-los pelo nome.
-
 ### Regras de manutenção
 
-- **Não é preciso escolher uma pasta**: mantenha as duas no projeto; cada ferramenta usa a sua.
-- **Alterou uma skill? Replique** em `.agents/skills/` e `.claude/skills/` para que as duas ferramentas continuem com o mesmo comportamento.
-- **Novo agente?** Crie a skill nas duas pastas, o `.claude/agents/<nome>.md`, o `.kimi-code/agents/<nome>.md`, o `.codex/agents/<nome>.toml` e registre-o no `AGENTS.md` e no `CLAUDE.md`.
-- **Padrões corporativos** (`padrao-desenvolvimento.md`, `naming-conventions.json`) ficam na raiz e são a fonte única de verdade — não duplique regras dentro das skills.
+- **Edite só a fonte** (`AGENTS.md`, `standards/`, `.agents/agents/`, `.agents/skills/`, `.agents/mcp.servers.json`) e rode:
+  ```bash
+  node scripts/sync-agents.mjs
+  ```
+  Faça commit da fonte **e** dos arquivos gerados juntos.
+- **A CI** (`.github/workflows/sync-agents.yml`) roda `node scripts/sync-agents.mjs --check` e reprova o PR se algum arquivo gerado foi editado à mão ou ficou desatualizado.
+- **Novo agente?** Crie `.agents/agents/<nome>.md` e `.agents/skills/<nome>/SKILL.md`, registre-o no `AGENTS.md` e rode o script. Os arquivos de todas as ferramentas são criados automaticamente.
+- **Removeu um agente?** Apague a fonte e rode o script: os arquivos gerados órfãos são removidos.
+- **Não use valores de cliente nas skills.** Pacotes, variantes e pastas vêm do bloco `cliente` de `standards/naming-conventions.json`.
+- **Padrões corporativos** (`standards/`) são a fonte única de verdade — não duplique regras dentro das skills.
 
 ---
 

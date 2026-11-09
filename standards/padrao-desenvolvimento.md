@@ -87,7 +87,7 @@ Vamos ter o pacote principal **"Z<SIGLA>"** que vai ser utilizado no projeto com
 
 Todos os módulos SAP vão possuir um pacote, caso algum módulo não tenha pacote criado o mesmo deve ser criado e salvo na mesma Request que os demais pacotes de módulos.
 
-![Pacotes por módulo](imagens/05-pacotes-por-modulo.png)
+![Pacotes por módulo](../imagens/05-pacotes-por-modulo.png)
 
 ### 5.1. Criação de Pacote por processo
 
@@ -99,7 +99,7 @@ Os pacotes de cada processo serão criados dentro do pacote superior corresponde
 
 > **Todos os pacotes criados devem ser salvos na Request abaixo, com isso uma única Request vai centralizar todos os pacotes criados no ambiente:**
 >
-> - `<SID>K9XXXXX` - [Equipe ABAP]-[Objetos Iniciais]
+> - `<REQUEST_OBJETOS_INICIAIS>` - [Equipe ABAP]-[Objetos Iniciais]
 
 **Exemplo da estruturação dos níveis dos pacotes:**
 
@@ -131,7 +131,7 @@ Pacote do Desenvolvimento:
 
 **Exemplo que contempla todos os níveis apresentados:**
 
-![Exemplo dos níveis de pacote](imagens/05-niveis-de-pacote.png)
+![Exemplo dos níveis de pacote](../imagens/05-niveis-de-pacote.png)
 
 **Observação:**
 
@@ -175,11 +175,11 @@ Exemplo: Descrição da Request: `FIAA-01-Inclusão de denominação no material
 
 Antes de finalizar a criação da Request, precisamos atribuir o projeto abaixo:
 
-![Projeto no Change and Transport System](imagens/06-projeto-cts.png)
+![Projeto no Change and Transport System](../imagens/06-projeto-cts.png)
 
 | Projeto CTS | Identif. de projeto | Descrição breve |
 |---|---|---|
-| <SID>_P00001 | PROJ_XX | NOME DO PROJETO |
+| <PROJETO_CTS> | <ID_PROJETO_CTS> | <DESCRICAO_PROJETO_CTS> |
 
 ### 6.2. Transporte da Request
 
@@ -199,17 +199,17 @@ Ao criar objetos que podem ser reutilizáveis (Exemplo: CDS de Value Help/Help S
 2. Se o objeto pode ser reaproveitado por N módulos, sendo Cross Application, salve o objeto no pacote `ZCA_UTILITARIO`.
     1. Considere o prefixo CA para a criação destes objetos, conforme consta neste documento.
 3. Todos os objetos reaproveitáveis devem ser salvos diretamente na Request:
-    1. **`<SID>K9XXXXX` - [Equipe ABAP]-[Objetos Iniciais]**
+    1. **`<REQUEST_OBJETOS_INICIAIS>` - [Equipe ABAP]-[Objetos Iniciais]**
 
 **Observação:**
 
 Após criar objetos para serem reutilizados por demais desenvolvimentos, esses objetos não podem mais sofrer alterações, pois vai impactar em todos os desenvolvimentos que utilizam o objeto. Para identificar onde determinado objeto é utilizado, execute **Get Where-used List** (`Ctrl+Shift+G`) no Eclipse.
 
-![Get Where-used List no Eclipse](imagens/07-where-used-menu.png)
+![Get Where-used List no Eclipse](../imagens/07-where-used-menu.png)
 
 O objeto deste exemplo é usado em outros 46 objetos:
 
-![Resultado do Where-used List](imagens/07-where-used-resultado.png)
+![Resultado do Where-used List](../imagens/07-where-used-resultado.png)
 
 ## 8. Regras de nomenclatura ABAP
 
@@ -460,7 +460,7 @@ Utilizar o mesmo nome da CDS à qual o Metadata Extension se refere.
 
 Exemplo (tela *Model and Service Definition*):
 
-![Model and Service Definition](imagens/08-segw-model-service-definition.png)
+![Model and Service Definition](../imagens/08-segw-model-service-definition.png)
 
 | Campo | Valor |
 |---|---|
@@ -516,7 +516,7 @@ Para gerar os objetos pelo SPROXY use o prefixo definido. Todos os objetos do pr
 
 Inserir o campo `ACTVT` no objeto e marcar as atividades necessárias:
 
-![Campo ACTVT](imagens/08-su21-actvt.png)
+![Campo ACTVT](../imagens/08-su21-actvt.png)
 
 | Atividade | Texto |
 |---|---|
@@ -575,11 +575,11 @@ Para obter informações sobre CDS Views Standards utilizar o link:
 
 - **CDS Views** (SAP Help Portal – *Virtual Data Model and CDS Views in SAP S/4HANA*)
 
-![SAP Help Portal - CDS Views](imagens/10-sap-help-cds.png)
+![SAP Help Portal - CDS Views](../imagens/10-sap-help-cds.png)
 
 CDS:
 
-![Índice de CDS Views](imagens/10-sap-help-cds-indice.png)
+![Índice de CDS Views](../imagens/10-sap-help-cds-indice.png)
 
 ## 11. Hana
 
@@ -671,7 +671,7 @@ Para o processo de controle de qualidade de desenvolvimentos ABAP deve ser aplic
 
 #### Verificações de Performance
 
-![Verificações de Performance](imagens/13-atc-performance.png)
+![Verificações de Performance](../imagens/13-atc-performance.png)
 
 - Análise da condição WHERE para SELECT
 - Análise da condição WHERE para UPDATE e DELETE
@@ -696,7 +696,7 @@ Para o processo de controle de qualidade de desenvolvimentos ABAP deve ser aplic
 
 #### Core Data Services (CDS)
 
-![Core Data Services (CDS)](imagens/13-atc-cds.png)
+![Core Data Services (CDS)](../imagens/13-atc-cds.png)
 
 - **General Checks**
     - Annotation Check for Data Definitions
@@ -716,7 +716,7 @@ Para o processo de controle de qualidade de desenvolvimentos ABAP deve ser aplic
 
 #### Verificação de Sintaxe
 
-![Verificação de Sintaxe](imagens/13-atc-sintaxe.png)
+![Verificação de Sintaxe](../imagens/13-atc-sintaxe.png)
 
 | Ativo | Verificação |
 |---|---|
@@ -732,7 +732,7 @@ Para o processo de controle de qualidade de desenvolvimentos ABAP deve ser aplic
 
 #### Programação Robusta
 
-![Programação Robusta](imagens/13-atc-programacao-robusta.png)
+![Programação Robusta](../imagens/13-atc-programacao-robusta.png)
 
 | Ativo | Verificação |
 |---|---|
@@ -755,7 +755,7 @@ Para o processo de controle de qualidade de desenvolvimentos ABAP deve ser aplic
 
 **As convenções de nomes estão configuradas conforme tópico 11.**
 
-![Convenções de Programação](imagens/13-atc-convencoes.png)
+![Convenções de Programação](../imagens/13-atc-convencoes.png)
 
 | Ativo | Verificação |
 |---|---|
@@ -769,13 +769,13 @@ Para o processo de controle de qualidade de desenvolvimentos ABAP deve ser aplic
 
 Com o objeto a ser analisado aberto no Eclipse, clicar com o botão direito do mouse, ir para a opção **"Run As"** e depois em **"ABAP Test Cockpit With..."**.
 
-![Run As > ABAP Test Cockpit With](imagens/13-atc-run-as.png)
+![Run As > ABAP Test Cockpit With](../imagens/13-atc-run-as.png)
 
 Em seguida, inserir a variante **"<VARIANTE_ATC>"**.
 
 Os resultados ficam na aba **"ATC Problems"**.
 
-![Aba ATC Problems](imagens/13-atc-problems.png)
+![Aba ATC Problems](../imagens/13-atc-problems.png)
 
 ## 14. Fiori
 
@@ -797,13 +797,13 @@ Temos os seguintes passos para atender o cliente, seguindo sugestão da SAP:
     1. Sim. Basta emular e disponibilizá-la no Launchpad em catálogo/grupo específico
 3. Se não há APP standard que atenda o cliente e não é possível emular transações, vamos desenvolver. Neste sentido, temos que entender a necessidade do cliente, e avaliar se os modelos atendem:
 
-![Supported Floorplans](imagens/14-fiori-floorplans.png)
+![Supported Floorplans](../imagens/14-fiori-floorplans.png)
 
 Link com detalhamento:
 
 - **Best UX Resources for Functional Consultants**
 
-![Handling Fit-Gap Decisions](imagens/14-fiori-fit-gap.png)
+![Handling Fit-Gap Decisions](../imagens/14-fiori-fit-gap.png)
 
 > Resumo do fluxo: Design Thinking → *SAP Fiori app disponível?*
 > - **Sim** → *Precisa de melhoria?* Não → SAP Fiori (usar como está). Sim → *In-App Extensibility suficiente?* Sim → SAP Fiori (estender com Key User Tools); Não → SAP Fiori (estender com SAP Web IDE).
@@ -820,7 +820,7 @@ O *modelo* deve ser definido conforme os requisitos da solicitação do cliente 
 - **ABAP RESTful Programming Model (RAP):** CDS View, Projection, Definition, Behavior, etc.
     - Link: Help SAP
 
-![Evolution of the ABAP programming model](imagens/14-evolucao-abap.png)
+![Evolution of the ABAP programming model](../imagens/14-evolucao-abap.png)
 
 > 1. **Classic ABAP Programming** (ABAP platform ≤ 7.4) — best practice freestyle ABAP programming → *Dos and Don'ts: be prepared for the new programming models*.
 > 2. **ABAP Programming Model for SAP Fiori** (ABAP platform ≥ 7.5) — SEGW, @OData, Core Data Services, CDS based BOPF → *Currently best practice*.
@@ -943,7 +943,7 @@ Executar o Pretty Printer em todos os códigos desenvolvidos.
 
 Configuração no Eclipse, acessar **Preferences** → ABAP Development → Editors → Source Code Editors → **ABAP Formatter**:
 
-![Configuração do ABAP Formatter no Eclipse](imagens/17-pretty-printer.png)
+![Configuração do ABAP Formatter no Eclipse](../imagens/17-pretty-printer.png)
 
 ### 17.4. Hard Code
 
@@ -964,7 +964,7 @@ Ao realizar alterações em programas Standard, considere a seguinte ordem de pr
 
 Ao implementar BADIs que não permitem utilização múltipla para criar a sua própria implementação, conforme exemplo abaixo, realize a chamada de um Include com `IF FOUND` no método a ser implementado.
 
-![BAdI sem utilização múltipla](imagens/17-badi-utilizacao-multipla.png)
+![BAdI sem utilização múltipla](../imagens/17-badi-utilizacao-multipla.png)
 
 Exemplo: toda a lógica deve estar dentro deste include.
 

@@ -8,17 +8,17 @@ description: >-
 
 # Agente Desenvolvedor ABAP RAP
 
-Esta skill orienta o desenvolvimento, ajuste e ativação de objetos do modelo ABAP RESTful Application Programming Model (RAP) seguindo estritamente as diretrizes corporativas de [padrao-desenvolvimento.md](../../padrao-desenvolvimento.md) e [naming-conventions.json](../../naming-conventions.json).
+Esta skill orienta o desenvolvimento, ajuste e ativação de objetos do modelo ABAP RESTful Application Programming Model (RAP) seguindo estritamente as diretrizes corporativas de [padrao-desenvolvimento.md](../../../standards/padrao-desenvolvimento.md) e [naming-conventions.json](../../../standards/naming-conventions.json).
 
 ## Diretrizes de Nomenclatura (Padrão Corporativo)
 
 1. **CDS Views (Core Data Services)**:
-   - **View Basic**: `ZI_<MD>_<DESCRICAO>` (ex: `ZI_FS_TRAVEL`)
-   - **View Composite**: `ZI_<MD>_<DESCRICAO>` (ex: `ZI_FS_TRAVEL_CUBE`)
-   - **View Consumption / Projeção**: `ZC_<MD>_<DESCRICAO>` (ex: `ZC_FS_TRAVEL`)
-   - **Nome da SQL View (@AbapCatalog.sqlViewName)**: `ZV<MD>_<DESCRICAO>` (ex: `ZVFS_TRAVEL`)
+   - **View Basic**: `ZI_<MD>_<DESCRICAO>` (ex: `ZI_SD_ORDEM`)
+   - **View Composite**: `ZI_<MD>_<DESCRICAO>` (ex: `ZI_SD_ORDEM_CUBE`)
+   - **View Consumption / Projeção**: `ZC_<MD>_<DESCRICAO>` (ex: `ZC_SD_ORDEM`)
+   - **SQL View (`@AbapCatalog.sqlViewName`)**: **não usar** em CDS View Entities (`DEFINE VIEW ENTITY`), que são o padrão em RAP / ABAP Cloud. `ZV<MD>_<DESCRICAO>` vale só para manutenção de views DDIC-based legadas (`DEFINE VIEW`).
    - **Access Control (DCL)**: Mesmo nome da view CDS (`ZI_<MD>_<DESCRICAO>` ou `ZC_<MD>_<DESCRICAO>`)
-   - **Value Help CDS**: `ZI_<MD>_VH_<DESCRICAO>` (ex: `ZI_FS_VH_AGENCIA`)
+   - **Value Help CDS**: `ZI_<MD>_VH_<DESCRICAO>` (ex: `ZI_SD_VH_CLIENTE`)
 
 2. **Metadata Extensions (`DDLX`)**:
    - Mesmo nome da CDS à qual se refere (`ZC_<MD>_<DESCRICAO>`).
@@ -27,16 +27,16 @@ Esta skill orienta o desenvolvimento, ajuste e ativação de objetos do modelo A
    - Configure cabeçalhos com campos de negócio significativos (`title.value: 'Description'`, `description.value: 'AgencyID'`).
 
 3. **Publicação OData (Service Definition & Binding)**:
-   - **Service Definition UI**: `ZUI_<DESCRICAO>` (ex: `ZUI_FS_TRAVEL`)
+   - **Service Definition UI**: `ZUI_<DESCRICAO>` (ex: `ZUI_SD_ORDEM`)
    - **Service Definition API**: `ZAPI_<MD>_<DESCRICAO>`
-   - **Service Binding OData V4 UI**: `ZUI_O4_<DESCRICAO>` (ex: `ZUI_O4_FS_TRAVEL`)
+   - **Service Binding OData V4 UI**: `ZUI_O4_<DESCRICAO>` (ex: `ZUI_O4_SD_ORDEM`)
    - **Service Binding OData V2 UI**: `ZUI_O2_<DESCRICAO>`
    - **Service Binding API**: `ZAPI_O4_<DESCRICAO>` / `ZAPI_O2_<DESCRICAO>`
 
 4. **Tabelas & Dicionário**:
-   - Tabela Transparente: `ZT<MD>_<DESCRICAO>` (ex: `ZTFS_TRAVEL`)
-   - Tabela Draft: `ZT<MD>_<DESCRICAO>_D` (ex: `ZTFS_TRAVEL_D`)
-   - Estrutura: `ZS<MD>_<DESCRICAO>` (ex: `ZSFS_TRAVEL_DATA`)
+   - Tabela Transparente: `ZT<MD>_<DESCRICAO>` (ex: `ZTSD_ORDEM`)
+   - Tabela Draft: `ZT<MD>_<DESCRICAO>_D` (ex: `ZTSD_ORDEM_D`)
+   - Estrutura: `ZS<MD>_<DESCRICAO>` (ex: `ZSSD_ORDEM_DADOS`)
    - Elemento de Dados: `ZE_<DESCRICAO>`
    - Domínio: `ZD_<DESCRICAO>`
 
