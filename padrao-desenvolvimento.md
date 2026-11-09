@@ -28,6 +28,7 @@
 | Versão | Data | Descrição | Autor |
 |---|---|---|---|
 | 1º | 05/11/2026 | Padrão de Desenvolvimento | José Víctor Martins da Silva |
+| 2º | 09/11/2026 | Imagens de exemplo | José Víctor Martins da Silva |
 
 ## 2. Visão Geral
 
@@ -86,7 +87,7 @@ Vamos ter o pacote principal **"Z<SIGLA>"** que vai ser utilizado no projeto com
 
 Todos os módulos SAP vão possuir um pacote, caso algum módulo não tenha pacote criado o mesmo deve ser criado e salvo na mesma Request que os demais pacotes de módulos.
 
-> *[Imagem: lista de pacotes por módulo no Eclipse — ZACM, ZCO, ZFI, ZFSCM, ZMM, ZNFE, ZSD, ZWM]*
+![Pacotes por módulo](imagens/05-pacotes-por-modulo.png)
 
 ### 5.1. Criação de Pacote por processo
 
@@ -98,7 +99,7 @@ Os pacotes de cada processo serão criados dentro do pacote superior corresponde
 
 > **Todos os pacotes criados devem ser salvos na Request abaixo, com isso uma única Request vai centralizar todos os pacotes criados no ambiente:**
 >
-> - `S4DK900336` - [Equipe ABAP]-[Objetos Iniciais]
+> - `<SID>K9XXXXX` - [Equipe ABAP]-[Objetos Iniciais]
 
 **Exemplo da estruturação dos níveis dos pacotes:**
 
@@ -130,7 +131,7 @@ Pacote do Desenvolvimento:
 
 **Exemplo que contempla todos os níveis apresentados:**
 
-> *[Imagem: árvore Z<SIGLA> → ZPP → ZPP_PRODUCAO_ESTOQUE → ZPP_AJUSTE_INVENTARIO no Eclipse]*
+![Exemplo dos níveis de pacote](imagens/05-niveis-de-pacote.png)
 
 **Observação:**
 
@@ -174,9 +175,11 @@ Exemplo: Descrição da Request: `FIAA-01-Inclusão de denominação no material
 
 Antes de finalizar a criação da Request, precisamos atribuir o projeto abaixo:
 
+![Projeto no Change and Transport System](imagens/06-projeto-cts.png)
+
 | Projeto CTS | Identif. de projeto | Descrição breve |
 |---|---|---|
-| S4D_P00001 | ESTRUT_50 | PROJETO ESTRUTURANTE 5.0 |
+| <SID>_P00001 | PROJ_XX | NOME DO PROJETO |
 
 ### 6.2. Transporte da Request
 
@@ -196,17 +199,17 @@ Ao criar objetos que podem ser reutilizáveis (Exemplo: CDS de Value Help/Help S
 2. Se o objeto pode ser reaproveitado por N módulos, sendo Cross Application, salve o objeto no pacote `ZCA_UTILITARIO`.
     1. Considere o prefixo CA para a criação destes objetos, conforme consta neste documento.
 3. Todos os objetos reaproveitáveis devem ser salvos diretamente na Request:
-    1. **`S4DK900336` - [Equipe ABAP]-[Objetos Iniciais]**
+    1. **`<SID>K9XXXXX` - [Equipe ABAP]-[Objetos Iniciais]**
 
 **Observação:**
 
 Após criar objetos para serem reutilizados por demais desenvolvimentos, esses objetos não podem mais sofrer alterações, pois vai impactar em todos os desenvolvimentos que utilizam o objeto. Para identificar onde determinado objeto é utilizado, execute **Get Where-used List** (`Ctrl+Shift+G`) no Eclipse.
 
-> *[Imagem: menu de contexto no Eclipse com a opção "Get Where-used List"]*
+![Get Where-used List no Eclipse](imagens/07-where-used-menu.png)
 
 O objeto deste exemplo é usado em outros 46 objetos:
 
-> *[Imagem: "References for: ZSCA_CAMPOS_CONTROLE (Estrutura) [S4D] 46 matches in 46 objects"]*
+![Resultado do Where-used List](imagens/07-where-used-resultado.png)
 
 ## 8. Regras de nomenclatura ABAP
 
@@ -457,6 +460,8 @@ Utilizar o mesmo nome da CDS à qual o Metadata Extension se refere.
 
 Exemplo (tela *Model and Service Definition*):
 
+![Model and Service Definition](imagens/08-segw-model-service-definition.png)
+
 | Campo | Valor |
 |---|---|
 | **Model Provider Class** – Class Name | `ZCLCA_TT_MPC_EXT` |
@@ -510,6 +515,8 @@ Para gerar os objetos pelo SPROXY use o prefixo definido. Todos os objetos do pr
 <u>Informação:</u>
 
 Inserir o campo `ACTVT` no objeto e marcar as atividades necessárias:
+
+![Campo ACTVT](imagens/08-su21-actvt.png)
 
 | Atividade | Texto |
 |---|---|
@@ -568,7 +575,11 @@ Para obter informações sobre CDS Views Standards utilizar o link:
 
 - **CDS Views** (SAP Help Portal – *Virtual Data Model and CDS Views in SAP S/4HANA*)
 
-> *[Imagem: página do SAP Help Portal "Virtual Data Model and CDS Views in SAP S/4HANA" e índice "CDS Views" por área — Cross-Line-of-Business, Asset Management, Finance, Human Resources, Manufacturing, R&D/Engineering, Sales, Service, Sourcing and Procurement, Project Systems, Supply Chain]*
+![SAP Help Portal - CDS Views](imagens/10-sap-help-cds.png)
+
+CDS:
+
+![Índice de CDS Views](imagens/10-sap-help-cds-indice.png)
 
 ## 11. Hana
 
@@ -660,6 +671,8 @@ Para o processo de controle de qualidade de desenvolvimentos ABAP deve ser aplic
 
 #### Verificações de Performance
 
+![Verificações de Performance](imagens/13-atc-performance.png)
+
 - Análise da condição WHERE para SELECT
 - Análise da condição WHERE para UPDATE e DELETE
 - Instruções SELECT que lêem o passado no buffer tabela
@@ -683,6 +696,8 @@ Para o processo de controle de qualidade de desenvolvimentos ABAP deve ser aplic
 
 #### Core Data Services (CDS)
 
+![Core Data Services (CDS)](imagens/13-atc-cds.png)
+
 - **General Checks**
     - Annotation Check for Data Definitions
     - Referenced Objects in CDS
@@ -701,6 +716,8 @@ Para o processo de controle de qualidade de desenvolvimentos ABAP deve ser aplic
 
 #### Verificação de Sintaxe
 
+![Verificação de Sintaxe](imagens/13-atc-sintaxe.png)
+
 | Ativo | Verificação |
 |---|---|
 | ✅ | Verif. sintaxe |
@@ -714,6 +731,8 @@ Para o processo de controle de qualidade de desenvolvimentos ABAP deve ser aplic
 | ⬜ | Verificação de aplicação para ABAP Push Channels |
 
 #### Programação Robusta
+
+![Programação Robusta](imagens/13-atc-programacao-robusta.png)
 
 | Ativo | Verificação |
 |---|---|
@@ -736,6 +755,8 @@ Para o processo de controle de qualidade de desenvolvimentos ABAP deve ser aplic
 
 **As convenções de nomes estão configuradas conforme tópico 11.**
 
+![Convenções de Programação](imagens/13-atc-convencoes.png)
+
 | Ativo | Verificação |
 |---|---|
 | ✅ | Convenções nomes |
@@ -748,13 +769,13 @@ Para o processo de controle de qualidade de desenvolvimentos ABAP deve ser aplic
 
 Com o objeto a ser analisado aberto no Eclipse, clicar com o botão direito do mouse, ir para a opção **"Run As"** e depois em **"ABAP Test Cockpit With..."**.
 
-> *[Imagem: menu de contexto Run As → 4 ABAP Test Cockpit With...]*
+![Run As > ABAP Test Cockpit With](imagens/13-atc-run-as.png)
 
 Em seguida, inserir a variante **"<VARIANTE_ATC>"**.
 
 Os resultados ficam na aba **"ATC Problems"**.
 
-> *[Imagem: aba ATC Problems exibindo "Findings: No findings"]*
+![Aba ATC Problems](imagens/13-atc-problems.png)
 
 ## 14. Fiori
 
@@ -776,14 +797,14 @@ Temos os seguintes passos para atender o cliente, seguindo sugestão da SAP:
     1. Sim. Basta emular e disponibilizá-la no Launchpad em catálogo/grupo específico
 3. Se não há APP standard que atenda o cliente e não é possível emular transações, vamos desenvolver. Neste sentido, temos que entender a necessidade do cliente, e avaliar se os modelos atendem:
 
-> *[Imagem: "Supported Floorplans" — SAP Fiori elements templates: List report, Worklist, Object page, Overview page, Analytical list page]*
+![Supported Floorplans](imagens/14-fiori-floorplans.png)
 
 Link com detalhamento:
 
 - **Best UX Resources for Functional Consultants**
 
-> *[Imagem: fluxograma "Handling Fit-Gap Decisions - Simple Guidance to Adapt, Extend, or Build"]*
->
+![Handling Fit-Gap Decisions](imagens/14-fiori-fit-gap.png)
+
 > Resumo do fluxo: Design Thinking → *SAP Fiori app disponível?*
 > - **Sim** → *Precisa de melhoria?* Não → SAP Fiori (usar como está). Sim → *In-App Extensibility suficiente?* Sim → SAP Fiori (estender com Key User Tools); Não → SAP Fiori (estender com SAP Web IDE).
 > - **Não** → *Classic SAP GUI ou WDA existe?* Sim → *Requer simplificação?* Não → Classic SAP GUI/WDA (usar como está); Sim → Classic SAP GUI/WDA (simplificar com SAP Screen Personas). Não → *In-App Extensibility suficiente?* Sim → construir app Fiori próprio (Key User Tools); Não → construir app Fiori próprio (SAP Web IDE).
@@ -799,8 +820,8 @@ O *modelo* deve ser definido conforme os requisitos da solicitação do cliente 
 - **ABAP RESTful Programming Model (RAP):** CDS View, Projection, Definition, Behavior, etc.
     - Link: Help SAP
 
-> *[Imagem: "Evolution of the ABAP programming model"]*
->
+![Evolution of the ABAP programming model](imagens/14-evolucao-abap.png)
+
 > 1. **Classic ABAP Programming** (ABAP platform ≤ 7.4) — best practice freestyle ABAP programming → *Dos and Don'ts: be prepared for the new programming models*.
 > 2. **ABAP Programming Model for SAP Fiori** (ABAP platform ≥ 7.5) — SEGW, @OData, Core Data Services, CDS based BOPF → *Currently best practice*.
 > 3. **ABAP RESTful Programming Model** (SAP Cloud Platform ABAP Environment ≥ 1808) — Business Service, Core Data Services, Behaviour Definition → *Future direction*.
@@ -922,7 +943,7 @@ Executar o Pretty Printer em todos os códigos desenvolvidos.
 
 Configuração no Eclipse, acessar **Preferences** → ABAP Development → Editors → Source Code Editors → **ABAP Formatter**:
 
-> *[Imagem: Preferences do Eclipse com ABAP Formatter — Indent Lines marcado; Upper/Lower Case Conversion; Keywords: Upper Case; Keep Camel Case Identifiers]*
+![Configuração do ABAP Formatter no Eclipse](imagens/17-pretty-printer.png)
 
 ### 17.4. Hard Code
 
@@ -943,7 +964,7 @@ Ao realizar alterações em programas Standard, considere a seguinte ordem de pr
 
 Ao implementar BADIs que não permitem utilização múltipla para criar a sua própria implementação, conforme exemplo abaixo, realize a chamada de um Include com `IF FOUND` no método a ser implementado.
 
-> *[Imagem: definição da BAdI `J_1BNF_ADD_DATA` (ponto de ampliação `ES_J_1BNF_ADD_DATA`, interface `IF_J_1BNF_ADD_DATA`) com a flag "De utilização múltipla" desmarcada]*
+![BAdI sem utilização múltipla](imagens/17-badi-utilizacao-multipla.png)
 
 Exemplo: toda a lógica deve estar dentro deste include.
 
@@ -1030,13 +1051,3 @@ Avaliar a necessidade e utilizar alguma das seguintes opções:
 1. **Utilizar o Aplicativo da Tabela de Parâmetros**
 2. Criação de tabela Z;
 3. Objetos de autorização.
-
-### 18.4. Aplicativo: Tabela de Parâmetros
-
-Para cadastro de parâmetros utilizar o aplicativo abaixo:
-
-> *[Imagem: tile do Fiori Launchpad "Tabela de Parâmetros"]*
-
-- O aplicativo possui objeto de autorização para disponibilizar acesso aos dados.
-
-Para mais informações consulte o documento "Utilização da tabela de Parâmetros".
