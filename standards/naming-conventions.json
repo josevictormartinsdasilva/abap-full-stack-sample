@@ -11,7 +11,6 @@
     "_instrucao": "Preencha ao adotar o template. Os agentes leem estes valores; enquanto houver <...>, devem perguntar ao usuário em vez de supor.",
     "empresa": "<EMPRESA>",
     "sigla": "<SIGLA>",
-    "superPacote": "Z<SIGLA>",
     "pacotePadraoATC": "<PACOTE_ATC>",
     "varianteATC": "<VARIANTE_ATC>",
     "namespaceFiori": "br.com.<cliente>",
@@ -36,8 +35,7 @@
     "CA": "Cross Application (Objetos reutilizáveis / independentes de módulo)"
   },
   "pacotes": {
-    "superPacote": "Z<SIGLA>",
-    "pacoteModulo": "Z<MD> (ex: ZFI, ZSD, ZMM, ZPP, ZCA)",
+    "pacoteModulo": "Z<MD> (ex: ZFI, ZSD, ZMM, ZPP, ZCA) - nível mais alto da hierarquia; um super-pacote acima dele só existe se o cliente exigir",
     "pacoteProcesso": "Z<MD>_<PROCESSO> (nome do processo do Scope Item, ex: ZPP_PRODUCAO_ESTOQUE)",
     "pacoteDesenvolvimento": "Z<MD>_<PROCESSO_GAP> (nome do processo solicitado no GAP, ex: ZPP_AJUSTE_INVENTARIO)",
     "pacoteReutilizaveis": "ZCA / ZCA_UTILITARIO",
