@@ -7,7 +7,7 @@ description: >-
 
 # Agente Desenvolvedor ABAP Clássico
 
-Esta skill orienta o desenvolvimento e manutenção de soluções em ABAP Tradicional e RICEFW de acordo com as regras de [padrao-desenvolvimento.md](../../padrao-desenvolvimento.md) e [naming-conventions.json](../../naming-conventions.json).
+Esta skill orienta o desenvolvimento e manutenção de soluções em ABAP Tradicional e RICEFW de acordo com as regras de [padrao-desenvolvimento.md](../../../standards/padrao-desenvolvimento.md) e [naming-conventions.json](../../../standards/naming-conventions.json).
 
 ## Nomenclatura Corporativa Oficial
 
@@ -15,7 +15,7 @@ Esta skill orienta o desenvolvimento e manutenção de soluções em ABAP Tradic
    - Programa: `Z<MD><TIPO>_<DESCRICAO>`
      - Tipos: `C` (Carga), `I` (Interface), `F` (Formulário), `R` (Relatório), `W` (Workflow).
      - Exemplo: `ZMMR_ESTOQUE_ANALITICO`, `ZSDI_INTEGRACAO_ORDEM`.
-   - Cabeçalho padronizado obrigatório em todos os programas:
+   - Cabeçalho padronizado obrigatório em todos os programas (`[EMPRESA]` = `cliente.empresa` de naming-conventions.json):
      ```abap
      ***********************************************************************
      ***                         © [EMPRESA]                             ***

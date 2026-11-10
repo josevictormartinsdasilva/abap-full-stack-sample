@@ -1,11 +1,22 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "project": {
-    "name": "abap-full-stack-antigravity",
+    "name": "abap-full-stack-template",
     "description": "Convenções oficiais de nomenclatura baseadas no documento padrao-desenvolvimento.md para ABAP Cloud / RAP, ABAP Clássico / RICEFW e SAP Fiori",
-    "referencia": "padrao-desenvolvimento.md",
+    "referencia": "standards/padrao-desenvolvimento.md",
     "idiomaPadrao": "Português (PT) - Códigos, objetos e descrições",
     "objetosLocais": "Prefixo Y (em vez de $TMP)"
+  },
+  "cliente": {
+    "_instrucao": "Preencha ao adotar o template. Os agentes leem estes valores; enquanto houver <...>, devem perguntar ao usuário em vez de supor.",
+    "empresa": "<EMPRESA>",
+    "sigla": "<SIGLA>",
+    "superPacote": "Z<SIGLA>",
+    "pacotePadraoATC": "<PACOTE_ATC>",
+    "varianteATC": "<VARIANTE_ATC>",
+    "namespaceFiori": "br.com.<cliente>",
+    "pastaAppsFiori": "<PASTA_APPS_FIORI>",
+    "sistemaDesenvolvimento": "<SID_DEV> (agentes só criam/ativam objetos neste sistema)"
   },
   "modulosSAP": {
     "AM": "Assets Management",
@@ -22,94 +33,93 @@
     "WM": "Warehouse Management",
     "CCS": "Customer Care & Service",
     "CRM": "Customer Relationship Management",
-    "CA": "Cross Application (Objetos reutilizáveis / independentes de módulo)",
-    "FS": "Full Stack (Módulo do cenário de demonstração)"
+    "CA": "Cross Application (Objetos reutilizáveis / independentes de módulo)"
   },
   "pacotes": {
     "superPacote": "Z<SIGLA>",
-    "pacoteModulo": "Z<MD> (ex: ZFI, ZSD, ZMM, ZPP, ZCA, ZFS)",
+    "pacoteModulo": "Z<MD> (ex: ZFI, ZSD, ZMM, ZPP, ZCA)",
     "pacoteProcesso": "Z<MD>_<PROCESSO> (nome do processo do Scope Item, ex: ZPP_PRODUCAO_ESTOQUE)",
     "pacoteDesenvolvimento": "Z<MD>_<PROCESSO_GAP> (nome do processo solicitado no GAP, ex: ZPP_AJUSTE_INVENTARIO)",
     "pacoteReutilizaveis": "ZCA / ZCA_UTILITARIO",
-    "requestPacotes": "S4DK900336 - [Equipe ABAP]-[Objetos Iniciais]"
+    "requestPacotes": "<REQUEST_OBJETOS_INICIAIS> - [Equipe ABAP]-[Objetos Iniciais]"
   },
   "requests": {
     "padrao": "<GAP>-<Descricao>",
     "exemplo": "FIAA-01-Inclusão de denominação no material",
     "projetoCTS": {
-      "projeto": "S4D_P00001",
-      "identificador": "ESTRUT_50",
-      "descricao": "PROJETO ESTRUTURANTE 5.0"
+      "projeto": "<PROJETO_CTS>",
+      "identificador": "<ID_PROJETO_CTS>",
+      "descricao": "<DESCRICAO_PROJETO_CTS>"
     },
-    "objetosIniciaisReutilizaveis": "S4DK900336"
+    "objetosIniciaisReutilizaveis": "<REQUEST_OBJETOS_INICIAIS>"
   },
   "cdsAndRAP": {
     "viewBasic": {
       "padrao": "ZI_<MD>_<DESCRICAO>",
-      "exemplo": "ZI_FS_TRAVEL, ZI_SD_CLIENTE",
+      "exemplo": "ZI_SD_ORDEM, ZI_SD_CLIENTE",
       "descricao": "CDS View Entity básica (Basic / Core Data Source)"
     },
     "viewComposite": {
       "padrao": "ZI_<MD>_<DESCRICAO>",
-      "exemplo": "ZI_FS_TRAVEL_CUBE",
+      "exemplo": "ZI_SD_ORDEM_CUBE",
       "descricao": "CDS View Entity de composição (Composite)"
     },
     "viewConsumption": {
       "padrao": "ZC_<MD>_<DESCRICAO>",
-      "exemplo": "ZC_FS_TRAVEL, ZC_FS_BOOKING",
+      "exemplo": "ZC_SD_ORDEM, ZC_SD_ORDEM_ITEM",
       "descricao": "CDS View Entity de consumo / projeção para UI"
     },
     "sqlViewName": {
       "padrao": "ZV<MD>_<DESCRICAO>",
-      "exemplo": "ZVFS_TRAVEL",
-      "descricao": "Nome da SQL View interna dentro da definição CDS (@AbapCatalog.sqlViewName)"
+      "exemplo": "ZVSD_ORDEM",
+      "descricao": "SOMENTE para CDS DDIC-based (DEFINE VIEW, legado/obsoleto) em manutenção. CDS View Entities (DEFINE VIEW ENTITY, RAP / ABAP Cloud) não possuem SQL View: não usar @AbapCatalog.sqlViewName em desenvolvimento novo."
     },
     "accessControl": {
       "padrao": "Mesmo nome da View CDS (ZI_<MD>_<DESCRICAO> ou ZC_<MD>_<DESCRICAO>)",
-      "exemplo": "ZI_FS_TRAVEL, ZC_FS_TRAVEL",
+      "exemplo": "ZI_SD_ORDEM, ZC_SD_ORDEM",
       "descricao": "Controle de Acesso DCL"
     },
     "valueHelp": {
       "padrao": "ZI_<MD>_VH_<DESCRICAO>",
-      "exemplo": "ZI_FS_VH_AGENCIA, ZI_SD_VH_EXEMPLO",
+      "exemplo": "ZI_SD_VH_CLIENTE, ZI_SD_VH_EXEMPLO",
       "descricao": "CDS View dedicada para Value Help / Help Search"
     },
     "metadataExtension": {
       "padrao": "Mesmo nome da CDS à qual o Metadata Extension se refere (ZC_<MD>_<DESCRICAO>)",
-      "exemplo": "ZC_FS_TRAVEL, ZC_FS_BOOKING",
+      "exemplo": "ZC_SD_ORDEM, ZC_SD_ORDEM_ITEM",
       "descricao": "Metadata Extension (DDLX) com anotações @UI"
     },
     "serviceDefinition": {
       "ui": {
         "padrao": "ZUI_<DESCRICAO>",
-        "exemplo": "ZUI_TRAVEL, ZUI_FS_TRAVEL",
+        "exemplo": "ZUI_ORDEM, ZUI_SD_ORDEM",
         "descricao": "Service Definition para consumo em UI5 / Fiori"
       },
       "api": {
         "padrao": "ZAPI_<MD>_<DESCRICAO>",
-        "exemplo": "ZAPI_FS_TRAVEL, ZAPI_SD_ORDEM",
+        "exemplo": "ZAPI_SD_ORDEM, ZAPI_MM_ESTOQUE",
         "descricao": "Service Definition para consumo externo via Web API"
       }
     },
     "serviceBinding": {
       "uiODataV4": {
         "padrao": "ZUI_O4_<DESCRICAO>",
-        "exemplo": "ZUI_O4_TRAVEL, ZUI_O4_FS_TRAVEL",
+        "exemplo": "ZUI_O4_ORDEM, ZUI_O4_SD_ORDEM",
         "descricao": "Service Binding OData V4 para consumo Fiori UI5"
       },
       "uiODataV2": {
         "padrao": "ZUI_O2_<DESCRICAO>",
-        "exemplo": "ZUI_O2_TRAVEL",
+        "exemplo": "ZUI_O2_ORDEM",
         "descricao": "Service Binding OData V2 para consumo Fiori UI5"
       },
       "apiODataV4": {
         "padrao": "ZAPI_O4_<DESCRICAO>",
-        "exemplo": "ZAPI_O4_TRAVEL",
+        "exemplo": "ZAPI_O4_ORDEM",
         "descricao": "Service Binding OData V4 para consumo via API"
       },
       "apiODataV2": {
         "padrao": "ZAPI_O2_<DESCRICAO>",
-        "exemplo": "ZAPI_O2_TRAVEL",
+        "exemplo": "ZAPI_O2_ORDEM",
         "descricao": "Service Binding OData V2 para consumo via API"
       }
     },
@@ -119,29 +129,29 @@
     },
     "behaviorPoolClass": {
       "padrao": "ZCL<MD>_BP_<ENTIDADE> ou ZBP_C_<ENTIDADE>",
-      "exemplo": "ZCLFS_BP_TRAVEL",
+      "exemplo": "ZCLSD_BP_ORDEM",
       "descricao": "Classe ABAP de implementação de comportamento do RAP"
     }
   },
   "dicionarioDeDados": {
     "tabelaTransparente": {
       "padrao": "ZT<MD>_<DESCRICAO>",
-      "exemplo": "ZTFS_TRAVEL, ZTSD_PEDIDOS",
+      "exemplo": "ZTSD_ORDEM, ZTSD_PEDIDOS",
       "descricao": "Tabela de banco de dados transparente"
     },
     "tabelaDraft": {
       "padrao": "ZT<MD>_<DESCRICAO>_D",
-      "exemplo": "ZTFS_TRAVEL_D, ZTFS_BOOKING_D",
+      "exemplo": "ZTSD_ORDEM_D, ZTSD_ORDEM_ITEM_D",
       "descricao": "Tabela de draft para Business Object RAP"
     },
     "estrutura": {
       "padrao": "ZS<MD>_<DESCRICAO>",
-      "exemplo": "ZSFS_TRAVEL_DATA, ZSCA_CAMPOS_CONTROLE",
+      "exemplo": "ZSSD_ORDEM_DADOS, ZSCA_CAMPOS_CONTROLE",
       "descricao": "Estrutura do Dicionário ABAP"
     },
     "categoriaTabela": {
       "padrao": "ZCTG<MD>_<DESCRICAO> (ou ZTT<MD>_<DESCRICAO>)",
-      "exemplo": "ZCTGFS_ITEMS, ZTTCA_LOG",
+      "exemplo": "ZCTGSD_ITENS, ZTTCA_LOG",
       "descricao": "Tipo de Tabela (Table Type)"
     },
     "visao": {
@@ -156,12 +166,12 @@
     },
     "elementoDeDados": {
       "padrao": "ZE_<DESCRICAO>",
-      "exemplo": "ZE_TRAVEL_REASON, ZE_DATA_CRIACAO",
+      "exemplo": "ZE_MOTIVO_ORDEM, ZE_DATA_CRIACAO",
       "descricao": "Elemento de Dados (prefixo ZE_)"
     },
     "dominio": {
       "padrao": "ZD_<DESCRICAO>",
-      "exemplo": "ZD_STATUS_VIAGEM, ZD_TIPO_OPERACAO",
+      "exemplo": "ZD_STATUS_ORDEM, ZD_TIPO_OPERACAO",
       "descricao": "Domínio (prefixo ZD_)"
     },
     "ajudaPesquisa": {
@@ -171,7 +181,7 @@
     },
     "objetoBloqueio": {
       "padrao": "EZ<MD>_<DESCRICAO>",
-      "exemplo": "EZFS_TRAVEL, EZSD_ORDEM",
+      "exemplo": "EZSD_ORDEM, EZMM_ESTOQUE",
       "descricao": "Objeto de Bloqueio (Lock Object / Enqueue)"
     },
     "bancoDadosLogico": {
@@ -261,7 +271,7 @@
     },
     "classeMensagem": {
       "padrao": "Z<MD>_<DESCRICAO>",
-      "exemplo": "ZSD_MENSAGENS, ZFS_TRAVEL",
+      "exemplo": "ZSD_MENSAGENS, ZSD_ORDEM",
       "descricao": "Classe de Mensagem (SE91 / MSAG)"
     },
     "areaMenu": {
@@ -312,7 +322,7 @@
     },
     "snro": {
       "padrao": "Z<DESCRICAO>",
-      "exemplo": "ZNR_VIAGEM, ZNR_PEDIDO"
+      "exemplo": "ZNR_ORDEM, ZNR_PEDIDO"
     },
     "logSLG0": {
       "objeto": "Z<MD>_<DESCRICAO>",

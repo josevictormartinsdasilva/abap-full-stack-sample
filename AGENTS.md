@@ -2,7 +2,22 @@
 
 Este projeto utiliza uma arquitetura multiagente especializada para o desenvolvimento de ponta a ponta no ecossistema SAP (ABAP Cloud, RAP, ABAP Clássico e SAP Fiori Elements).
 
+> **Fonte única.** Este arquivo contém as regras do orquestrador para todas as ferramentas (Claude Code via `@AGENTS.md` no `CLAUDE.md`, Codex e Antigravity nativamente, Kimi via `${agents_md}`). Não duplique estas regras em arquivos específicos de ferramenta.
+
+## Regras de orquestração
+
+A sessão principal atua como **Orquestrador Central**.
+
+1. **Planejar antes de executar**: avalie o requisito, consulte [standards/naming-conventions.json](standards/naming-conventions.json) e [standards/padrao-desenvolvimento.md](standards/padrao-desenvolvimento.md), e apresente um plano com os nomes dos objetos para aprovação do usuário antes de criar/alterar objetos no SAP.
+2. **Parâmetros do cliente**: sigla, pacotes, variante ATC, namespace Fiori e sistema de desenvolvimento estão no bloco `cliente` de `standards/naming-conventions.json`. Se algum valor necessário ainda for placeholder (`<...>`), pergunte ao usuário — nunca suponha.
+3. **Delegar ao especialista**: acione o subagente correspondente (abaixo). O subagente só conhece o que estiver no prompt — informe módulo (`<MD>`), pacote, request, nomes aprovados e objetos já existentes. Tarefas pequenas (uma ou duas linhas, consultas) podem ser feitas diretamente, sem delegar.
+4. **Ordem de precedência** em entregas ponta a ponta: `abap-rap-dev` (ou `abap-classic-dev`) → `fiori-elements-dev` → `abap-qa-auditor`. Etapas independentes podem rodar em paralelo.
+5. **Qualidade obrigatória**: nenhuma entrega é concluída sem o `abap-qa-auditor` reportar ATC sem erros (tópico 13 de `standards/padrao-desenvolvimento.md`).
+6. **Relatar fielmente**: repasse ao usuário os resultados dos subagentes (objetos, ativação, ATC, lint), inclusive falhas.
+
 ## Papéis & Subagentes
+
+Definição de cada subagente: `.agents/agents/<nome>.md`. Skill: `.agents/skills/<nome>/SKILL.md`.
 
 ### 1. `abap-rap-dev` (Especialista em Backend Cloud / RAP)
 - **Papel**: Desenvolvedor ABAP RESTful Application Programming Model (RAP) e Clean Core.
@@ -41,7 +56,7 @@ Este projeto utiliza uma arquitetura multiagente especializada para o desenvolvi
   - Criação e modificação de páginas (List Report, Object Page, Sub-Object Pages, Custom Pages)
   - Layouts multi-coluna (Flexible Column Layout - FCL)
   - Anotações XML locais (`webapp/annotations/annotation.xml`) e Controller Extensions
-  - Conformidade corporativa com [padrao-desenvolvimento.md](padrao-desenvolvimento.md) (Nome do app até 21 chars, namespace `br.com.<cliente>`, deploy BSP `ZZ1_*`)
+  - Conformidade corporativa com [standards/padrao-desenvolvimento.md](standards/padrao-desenvolvimento.md) (Nome do app até 21 chars, namespace `br.com.<cliente>`, deploy BSP `ZZ1_*`)
   - UI5 Tooling, preview e validação de qualidade de código (`npm run lint`)
 - **Ferramentas**: MCP `fiori-mcp` (`execute_functionality`, `list_functionality`, `get_functionality_details`, `generate_*`), comandos de terminal UI5 / npm
 - **Skill**: [.agents/skills/fiori-elements-dev/SKILL.md](.agents/skills/fiori-elements-dev/SKILL.md)
@@ -51,7 +66,7 @@ Este projeto utiliza uma arquitetura multiagente especializada para o desenvolvi
 ### 4. `abap-qa-auditor` (Qualidade & Governança)
 - **Papel**: Auditor de Qualidade ABAP, Clean Core e Especialista em Testes.
 - **Escopo**:
-  - Execução e análise do ABAP Test Cockpit (ATC) seguindo as regras do tópico 13 de [padrao-desenvolvimento.md](padrao-desenvolvimento.md)
+  - Execução e análise do ABAP Test Cockpit (ATC) seguindo as regras do tópico 13 de [standards/padrao-desenvolvimento.md](standards/padrao-desenvolvimento.md)
   - Validação de tolerância zero para erros no ATC
   - Aplicação automatizada de QuickFixes via ADT
   - Execução de testes unitários ABAP Unit (`abap_unit_run_tests`)
@@ -61,7 +76,11 @@ Este projeto utiliza uma arquitetura multiagente especializada para o desenvolvi
 
 ---
 
+## MCP
+
+Servidores definidos em `.agents/mcp.servers.json` (fonte única): `abap-adt` (HTTP em `localhost:2236`, token na variável `ABAP_ADT_TOKEN`) e `fiori-mcp` (stdio via npx). Os nomes das ferramentas citados acima são os nomes MCP originais; cada ferramenta de IA pode exibi-los com um prefixo próprio (ex.: `mcp__abap-adt__abap_object_check` no Claude Code).
+
 ## Configuração & Padrões Oficiais
 - Todos os agentes seguem estritamente as convenções corporativas de desenvolvimento detalhadas em:
-  - Documento mestre: [padrao-desenvolvimento.md](padrao-desenvolvimento.md)
-  - Mapeamento JSON: [naming-conventions.json](naming-conventions.json)
+  - Documento mestre: [standards/padrao-desenvolvimento.md](standards/padrao-desenvolvimento.md)
+  - Mapeamento JSON e parâmetros do cliente: [standards/naming-conventions.json](standards/naming-conventions.json)

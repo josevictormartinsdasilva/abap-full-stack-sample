@@ -1,0 +1,15 @@
+{
+  "enabledMcpjsonServers": [
+    "abap-adt",
+    "fiori-mcp"
+  ],
+  "env": {
+    "MCP_TIMEOUT": "600000"
+  },
+  "permissions": {
+    "allow": [
+      "Bash(npm run lint)",
+      "Bash(npm run lint:*)"
+    ]
+  }
+}

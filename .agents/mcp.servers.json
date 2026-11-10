@@ -1,0 +1,16 @@
+{
+  "_comentario": "FONTE ÚNICA dos servidores MCP. Edite aqui e rode `node scripts/sync-agents.mjs`. O token nunca é versionado: vem da variável de ambiente indicada em tokenEnvVar.",
+  "servers": {
+    "abap-adt": {
+      "transport": "http",
+      "url": "http://localhost:2236/mcp",
+      "tokenEnvVar": "ABAP_ADT_TOKEN"
+    },
+    "fiori-mcp": {
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["--yes", "@sap-ux/fiori-mcp-server@1.15.19", "fiori-mcp"],
+      "timeoutSec": 600
+    }
+  }
+}
