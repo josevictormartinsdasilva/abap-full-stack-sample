@@ -153,7 +153,7 @@ Quando uma nova funcionalidade completa precisa ser entregue, o **Orquestrador C
 ## 🚀 Adotando o template num projeto
 
 1. Preencha o bloco `cliente` de [standards/naming-conventions.json](standards/naming-conventions.json): empresa, sigla, pacote e variante ATC, namespace Fiori, pasta dos apps e sistema de desenvolvimento. Enquanto houver placeholders `<...>`, os agentes perguntam em vez de supor.
-2. Preencha os placeholders restantes de [standards/padrao-desenvolvimento.md](standards/padrao-desenvolvimento.md) (`<SIGLA>`, `<VARIANTE_ATC>`, `<REQUEST_OBJETOS_INICIAIS>`, `<PROJETO_CTS>` etc.) ou substitua o documento pelo padrão do cliente.
+2. Preencha os placeholders restantes de [standards/padrao-desenvolvimento.md](standards/padrao-desenvolvimento.md) (`<VARIANTE_ATC>`, `<PROJETO_CTS>`, `<ID_PROJETO_CTS>`, `<DESCRICAO_PROJETO_CTS>` e `[EMPRESA]`) ou substitua o documento pelo padrão do cliente.
 3. Configure o token MCP (seção abaixo) e confirme a conexão com `/mcp`.
 4. **Libere os agentes apenas no sistema de desenvolvimento.** Eles criam e ativam objetos diretamente via `abap-adt`; use um usuário com autorizações restritas a DEV/sandbox.
 
