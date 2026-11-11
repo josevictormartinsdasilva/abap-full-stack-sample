@@ -220,10 +220,29 @@ standards/
   mcp.servers.json              ← servidores MCP (fonte)
   mcp_config.json               ← gerado (Antigravity)
 scripts/sync-agents.mjs         ← gerador
-.claude/  .codex/  .kimi-code/  .mcp.json   ← gerados
+.claude/                        ← gerado (Claude Code: agents, skills, settings.json)
+.mcp.json                       ← gerado (Claude Code: servidores MCP, na raiz)
+.codex/                         ← gerado (Codex)
+.kimi-code/                     ← gerado (Kimi Code)
 ```
 
 Os arquivos gerados são versionados (quem clona usa direto) e trazem o aviso `GERADO por scripts/sync-agents.mjs`. Em `.claude/settings.json` o script só gerencia `enabledMcpjsonServers` e `env.MCP_TIMEOUT`; as demais chaves (permissões etc.) podem ser editadas à mão.
+
+### Servidores MCP: qual arquivo editar?
+
+Edite **somente** `.agents/mcp.servers.json`. Os demais arquivos de MCP são gerados a partir dele, cada um no nome, local e formato que a ferramenta exige:
+
+| Arquivo | Quem lê | Papel |
+|---|---|---|
+| `.agents/mcp.servers.json` | nenhuma ferramenta (só o gerador) | **fonte única** — edite aqui |
+| `.mcp.json` (raiz) | Claude Code | gerado |
+| `.codex/config.toml` | Codex | gerado |
+| `.kimi-code/mcp.json` | Kimi Code | gerado |
+| `.agents/mcp_config.json` | Antigravity | gerado |
+
+Os gerados podem parecer cópias da fonte, mas o formato muda por ferramenta. No `.mcp.json`, por exemplo: `transport` vira `type`; `tokenEnvVar` vira o header `Authorization: Bearer ${ABAP_ADT_TOKEN}`; o `npx` ganha o prefixo `cmd /c` no Windows; e `timeoutSec` vai para `env.MCP_TIMEOUT` em `.claude/settings.json`.
+
+> Os `.json` gerados **não** trazem o aviso `GERADO`, porque JSON não aceita comentários. Na dúvida, consulte esta tabela. Uma edição manual num gerado é reprovada pelo `--check` da CI e sobrescrita na próxima execução do script.
 
 ### Formato de um subagente (`.agents/agents/<nome>.md`)
 
