@@ -35,7 +35,7 @@
     "CA": "Cross Application (Objetos reutilizáveis / independentes de módulo)"
   },
   "pacotes": {
-    "pacoteModulo": "Z<MD> (ex: ZFI, ZSD, ZMM, ZPP, ZCA) - nível mais alto da hierarquia; um super-pacote acima dele só existe se o cliente exigir",
+    "pacoteModulo": "Z<MD> (ex: ZFI, ZSD, ZMM, ZPP, ZCA) - nível mais alto da hierarquia",
     "pacoteProcesso": "Z<MD>_<PROCESSO> (nome do processo do Scope Item, ex: ZPP_PRODUCAO_ESTOQUE)",
     "pacoteDesenvolvimento": "Z<MD>_<PROCESSO_GAP> (nome do processo solicitado no GAP, ex: ZPP_AJUSTE_INVENTARIO)",
     "pacoteReutilizaveis": "ZCA / ZCA_UTILITARIO"

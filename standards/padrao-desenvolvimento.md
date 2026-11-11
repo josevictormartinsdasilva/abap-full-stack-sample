@@ -83,7 +83,7 @@ Todo teste unitário de um desenvolvimento ABAP deve ter como base os cenários 
 
 ## 5. Pacote
 
-O nível mais alto da hierarquia é o pacote por módulo (`ZFI`, `ZSD`, `ZPP` etc.). Se o cliente exigir um super-pacote (por exemplo `Z<SIGLA>`), os pacotes por módulo são criados dentro dele como sub-pacotes; caso contrário, não crie super-pacote.
+O nível mais alto da hierarquia é o pacote por módulo (`ZFI`, `ZSD`, `ZPP` etc.).
 
 Todos os módulos SAP vão possuir um pacote. Caso algum módulo ainda não tenha pacote, ele deve ser criado e salvo na request do desenvolvimento que precisou dele (tópico 6).
 
@@ -104,8 +104,6 @@ Os pacotes de cada processo serão criados dentro do pacote superior corresponde
 1. Pacote por Módulo
     1. Pacote por Processo do Scope Item
         1. Pacote do Desenvolvimento
-
-> Quando o cliente exigir um super-pacote, ele fica acima do Pacote por Módulo.
 
 **Exemplo no ambiente:**
 
@@ -131,7 +129,7 @@ Pacote do Desenvolvimento:
 
 ![Exemplo dos níveis de pacote](../imagens/05-niveis-de-pacote.png)
 
-*Na imagem, o primeiro nível é o super-pacote de um cliente que exige esse nível. Sem essa exigência, a árvore começa no pacote por módulo (`ZPP`).*
+*Na imagem, observe os três níveis destacados: módulo (`ZPP`), processo (`ZPP_PRODUCAO_ESTOQUE`) e desenvolvimento (`ZPP_AJUSTE_INVENTARIO`).*
 
 **Observação:**
 
