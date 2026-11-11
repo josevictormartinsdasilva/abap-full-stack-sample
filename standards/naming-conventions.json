@@ -11,7 +11,6 @@
     "_instrucao": "Preencha ao adotar o template. Os agentes leem estes valores; enquanto houver <...>, devem perguntar ao usuário em vez de supor.",
     "empresa": "<EMPRESA>",
     "sigla": "<SIGLA>",
-    "superPacote": "Z<SIGLA>",
     "pacotePadraoATC": "<PACOTE_ATC>",
     "varianteATC": "<VARIANTE_ATC>",
     "namespaceFiori": "br.com.<cliente>",
@@ -36,22 +35,20 @@
     "CA": "Cross Application (Objetos reutilizáveis / independentes de módulo)"
   },
   "pacotes": {
-    "superPacote": "Z<SIGLA>",
-    "pacoteModulo": "Z<MD> (ex: ZFI, ZSD, ZMM, ZPP, ZCA)",
+    "pacoteModulo": "Z<MD> (ex: ZFI, ZSD, ZMM, ZPP, ZCA) - nível mais alto da hierarquia",
     "pacoteProcesso": "Z<MD>_<PROCESSO> (nome do processo do Scope Item, ex: ZPP_PRODUCAO_ESTOQUE)",
     "pacoteDesenvolvimento": "Z<MD>_<PROCESSO_GAP> (nome do processo solicitado no GAP, ex: ZPP_AJUSTE_INVENTARIO)",
-    "pacoteReutilizaveis": "ZCA / ZCA_UTILITARIO",
-    "requestPacotes": "<REQUEST_OBJETOS_INICIAIS> - [Equipe ABAP]-[Objetos Iniciais]"
+    "pacoteReutilizaveis": "ZCA / ZCA_UTILITARIO"
   },
   "requests": {
+    "escopo": "Uma request por GAP, atribuída ao projeto CTS. Pacotes e objetos reutilizáveis são salvos na request do desenvolvimento que os criou; não existe request separada para objetos iniciais",
     "padrao": "<GAP>-<Descricao>",
     "exemplo": "FIAA-01-Inclusão de denominação no material",
     "projetoCTS": {
       "projeto": "<PROJETO_CTS>",
       "identificador": "<ID_PROJETO_CTS>",
       "descricao": "<DESCRICAO_PROJETO_CTS>"
-    },
-    "objetosIniciaisReutilizaveis": "<REQUEST_OBJETOS_INICIAIS>"
+    }
   },
   "cdsAndRAP": {
     "viewBasic": {

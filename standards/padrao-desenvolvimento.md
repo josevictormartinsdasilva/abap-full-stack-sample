@@ -83,9 +83,9 @@ Todo teste unitário de um desenvolvimento ABAP deve ter como base os cenários 
 
 ## 5. Pacote
 
-Vamos ter o pacote principal **"Z<SIGLA>"** que vai ser utilizado no projeto como Super-Pacote, todos os pacotes detalhados abaixo vão ser salvos nele como Sub-Pacote.
+O nível mais alto da hierarquia é o pacote por módulo (`ZFI`, `ZSD`, `ZPP` etc.).
 
-Todos os módulos SAP vão possuir um pacote, caso algum módulo não tenha pacote criado o mesmo deve ser criado e salvo na mesma Request que os demais pacotes de módulos.
+Todos os módulos SAP vão possuir um pacote. Caso algum módulo ainda não tenha pacote, ele deve ser criado e salvo na request do desenvolvimento que precisou dele (tópico 6).
 
 ![Pacotes por módulo](../imagens/05-pacotes-por-modulo.png)
 
@@ -97,23 +97,19 @@ Os pacotes de cada processo serão criados dentro do pacote superior corresponde
 |---|---|---|---|
 | Z | [MD] | _ | Descrição abreviada do processo |
 
-> **Todos os pacotes criados devem ser salvos na Request abaixo, com isso uma única Request vai centralizar todos os pacotes criados no ambiente:**
->
-> - `<REQUEST_OBJETOS_INICIAIS>` - [Equipe ABAP]-[Objetos Iniciais]
+> **Os pacotes criados são salvos na request do desenvolvimento que os originou** (tópico 6), atribuída ao projeto CTS. Não há uma request separada para pacotes.
 
 **Exemplo da estruturação dos níveis dos pacotes:**
 
-1. Super-Pacote Raiz
-    1. Pacote por Módulo
-        1. Pacote por Processo do Scope Item
-            1. Pacote do Desenvolvimento
+1. Pacote por Módulo
+    1. Pacote por Processo do Scope Item
+        1. Pacote do Desenvolvimento
 
 **Exemplo no ambiente:**
 
-1. `Z<SIGLA>` - Superpackage - Objetos de Desenvolvimento
-    1. `ZPP` - Planejamento e Produção
-        1. `ZPP_PRODUCAO_ESTOQUE` - Processo BJ8 - Produção para estoque
-            1. `ZPP_AJUSTE_INVENTARIO` - Ajuste de Inventário
+1. `ZPP` - Planejamento e Produção
+    1. `ZPP_PRODUCAO_ESTOQUE` - Processo BJ8 - Produção para estoque
+        1. `ZPP_AJUSTE_INVENTARIO` - Ajuste de Inventário
 
 **Informações adicionais para criação dos pacotes:**
 
@@ -132,6 +128,8 @@ Pacote do Desenvolvimento:
 **Exemplo que contempla todos os níveis apresentados:**
 
 ![Exemplo dos níveis de pacote](../imagens/05-niveis-de-pacote.png)
+
+*Na imagem, observe os três níveis destacados: módulo (`ZPP`), processo (`ZPP_PRODUCAO_ESTOQUE`) e desenvolvimento (`ZPP_AJUSTE_INVENTARIO`).*
 
 **Observação:**
 
@@ -198,8 +196,7 @@ Ao criar objetos que podem ser reutilizáveis (Exemplo: CDS de Value Help/Help S
 1. Se o objeto pode ser reaproveitado por demais desenvolvimentos do seu módulo, salve o mesmo diretamente no pacote do módulo.
 2. Se o objeto pode ser reaproveitado por N módulos, sendo Cross Application, salve o objeto no pacote `ZCA_UTILITARIO`.
     1. Considere o prefixo CA para a criação destes objetos, conforme consta neste documento.
-3. Todos os objetos reaproveitáveis devem ser salvos diretamente na Request:
-    1. **`<REQUEST_OBJETOS_INICIAIS>` - [Equipe ABAP]-[Objetos Iniciais]**
+3. Os objetos reaproveitáveis são salvos na request do desenvolvimento que os criou (tópico 6), atribuída ao projeto CTS.
 
 **Observação:**
 
