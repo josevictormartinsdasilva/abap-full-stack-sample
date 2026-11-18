@@ -175,6 +175,12 @@ Todas as mensagens do launcher começam com `mcp-launch:`. Para vê-las, rode o 
 | `vsp recusado: ... é QAS` | A URL do `vsp` aponta para um QAS, ou o mandante do DEV não está como customizing (`C`) na SCC4. |
 | `o sistema conectado é QS4, mas VSP_SAP_SID diz DS4` | A URL está trocada. Corrija `VSP_SAP_URL`. |
 | `vsp recusado: SAP_BASIS 816` | É um S/4HANA 2025. Use o `abap-adt` (MCP oficial). |
+| `recusado: SAP_BASIS 702 ... fora do escopo` | Release anterior ao NW 7.50. A política não cobre esse sistema (regra absoluta 5). |
+| `vsp recusado: o SID DS4 veio do T000-LOGSYS` | O release não informa o SID pelo ADT. Se o SID estiver certo, defina `VSP_SAP_SID=DS4`. Sem isso, o `arc-1` também só inicia em leitura. |
+| `o T000-LOGSYS indica o SID QS4, mas VSP_SAP_SID diz DS4` | A URL está trocada, ou o LOGSYS ficou errado depois de uma cópia de mandante. Confira a URL; se for o LOGSYS, peça a correção ao Basis. |
+| `a URL do SAP precisa ser https://` | Use a porta HTTPS do ICM (ex.: `https://host:44300`). `http://` só é aceito para `localhost`. |
+| `NODE_TLS_REJECT_UNAUTHORIZED=0 desliga a verificação TLS` | Remova a variável do ambiente. Para certificado de CA interna, use `NODE_EXTRA_CA_CERTS` (passo 3). |
+| `standards/sistemas-sap.json ...` | O registro de restrições tem JSON inválido ou uma entrada sem `sid`/`ambiente` válidos. A mensagem aponta a entrada (`restricoes[n]`). |
 | `"vsp" não encontrado` | O binário não foi baixado (passo 2), ou não está no PATH. Abra um terminal novo depois de alterar o PATH, ou defina `VSP_BIN`. |
 | `"vsp" não pôde ser executado (EACCES/EPERM)` | O arquivo está bloqueado. No Windows, abra as propriedades do arquivo e marque "Desbloquear". No macOS, rode `xattr -d com.apple.quarantine`. No Linux, rode `chmod +x`. |
 | `"vsp --version" terminou com código ...` | O arquivo não é o `vsp` correto, ou é de outra plataforma. Baixe novamente o asset da sua plataforma. |

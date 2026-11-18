@@ -33,7 +33,7 @@ O operador só informa **como conectar**: URL, mandante, usuário e senha (`ARC1
 
 | O que | De onde | Se não puder ler |
 |---|---|---|
-| SID, mandante e usuário | `/sap/bc/adt/core/http/systeminformation`; em releases antigos, `T000-LOGSYS` (`<SID>CLNT<mandante>`) | Usa `<P>_SAP_SID` declarado, com aviso; sem ele, não inicia |
+| SID, mandante e usuário | `/sap/bc/adt/core/http/systeminformation` (SID confirmado); em releases antigos, `T000-LOGSYS` (`<SID>CLNT<mandante>`, SID **não confirmado**) | Usa `<P>_SAP_SID` declarado, com aviso; sem ele, não inicia |
 | Release | `/sap/bc/adt/system/components` (SAP_BASIS e S4CORE) | Não inicia |
 | Ambiente | `T000` do mandante (SCC4): `CCCATEGORY` e `CCNOCLIIND` | Tratado como **PRD** |
 
@@ -50,10 +50,17 @@ O operador só informa **como conectar**: URL, mandante, usuário e senha (`ARC1
 **Conferências do launcher:**
 
 - Se `<P>_SAP_SID` for informado e o SID detectado for outro, ele **recusa** iniciar. Isso pega a URL trocada.
+- Um SID tirado do `T000-LOGSYS` é só convenção e costuma vir errado depois de uma cópia de mandante. Por isso ele **não conta como confirmado** (`sidConfirmado: false` no runtime) e exige `<P>_SAP_SID` igual. Sem a declaração, o `vsp` recusa iniciar e o `arc-1` inicia somente leitura.
 - O mandante detectado precisa bater com o configurado.
 - O `vsp` recebe o SID detectado em `--expect` e o confere de novo a cada sessão.
+- SAP_BASIS < 750 recusa os dois servidores (regra absoluta 5).
+- A URL precisa ser `https://` (exceto `localhost`), porque a autenticação é Basic. `NODE_TLS_REJECT_UNAUTHORIZED=0` faz o launcher recusar iniciar; para certificado de CA interna, use `NODE_EXTRA_CA_CERTS`. `NODE_OPTIONS` e `NODE_TLS_REJECT_UNAUTHORIZED` não são repassados ao servidor.
 
 **Restrições adicionais (opcional):** [sistemas-sap.json](sistemas-sap.json) permite declarar um sistema como mais restritivo do que o detectado. Exemplo: um QAS cujo mandante foi cadastrado como customizing (`C`) na SCC4. Uma declaração **nunca libera**: vale sempre o mais restritivo entre o detectado e o declarado (DEV < SANDBOX < QAS < PRD).
+
+- Cada entrada tem `sid` e `ambiente` (`DEV`, `SANDBOX`, `QAS` ou `PRD`) obrigatórios. `mandante` é opcional: sem ele, a restrição vale para todos os mandantes do SID.
+- Uma entrada com `sid` ainda em placeholder (`<...>`) é tratada como modelo e ignorada, com aviso.
+- JSON malformado ou entrada inválida faz o launcher **recusar** iniciar, com a posição da entrada na mensagem. Assim, uma restrição nunca deixa de valer em silêncio.
 
 **Limites da detecção:**
 
@@ -104,7 +111,7 @@ O operador só informa **como conectar**: URL, mandante, usuário e senha (`ARC1
 
 **Travas técnicas** aplicadas por `scripts/mcp-launch.mjs`, que o agente não consegue desligar:
 
-- Somente leitura em todo sistema que não seja detectado como DEV/SANDBOX, e em qualquer sistema com SAP_BASIS ≥ 816.
+- Somente leitura em todo sistema que não seja detectado como DEV/SANDBOX, em qualquer sistema com SAP_BASIS ≥ 816 e quando o SID não for confirmado (seção 2).
 - Prévia de dados, SQL livre, escrita em transporte e Git, e execução de plugins sempre desligados.
 - `SAPWrite.delete` sempre negado.
 
@@ -124,7 +131,7 @@ O operador só informa **como conectar**: URL, mandante, usuário e senha (`ARC1
 
 **Travas técnicas** aplicadas pelo launcher:
 
-- Só inicia para sistemas **detectados** como DEV/SANDBOX, com SAP_BASIS 750–815.
+- Só inicia para sistemas **detectados** como DEV/SANDBOX, com SAP_BASIS 750–815 e SID confirmado (seção 2).
 - Sempre com `--expect SID.MANDANTE/USUARIO`, `--allowed-packages` e `--block-free-sql`.
 - `--insecure` nunca é usado.
 - Edição de objetos transportáveis só com `VSP_ALLOWED_TRANSPORTS` definido.

@@ -4,7 +4,8 @@
 //   Diagnóstico: node scripts/mcp-launch.mjs <servidor> --diagnostico
 //
 // Fontes (somente leitura, endpoints ADT que o Eclipse e os próprios ARC-1/vsp usam):
-//   1. GET  /sap/bc/adt/core/http/systeminformation  -> SID, mandante, usuário (releases recentes)
+//   1. GET  /sap/bc/adt/core/http/systeminformation  -> SID, mandante, usuário (releases recentes).
+//      O resultado traz sidOrigem: "systeminformation" (confirmado) ou "logsys" (só inferido).
 //   2. GET  /sap/bc/adt/system/components            -> SAP_BASIS e S4CORE (release)
 //   3. POST /sap/bc/adt/datapreview/freestyle        -> T000 do mandante: papel (CCCATEGORY),
 //      alterabilidade (CCCORACTIV) e alterações entre mandantes (CCNOCLIIND); LOGSYS como
@@ -12,13 +13,38 @@
 //
 // Princípio: falha fechada. O que não puder ser lido é tratado como o caso mais restritivo.
 // Sem dependências: só Node.js >= 18. TLS nunca é desligado (use NODE_EXTRA_CA_CERTS se
-// o certificado do SAP for de CA interna).
+// o certificado do SAP for de CA interna) e a URL precisa ser https:// (exceto localhost),
+// porque a autenticação Basic levaria usuário e senha em texto claro.
 
 const TIMEOUT_MS = 20000;
 
 // Ordem de restrição: quanto maior, mais restritivo.
-export const RESTRICAO = { DEV: 0, SANDBOX: 1, QAS: 2, PRD: 3 };
-export const maisRestritivo = (a, b) => (RESTRICAO[a] >= RESTRICAO[b] ? a : b);
+export const RESTRICAO = Object.freeze({ DEV: 0, SANDBOX: 1, QAS: 2, PRD: 3 });
+export const ambienteValido = (a) => typeof a === "string" && Object.hasOwn(RESTRICAO, a);
+// Falha fechada: um valor fora da enumeração vira PRD.
+export const maisRestritivo = (a, b) => {
+  if (!ambienteValido(a) || !ambienteValido(b)) return "PRD";
+  return RESTRICAO[a] >= RESTRICAO[b] ? a : b;
+};
+
+// A autenticação é Basic: fora de https, usuário e senha trafegam em texto claro.
+const HOSTS_LOCAIS = new Set(["localhost", "127.0.0.1", "[::1]"]);
+export function validarUrlSap(url) {
+  let u;
+  try {
+    u = new URL(url);
+  } catch {
+    throw new Error(`URL do SAP inválida: "${url}"`);
+  }
+  if (u.protocol === "https:") return;
+  if (u.protocol === "http:" && HOSTS_LOCAIS.has(u.hostname.toLowerCase())) return;
+  throw new Error(`a URL do SAP precisa ser https:// (recebido ${u.protocol}//${u.host}); http:// só é aceito para localhost, porque a autenticação Basic enviaria usuário e senha em texto claro`);
+}
+
+// T000-LOGSYS segue a convenção <SID>CLNT<mandante>. É só convenção: depois de uma cópia de
+// mandante costuma vir errado, por isso o SID inferido daqui nunca conta como confirmado.
+export const sidDoLogsys = (logsys) =>
+  (typeof logsys === "string" ? logsys.trim().toUpperCase() : "").match(/^([A-Z][A-Z0-9]{2})CLNT\d{3}$/)?.[1] ?? null;
 
 const PRODUTO_POR_BASIS = {
   750: "S/4HANA 1511", 751: "S/4HANA 1610", 752: "S/4HANA 1709", 753: "S/4HANA 1809",
@@ -28,6 +54,7 @@ const PRODUTO_POR_BASIS = {
 
 class Sessao {
   constructor({ url, client, user, password }) {
+    validarUrlSap(url);
     this.base = url.replace(/\/+$/, "");
     this.client = client;
     this.auth = "Basic " + Buffer.from(`${user}:${password}`).toString("base64");
@@ -67,7 +94,7 @@ function lerXmlAttr(xml, tag) {
 }
 
 // Resposta do datapreview: uma <columns> por coluna, com o nome em metadata e os valores em dataSet.
-function lerDataPreview(xml) {
+export function lerDataPreview(xml) {
   const linha = {};
   for (const col of xml.matchAll(/<(?:\w+:)?columns>([\s\S]*?)<\/(?:\w+:)?columns>/g)) {
     const nome = col[1].match(/(?:\w+:)?name="([^"]+)"/)?.[1];
@@ -95,7 +122,7 @@ export function classificar(t000) {
 
 export async function detectar(conn) {
   const s = new Sessao(conn);
-  const out = { sid: null, client: null, user: null, sapBasis: null, s4core: null, produto: null, t000: null, avisos: [] };
+  const out = { sid: null, sidOrigem: null, client: null, user: null, sapBasis: null, s4core: null, produto: null, t000: null, avisos: [] };
 
   // 1. Identidade
   const si = await s.req("GET", "/sap/bc/adt/core/http/systeminformation", {
@@ -107,6 +134,7 @@ export async function detectar(conn) {
       const j = JSON.parse(si.text);
       const f = (...ns) => { for (const [k, v] of Object.entries(j)) if (ns.some((n) => n.toLowerCase() === k.toLowerCase()) && typeof v === "string") return v.trim().toUpperCase(); return null; };
       out.sid = f("systemID", "sid");
+      if (out.sid) out.sidOrigem = "systeminformation";
       out.client = f("client");
       out.user = f("userName", "user");
     } catch { /* release sem o recurso em JSON: cai no fallback da T000 */ }
@@ -137,7 +165,11 @@ export async function detectar(conn) {
   } else {
     out.avisos.push(`T000 ilegível (HTTP ${dp.status}; o usuário pode não ter autorização de data preview)`);
   }
-  if (!out.sid && out.t000?.LOGSYS) out.sid = out.t000.LOGSYS.match(/^([A-Z][A-Z0-9]{2})CLNT\d{3}$/)?.[1] ?? null;
+  if (!out.sid && out.t000?.LOGSYS) {
+    out.sid = sidDoLogsys(out.t000.LOGSYS);
+    if (out.sid) out.sidOrigem = "logsys";
+    else out.avisos.push(`T000-LOGSYS "${out.t000.LOGSYS}" fora do padrão <SID>CLNT<mandante>; SID não inferido`);
+  }
   if (!out.client && out.t000?.MANDT) out.client = out.t000.MANDT;
 
   Object.assign(out, classificar(out.t000));
