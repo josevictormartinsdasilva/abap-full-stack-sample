@@ -8,6 +8,25 @@
       },
       "disabled": false
     },
+    "arc-1": {
+      "type": "stdio",
+      "timeout": 300,
+      "command": "node",
+      "args": [
+        "scripts/mcp-launch.mjs",
+        "arc-1"
+      ],
+      "disabled": false
+    },
+    "vsp": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "scripts/mcp-launch.mjs",
+        "vsp"
+      ],
+      "disabled": false
+    },
     "fiori-mcp": {
       "type": "stdio",
       "timeout": 600,

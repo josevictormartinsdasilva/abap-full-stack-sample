@@ -1,0 +1,1551 @@
+From 983cb7d4386620a69bce7490cd2a63f2442f3ad8 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Tue, 17 Nov 2026 19:47:38 +0000
+Subject: [PATCH] =?UTF-8?q?Adiciona=20pol=C3=ADtica=20de=20sele=C3=A7?=
+ =?UTF-8?q?=C3=A3o=20de=20MCP=20ABAP=20por=20vers=C3=A3o=20e=20ambiente=20?=
+ =?UTF-8?q?(ADR-0009)?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- standards/politica-mcp-abap.md: matriz abap-adt / arc-1 / vsp, detecção, procedimento e equivalências
+- scripts/sap-probe.mjs: detecta SID, release (SAP_BASIS/S4CORE) e ambiente (T000/SCC4) no próprio SAP
+- scripts/mcp-launch.mjs: launcher de arc-1 e vsp com travas técnicas baseadas na detecção
+- standards/sistemas-sap.json: restrições opcionais (só tornam mais restritivo)
+- AGENTS.md, subagentes e skill do auditor: roteamento pelo sistema detectado (.agents/runtime)
+- .agents/mcp.servers.json + adaptadores regenerados (sync-agents --check OK)
+- ADR-0009, docs/setup-mcp-abap.md (passo a passo da máquina), .env.example, .gitignore e README
+---
+ .agents/agents/abap-classic-dev.md            |   4 +-
+ .agents/agents/abap-qa-auditor.md             |   5 +-
+ .agents/agents/abap-rap-dev.md                |   8 +-
+ .agents/mcp.servers.json                      |  13 +-
+ .agents/mcp_config.json                       |  19 ++
+ .agents/skills/abap-qa-auditor/SKILL.md       |   4 +
+ .claude/agents/abap-classic-dev.md            |   4 +-
+ .claude/agents/abap-qa-auditor.md             |   5 +-
+ .claude/agents/abap-rap-dev.md                |   8 +-
+ .claude/settings.json                         |   2 +
+ .claude/skills/abap-qa-auditor/SKILL.md       |   4 +
+ .codex/agents/abap-classic-dev.toml           |   4 +-
+ .codex/agents/abap-qa-auditor.toml            |   5 +-
+ .codex/agents/abap-rap-dev.toml               |   8 +-
+ .codex/config.toml                            |   9 +
+ .env.example                                  |  33 +++
+ .gitignore                                    |   1 +
+ .kimi-code/agents/abap-classic-dev.md         |   4 +-
+ .kimi-code/agents/abap-qa-auditor.md          |   5 +-
+ .kimi-code/agents/abap-rap-dev.md             |   8 +-
+ .kimi-code/mcp.json                           |  19 ++
+ .mcp.json                                     |  22 ++
+ AGENTS.md                                     |  39 +++-
+ README.md                                     |  47 +++-
+ ...lecao-de-mcp-abap-por-versao-e-ambiente.md |  72 ++++++
+ docs/adr/README.md                            |   1 +
+ docs/setup-mcp-abap.md                        | 185 +++++++++++++++
+ scripts/mcp-launch.mjs                        | 217 ++++++++++++++++++
+ scripts/sap-probe.mjs                         | 145 ++++++++++++
+ standards/politica-mcp-abap.md                | 194 ++++++++++++++++
+ standards/sistemas-sap.json                   |   4 +
+ 31 files changed, 1060 insertions(+), 38 deletions(-)
+ create mode 100644 docs/adr/0009-selecao-de-mcp-abap-por-versao-e-ambiente.md
+ create mode 100644 docs/setup-mcp-abap.md
+ create mode 100644 scripts/mcp-launch.mjs
+ create mode 100644 scripts/sap-probe.mjs
+ create mode 100644 standards/politica-mcp-abap.md
+ create mode 100644 standards/sistemas-sap.json
+
+diff --git a/.agents/agents/abap-classic-dev.md b/.agents/agents/abap-classic-dev.md
+index 15c3b85..e480bed 100644
+--- a/.agents/agents/abap-classic-dev.md
++++ b/.agents/agents/abap-classic-dev.md
+@@ -18,7 +18,9 @@ Você é o **abap-classic-dev**, desenvolvedor ABAP Tradicional, RICEFW e integr
+ - Consulte esses arquivos antes de propor qualquer nome de objeto. Nunca invente prefixos.
+ 
+ ## Ferramentas
+-- MCP `abap-adt`: `abap_object_*`.
++Use **somente** o servidor MCP informado pelo orquestrador para o sistema-alvo, conforme `standards/politica-mcp-abap.md`. Sem essa informação, pergunte ao orquestrador. Nunca escreva em QAS/PRD.
++- S/4HANA 2025+: MCP `abap-adt` (`abap_object_*`).
++- S/4HANA ≤ 2023 em DEV/SANDBOX: MCP `vsp` (`SAP`). Use as equivalências da seção 5 da política. `execute_abap`, RFC, execução de relatório e escrita de variáveis no debugger exigem confirmação do usuário a cada uso.
+ 
+ ## Forma de trabalho
+ 1. Confirme módulo (`<MD>`), tipo do programa, pacote e request; se faltar informação, pergunte ao orquestrador em vez de supor.
+diff --git a/.agents/agents/abap-qa-auditor.md b/.agents/agents/abap-qa-auditor.md
+index 2b94326..7e595cc 100644
+--- a/.agents/agents/abap-qa-auditor.md
++++ b/.agents/agents/abap-qa-auditor.md
+@@ -17,7 +17,10 @@ Você é o **abap-qa-auditor**, auditor de qualidade ABAP, Clean Core e especial
+ - `standards/naming-conventions.json` — para auditar aderência de nomenclatura; o bloco `cliente` traz pacote e variante ATC padrão.
+ 
+ ## Ferramentas
+-- MCP `abap-adt`: `abap_atc_*`, `abap_unit_*`.
++Use **somente** o servidor MCP informado pelo orquestrador para o sistema-alvo, conforme `standards/politica-mcp-abap.md`. Sem essa informação, pergunte ao orquestrador. Nunca escreva em QAS/PRD.
++- S/4HANA 2025+: MCP `abap-adt` (`abap_atc_*`, `abap_unit_*`).
++- S/4HANA ≤ 2023 em DEV/SANDBOX: MCP `vsp` (`SAP(action="test")`, `target="ATC"` para ATC).
++- S/4HANA ≤ 2023 em QAS/PRD: MCP `arc-1` (`SAPDiagnose`), somente leitura. Não aplique QuickFixes; ABAP Unit só em QAS, nunca em PRD.
+ - Terminal para `npm run lint` nos apps Fiori.
+ 
+ ## Forma de trabalho
+diff --git a/.agents/agents/abap-rap-dev.md b/.agents/agents/abap-rap-dev.md
+index 684879a..982235a 100644
+--- a/.agents/agents/abap-rap-dev.md
++++ b/.agents/agents/abap-rap-dev.md
+@@ -18,12 +18,14 @@ Você é o **abap-rap-dev**, desenvolvedor ABAP RESTful Application Programming
+ - Consulte esses arquivos antes de propor qualquer nome de objeto. Nunca invente prefixos.
+ 
+ ## Ferramentas
+-- MCP `abap-adt`: `abap_object_*`, `abap_repository_*`.
++Use **somente** o servidor MCP informado pelo orquestrador para o sistema-alvo, conforme `standards/politica-mcp-abap.md`. Sem essa informação, pergunte ao orquestrador. Nunca escreva em QAS/PRD.
++- S/4HANA 2025+: MCP `abap-adt` (`abap_object_*`, `abap_repository_*`).
++- S/4HANA ≤ 2023 em DEV/SANDBOX: MCP `vsp` (`SAP`). Use as equivalências da seção 5 da política. `execute_abap`, RFC e escrita de variáveis no debugger exigem confirmação do usuário a cada uso.
+ 
+ ## Forma de trabalho
+ 1. Confirme módulo (`<MD>`), pacote e request antes de criar objetos; se faltar informação, pergunte ao orquestrador em vez de supor.
+ 2. Liste os objetos a criar/alterar com os nomes conforme o padrão.
+-3. Implemente, valide sintaxe (`abap_object_check`) e ative cada objeto.
+-4. Ao final, devolva: objetos criados/alterados, status de ativação, pendências e recomendações para o `abap-qa-auditor` / `fiori-elements-dev`.
++3. Implemente, valide sintaxe (`abap_object_check` ou o equivalente do servidor) e ative cada objeto.
++4. Ao final, devolva: sistema e servidor MCP usados, objetos criados/alterados, status de ativação, pendências e recomendações para o `abap-qa-auditor` / `fiori-elements-dev`.
+ 
+ Sua última mensagem deve ser o resultado completo e autocontido para o orquestrador: ele não vê o seu histórico de trabalho.
+diff --git a/.agents/mcp.servers.json b/.agents/mcp.servers.json
+index d0eeb68..b9d5e18 100644
+--- a/.agents/mcp.servers.json
++++ b/.agents/mcp.servers.json
+@@ -1,11 +1,22 @@
+ {
+-  "_comentario": "FONTE ÚNICA dos servidores MCP. Edite aqui e rode `node scripts/sync-agents.mjs`. O token nunca é versionado: vem da variável de ambiente indicada em tokenEnvVar.",
++  "_comentario": "FONTE ÚNICA dos servidores MCP. Edite aqui e rode `node scripts/sync-agents.mjs`. O token nunca é versionado: vem da variável de ambiente indicada em tokenEnvVar. arc-1 e vsp são iniciados por scripts/mcp-launch.mjs, que aplica as travas de standards/politica-mcp-abap.md (ADR-0009); para mais sistemas, copie a entrada com sufixo (ex.: arc-1-qas-ne) com variáveis de prefixo próprio (ARC1_QAS_NE_*).",
+   "servers": {
+     "abap-adt": {
+       "transport": "http",
+       "url": "http://localhost:2236/mcp",
+       "tokenEnvVar": "ABAP_ADT_TOKEN"
+     },
++    "arc-1": {
++      "transport": "stdio",
++      "command": "node",
++      "args": ["scripts/mcp-launch.mjs", "arc-1"],
++      "timeoutSec": 300
++    },
++    "vsp": {
++      "transport": "stdio",
++      "command": "node",
++      "args": ["scripts/mcp-launch.mjs", "vsp"]
++    },
+     "fiori-mcp": {
+       "transport": "stdio",
+       "command": "npx",
+diff --git a/.agents/mcp_config.json b/.agents/mcp_config.json
+index 1a14db3..f0143d3 100644
+--- a/.agents/mcp_config.json
++++ b/.agents/mcp_config.json
+@@ -8,6 +8,25 @@
+       },
+       "disabled": false
+     },
++    "arc-1": {
++      "type": "stdio",
++      "timeout": 300,
++      "command": "node",
++      "args": [
++        "scripts/mcp-launch.mjs",
++        "arc-1"
++      ],
++      "disabled": false
++    },
++    "vsp": {
++      "type": "stdio",
++      "command": "node",
++      "args": [
++        "scripts/mcp-launch.mjs",
++        "vsp"
++      ],
++      "disabled": false
++    },
+     "fiori-mcp": {
+       "type": "stdio",
+       "timeout": 600,
+diff --git a/.agents/skills/abap-qa-auditor/SKILL.md b/.agents/skills/abap-qa-auditor/SKILL.md
+index 64bb3ca..c0470bf 100644
+--- a/.agents/skills/abap-qa-auditor/SKILL.md
++++ b/.agents/skills/abap-qa-auditor/SKILL.md
+@@ -17,6 +17,10 @@ Não há pacote nem pasta fixos nesta skill. Determine o escopo nesta ordem:
+ 2. Bloco `cliente` de [naming-conventions.json](../../../standards/naming-conventions.json): `pacotePadraoATC`, `varianteATC` e `pastaAppsFiori`.
+ 3. Se o valor ainda estiver como placeholder (`<...>`), **pare e pergunte** — nunca rode ATC num pacote suposto.
+ 
++## Servidor MCP
++
++Os nomes de ferramentas abaixo são os do `abap-adt` (MCP oficial, S/4HANA 2025+). Em sistemas ≤ 2023, use o servidor informado pelo orquestrador (`vsp` em DEV/SANDBOX, `arc-1` em QAS/PRD) e as equivalências da seção 5 de [politica-mcp-abap.md](../../../standards/politica-mcp-abap.md). Em QAS/PRD, a auditoria é somente leitura: não aplique QuickFixes e não rode ABAP Unit em PRD.
++
+ ## Tarefas Principais
+ 
+ 1. **Verificações ATC (ABAP Test Cockpit)**:
+diff --git a/.claude/agents/abap-classic-dev.md b/.claude/agents/abap-classic-dev.md
+index 1d8498b..510e9a0 100644
+--- a/.claude/agents/abap-classic-dev.md
++++ b/.claude/agents/abap-classic-dev.md
+@@ -19,7 +19,9 @@ Você é o **abap-classic-dev**, desenvolvedor ABAP Tradicional, RICEFW e integr
+ - Consulte esses arquivos antes de propor qualquer nome de objeto. Nunca invente prefixos.
+ 
+ ## Ferramentas
+-- MCP `abap-adt`: `abap_object_*`.
++Use **somente** o servidor MCP informado pelo orquestrador para o sistema-alvo, conforme `standards/politica-mcp-abap.md`. Sem essa informação, pergunte ao orquestrador. Nunca escreva em QAS/PRD.
++- S/4HANA 2025+: MCP `abap-adt` (`abap_object_*`).
++- S/4HANA ≤ 2023 em DEV/SANDBOX: MCP `vsp` (`SAP`). Use as equivalências da seção 5 da política. `execute_abap`, RFC, execução de relatório e escrita de variáveis no debugger exigem confirmação do usuário a cada uso.
+ 
+ ## Forma de trabalho
+ 1. Confirme módulo (`<MD>`), tipo do programa, pacote e request; se faltar informação, pergunte ao orquestrador em vez de supor.
+diff --git a/.claude/agents/abap-qa-auditor.md b/.claude/agents/abap-qa-auditor.md
+index 5a42e3a..dd514f9 100644
+--- a/.claude/agents/abap-qa-auditor.md
++++ b/.claude/agents/abap-qa-auditor.md
+@@ -18,7 +18,10 @@ Você é o **abap-qa-auditor**, auditor de qualidade ABAP, Clean Core e especial
+ - `standards/naming-conventions.json` — para auditar aderência de nomenclatura; o bloco `cliente` traz pacote e variante ATC padrão.
+ 
+ ## Ferramentas
+-- MCP `abap-adt`: `abap_atc_*`, `abap_unit_*`.
++Use **somente** o servidor MCP informado pelo orquestrador para o sistema-alvo, conforme `standards/politica-mcp-abap.md`. Sem essa informação, pergunte ao orquestrador. Nunca escreva em QAS/PRD.
++- S/4HANA 2025+: MCP `abap-adt` (`abap_atc_*`, `abap_unit_*`).
++- S/4HANA ≤ 2023 em DEV/SANDBOX: MCP `vsp` (`SAP(action="test")`, `target="ATC"` para ATC).
++- S/4HANA ≤ 2023 em QAS/PRD: MCP `arc-1` (`SAPDiagnose`), somente leitura. Não aplique QuickFixes; ABAP Unit só em QAS, nunca em PRD.
+ - Terminal para `npm run lint` nos apps Fiori.
+ 
+ ## Forma de trabalho
+diff --git a/.claude/agents/abap-rap-dev.md b/.claude/agents/abap-rap-dev.md
+index b479fb9..2e46b06 100644
+--- a/.claude/agents/abap-rap-dev.md
++++ b/.claude/agents/abap-rap-dev.md
+@@ -19,12 +19,14 @@ Você é o **abap-rap-dev**, desenvolvedor ABAP RESTful Application Programming
+ - Consulte esses arquivos antes de propor qualquer nome de objeto. Nunca invente prefixos.
+ 
+ ## Ferramentas
+-- MCP `abap-adt`: `abap_object_*`, `abap_repository_*`.
++Use **somente** o servidor MCP informado pelo orquestrador para o sistema-alvo, conforme `standards/politica-mcp-abap.md`. Sem essa informação, pergunte ao orquestrador. Nunca escreva em QAS/PRD.
++- S/4HANA 2025+: MCP `abap-adt` (`abap_object_*`, `abap_repository_*`).
++- S/4HANA ≤ 2023 em DEV/SANDBOX: MCP `vsp` (`SAP`). Use as equivalências da seção 5 da política. `execute_abap`, RFC e escrita de variáveis no debugger exigem confirmação do usuário a cada uso.
+ 
+ ## Forma de trabalho
+ 1. Confirme módulo (`<MD>`), pacote e request antes de criar objetos; se faltar informação, pergunte ao orquestrador em vez de supor.
+ 2. Liste os objetos a criar/alterar com os nomes conforme o padrão.
+-3. Implemente, valide sintaxe (`abap_object_check`) e ative cada objeto.
+-4. Ao final, devolva: objetos criados/alterados, status de ativação, pendências e recomendações para o `abap-qa-auditor` / `fiori-elements-dev`.
++3. Implemente, valide sintaxe (`abap_object_check` ou o equivalente do servidor) e ative cada objeto.
++4. Ao final, devolva: sistema e servidor MCP usados, objetos criados/alterados, status de ativação, pendências e recomendações para o `abap-qa-auditor` / `fiori-elements-dev`.
+ 
+ Sua última mensagem deve ser o resultado completo e autocontido para o orquestrador: ele não vê o seu histórico de trabalho.
+diff --git a/.claude/settings.json b/.claude/settings.json
+index 31a4eb8..5846a9a 100644
+--- a/.claude/settings.json
++++ b/.claude/settings.json
+@@ -1,6 +1,8 @@
+ {
+   "enabledMcpjsonServers": [
+     "abap-adt",
++    "arc-1",
++    "vsp",
+     "fiori-mcp"
+   ],
+   "env": {
+diff --git a/.claude/skills/abap-qa-auditor/SKILL.md b/.claude/skills/abap-qa-auditor/SKILL.md
+index 0ab05d8..100afac 100644
+--- a/.claude/skills/abap-qa-auditor/SKILL.md
++++ b/.claude/skills/abap-qa-auditor/SKILL.md
+@@ -19,6 +19,10 @@ Não há pacote nem pasta fixos nesta skill. Determine o escopo nesta ordem:
+ 2. Bloco `cliente` de [naming-conventions.json](../../../standards/naming-conventions.json): `pacotePadraoATC`, `varianteATC` e `pastaAppsFiori`.
+ 3. Se o valor ainda estiver como placeholder (`<...>`), **pare e pergunte** — nunca rode ATC num pacote suposto.
+ 
++## Servidor MCP
++
++Os nomes de ferramentas abaixo são os do `abap-adt` (MCP oficial, S/4HANA 2025+). Em sistemas ≤ 2023, use o servidor informado pelo orquestrador (`vsp` em DEV/SANDBOX, `arc-1` em QAS/PRD) e as equivalências da seção 5 de [politica-mcp-abap.md](../../../standards/politica-mcp-abap.md). Em QAS/PRD, a auditoria é somente leitura: não aplique QuickFixes e não rode ABAP Unit em PRD.
++
+ ## Tarefas Principais
+ 
+ 1. **Verificações ATC (ABAP Test Cockpit)**:
+diff --git a/.codex/agents/abap-classic-dev.toml b/.codex/agents/abap-classic-dev.toml
+index 4d14e9f..1586e45 100644
+--- a/.codex/agents/abap-classic-dev.toml
++++ b/.codex/agents/abap-classic-dev.toml
+@@ -14,7 +14,9 @@ Antes de começar, carregue a skill `abap-classic-dev` (`$abap-classic-dev`, em
+ - Consulte esses arquivos antes de propor qualquer nome de objeto. Nunca invente prefixos.
+ 
+ ## Ferramentas
+-- MCP `abap-adt`: `abap_object_*`.
++Use **somente** o servidor MCP informado pelo orquestrador para o sistema-alvo, conforme `standards/politica-mcp-abap.md`. Sem essa informação, pergunte ao orquestrador. Nunca escreva em QAS/PRD.
++- S/4HANA 2025+: MCP `abap-adt` (`abap_object_*`).
++- S/4HANA ≤ 2023 em DEV/SANDBOX: MCP `vsp` (`SAP`). Use as equivalências da seção 5 da política. `execute_abap`, RFC, execução de relatório e escrita de variáveis no debugger exigem confirmação do usuário a cada uso.
+ 
+ ## Forma de trabalho
+ 1. Confirme módulo (`<MD>`), tipo do programa, pacote e request; se faltar informação, pergunte ao orquestrador em vez de supor.
+diff --git a/.codex/agents/abap-qa-auditor.toml b/.codex/agents/abap-qa-auditor.toml
+index 7a35a6b..04ab542 100644
+--- a/.codex/agents/abap-qa-auditor.toml
++++ b/.codex/agents/abap-qa-auditor.toml
+@@ -13,7 +13,10 @@ Antes de começar, carregue a skill `abap-qa-auditor` (`$abap-qa-auditor`, em `.
+ - `standards/naming-conventions.json` — para auditar aderência de nomenclatura; o bloco `cliente` traz pacote e variante ATC padrão.
+ 
+ ## Ferramentas
+-- MCP `abap-adt`: `abap_atc_*`, `abap_unit_*`.
++Use **somente** o servidor MCP informado pelo orquestrador para o sistema-alvo, conforme `standards/politica-mcp-abap.md`. Sem essa informação, pergunte ao orquestrador. Nunca escreva em QAS/PRD.
++- S/4HANA 2025+: MCP `abap-adt` (`abap_atc_*`, `abap_unit_*`).
++- S/4HANA ≤ 2023 em DEV/SANDBOX: MCP `vsp` (`SAP(action="test")`, `target="ATC"` para ATC).
++- S/4HANA ≤ 2023 em QAS/PRD: MCP `arc-1` (`SAPDiagnose`), somente leitura. Não aplique QuickFixes; ABAP Unit só em QAS, nunca em PRD.
+ - Terminal para `npm run lint` nos apps Fiori.
+ 
+ ## Forma de trabalho
+diff --git a/.codex/agents/abap-rap-dev.toml b/.codex/agents/abap-rap-dev.toml
+index 3b81c4d..1019e8e 100644
+--- a/.codex/agents/abap-rap-dev.toml
++++ b/.codex/agents/abap-rap-dev.toml
+@@ -14,13 +14,15 @@ Antes de começar, carregue a skill `abap-rap-dev` (`$abap-rap-dev`, em `.agents
+ - Consulte esses arquivos antes de propor qualquer nome de objeto. Nunca invente prefixos.
+ 
+ ## Ferramentas
+-- MCP `abap-adt`: `abap_object_*`, `abap_repository_*`.
++Use **somente** o servidor MCP informado pelo orquestrador para o sistema-alvo, conforme `standards/politica-mcp-abap.md`. Sem essa informação, pergunte ao orquestrador. Nunca escreva em QAS/PRD.
++- S/4HANA 2025+: MCP `abap-adt` (`abap_object_*`, `abap_repository_*`).
++- S/4HANA ≤ 2023 em DEV/SANDBOX: MCP `vsp` (`SAP`). Use as equivalências da seção 5 da política. `execute_abap`, RFC e escrita de variáveis no debugger exigem confirmação do usuário a cada uso.
+ 
+ ## Forma de trabalho
+ 1. Confirme módulo (`<MD>`), pacote e request antes de criar objetos; se faltar informação, pergunte ao orquestrador em vez de supor.
+ 2. Liste os objetos a criar/alterar com os nomes conforme o padrão.
+-3. Implemente, valide sintaxe (`abap_object_check`) e ative cada objeto.
+-4. Ao final, devolva: objetos criados/alterados, status de ativação, pendências e recomendações para o `abap-qa-auditor` / `fiori-elements-dev`.
++3. Implemente, valide sintaxe (`abap_object_check` ou o equivalente do servidor) e ative cada objeto.
++4. Ao final, devolva: sistema e servidor MCP usados, objetos criados/alterados, status de ativação, pendências e recomendações para o `abap-qa-auditor` / `fiori-elements-dev`.
+ 
+ Sua última mensagem deve ser o resultado completo e autocontido para o orquestrador: ele não vê o seu histórico de trabalho.
+ '''
+diff --git a/.codex/config.toml b/.codex/config.toml
+index db8ef31..b54ac3f 100644
+--- a/.codex/config.toml
++++ b/.codex/config.toml
+@@ -10,6 +10,15 @@ max_depth = 1
+ url = "http://localhost:2236/mcp"
+ bearer_token_env_var = "ABAP_ADT_TOKEN"
+ 
++[mcp_servers.arc-1]
++command = "cmd"
++args = ["/c", "node", "scripts/mcp-launch.mjs", "arc-1"]
++startup_timeout_sec = 300
++
++[mcp_servers.vsp]
++command = "cmd"
++args = ["/c", "node", "scripts/mcp-launch.mjs", "vsp"]
++
+ [mcp_servers.fiori-mcp]
+ command = "cmd"
+ args = ["/c", "npx", "--yes", "@sap-ux/fiori-mcp-server@1.15.19", "fiori-mcp"]
+diff --git a/.env.example b/.env.example
+index f552938..7833625 100644
+--- a/.env.example
++++ b/.env.example
+@@ -1 +1,34 @@
+ ABAP_ADT_TOKEN=<SEU_TOKEN>
++
++# ---------------------------------------------------------------------------
++# arc-1 e vsp (standards/politica-mcp-abap.md, ADR-0009)
++# Lidas por scripts/mcp-launch.mjs: primeiro do ambiente do sistema, depois deste .env.
++# Informe só a conexão: SID, release e ambiente são detectados no próprio SAP.
++# <P>_SAP_SID é opcional; se informado e diferente do detectado, o launcher recusa iniciar.
++# Servidor com sufixo usa prefixo com sufixo (ex.: arc-1-qas-ne -> ARC1_QAS_NE_SAP_URL).
++# Diagnóstico: node scripts/mcp-launch.mjs <servidor> --diagnostico
++# ---------------------------------------------------------------------------
++
++# ARC-1 — análise somente leitura em QAS/PRD (S/4HANA <= 2023)
++ARC1_SAP_URL=<https://host:porta>
++# ARC1_SAP_SID=<SID>   (opcional, conferência)
++ARC1_SAP_CLIENT=<MANDANTE>
++ARC1_SAP_USER=<USUARIO_SOMENTE_LEITURA>
++ARC1_SAP_PASSWORD=<SENHA>
++# Só usada se o sistema do ARC-1 for detectado como DEV/SANDBOX (exceção da política, seção 4.2):
++# ARC1_ALLOWED_PACKAGES=Z*
++# Opcional, experimental: ARC1_BLOCKED_DATA_SOURCES=USR02,PA0002
++# Opcional: ARC1_BIN=<caminho do arc-1 instalado> (em vez de npx arc-1@versão fixada)
++
++# vsp — desenvolvimento em DEV/SANDBOX (S/4HANA <= 2023)
++VSP_SAP_URL=<https://host:porta>
++# VSP_SAP_SID=<SID>    (opcional, conferência)
++VSP_SAP_CLIENT=<MANDANTE>
++VSP_SAP_USER=<USUARIO>
++VSP_SAP_PASSWORD=<SENHA>
++VSP_ALLOWED_PACKAGES=$TMP,Z*
++# Edição de objetos transportáveis (ex.: DS4K*):
++# VSP_ALLOWED_TRANSPORTS=<SID>K*
++# VSP_ENABLE_TRANSPORTS=true   (criar/liberar requests; só sob pedido explícito)
++# VSP_READ_ONLY=true           (DEV apenas para análise)
++# Opcional: VSP_BIN=<caminho do binário vsp> (padrão: vsp no PATH)
+diff --git a/.gitignore b/.gitignore
+index dec23fa..27e400c 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -1,3 +1,4 @@
+ .claude/settings.local.json
+ node_modules/
+ .env
++.agents/runtime/
+diff --git a/.kimi-code/agents/abap-classic-dev.md b/.kimi-code/agents/abap-classic-dev.md
+index 7eb3681..df43a68 100644
+--- a/.kimi-code/agents/abap-classic-dev.md
++++ b/.kimi-code/agents/abap-classic-dev.md
+@@ -20,7 +20,9 @@ Antes de começar, carregue a skill `abap-classic-dev` (`/skill:abap-classic-dev
+ - Consulte esses arquivos antes de propor qualquer nome de objeto. Nunca invente prefixos.
+ 
+ ## Ferramentas
+-- MCP `abap-adt`: `abap_object_*`.
++Use **somente** o servidor MCP informado pelo orquestrador para o sistema-alvo, conforme `standards/politica-mcp-abap.md`. Sem essa informação, pergunte ao orquestrador. Nunca escreva em QAS/PRD.
++- S/4HANA 2025+: MCP `abap-adt` (`abap_object_*`).
++- S/4HANA ≤ 2023 em DEV/SANDBOX: MCP `vsp` (`SAP`). Use as equivalências da seção 5 da política. `execute_abap`, RFC, execução de relatório e escrita de variáveis no debugger exigem confirmação do usuário a cada uso.
+ 
+ ## Forma de trabalho
+ 1. Confirme módulo (`<MD>`), tipo do programa, pacote e request; se faltar informação, pergunte ao orquestrador em vez de supor.
+diff --git a/.kimi-code/agents/abap-qa-auditor.md b/.kimi-code/agents/abap-qa-auditor.md
+index 92e95dd..fda3536 100644
+--- a/.kimi-code/agents/abap-qa-auditor.md
++++ b/.kimi-code/agents/abap-qa-auditor.md
+@@ -19,7 +19,10 @@ Antes de começar, carregue a skill `abap-qa-auditor` (`/skill:abap-qa-auditor`,
+ - `standards/naming-conventions.json` — para auditar aderência de nomenclatura; o bloco `cliente` traz pacote e variante ATC padrão.
+ 
+ ## Ferramentas
+-- MCP `abap-adt`: `abap_atc_*`, `abap_unit_*`.
++Use **somente** o servidor MCP informado pelo orquestrador para o sistema-alvo, conforme `standards/politica-mcp-abap.md`. Sem essa informação, pergunte ao orquestrador. Nunca escreva em QAS/PRD.
++- S/4HANA 2025+: MCP `abap-adt` (`abap_atc_*`, `abap_unit_*`).
++- S/4HANA ≤ 2023 em DEV/SANDBOX: MCP `vsp` (`SAP(action="test")`, `target="ATC"` para ATC).
++- S/4HANA ≤ 2023 em QAS/PRD: MCP `arc-1` (`SAPDiagnose`), somente leitura. Não aplique QuickFixes; ABAP Unit só em QAS, nunca em PRD.
+ - Terminal para `npm run lint` nos apps Fiori.
+ 
+ ## Forma de trabalho
+diff --git a/.kimi-code/agents/abap-rap-dev.md b/.kimi-code/agents/abap-rap-dev.md
+index 9d4ef76..aaecd6b 100644
+--- a/.kimi-code/agents/abap-rap-dev.md
++++ b/.kimi-code/agents/abap-rap-dev.md
+@@ -20,12 +20,14 @@ Antes de começar, carregue a skill `abap-rap-dev` (`/skill:abap-rap-dev`, em `.
+ - Consulte esses arquivos antes de propor qualquer nome de objeto. Nunca invente prefixos.
+ 
+ ## Ferramentas
+-- MCP `abap-adt`: `abap_object_*`, `abap_repository_*`.
++Use **somente** o servidor MCP informado pelo orquestrador para o sistema-alvo, conforme `standards/politica-mcp-abap.md`. Sem essa informação, pergunte ao orquestrador. Nunca escreva em QAS/PRD.
++- S/4HANA 2025+: MCP `abap-adt` (`abap_object_*`, `abap_repository_*`).
++- S/4HANA ≤ 2023 em DEV/SANDBOX: MCP `vsp` (`SAP`). Use as equivalências da seção 5 da política. `execute_abap`, RFC e escrita de variáveis no debugger exigem confirmação do usuário a cada uso.
+ 
+ ## Forma de trabalho
+ 1. Confirme módulo (`<MD>`), pacote e request antes de criar objetos; se faltar informação, pergunte ao orquestrador em vez de supor.
+ 2. Liste os objetos a criar/alterar com os nomes conforme o padrão.
+-3. Implemente, valide sintaxe (`abap_object_check`) e ative cada objeto.
+-4. Ao final, devolva: objetos criados/alterados, status de ativação, pendências e recomendações para o `abap-qa-auditor` / `fiori-elements-dev`.
++3. Implemente, valide sintaxe (`abap_object_check` ou o equivalente do servidor) e ative cada objeto.
++4. Ao final, devolva: sistema e servidor MCP usados, objetos criados/alterados, status de ativação, pendências e recomendações para o `abap-qa-auditor` / `fiori-elements-dev`.
+ 
+ Sua última mensagem deve ser o resultado completo e autocontido para o orquestrador: ele não vê o seu histórico de trabalho.
+diff --git a/.kimi-code/mcp.json b/.kimi-code/mcp.json
+index 092de19..f0132e9 100644
+--- a/.kimi-code/mcp.json
++++ b/.kimi-code/mcp.json
+@@ -4,6 +4,25 @@
+       "url": "http://localhost:2236/mcp",
+       "bearerTokenEnvVar": "ABAP_ADT_TOKEN"
+     },
++    "arc-1": {
++      "command": "cmd",
++      "args": [
++        "/c",
++        "node",
++        "scripts/mcp-launch.mjs",
++        "arc-1"
++      ],
++      "startupTimeoutMs": 300000
++    },
++    "vsp": {
++      "command": "cmd",
++      "args": [
++        "/c",
++        "node",
++        "scripts/mcp-launch.mjs",
++        "vsp"
++      ]
++    },
+     "fiori-mcp": {
+       "command": "cmd",
+       "args": [
+diff --git a/.mcp.json b/.mcp.json
+index b515d51..e10c960 100644
+--- a/.mcp.json
++++ b/.mcp.json
+@@ -7,6 +7,28 @@
+         "Authorization": "Bearer ${ABAP_ADT_TOKEN}"
+       }
+     },
++    "arc-1": {
++      "type": "stdio",
++      "command": "cmd",
++      "args": [
++        "/c",
++        "node",
++        "scripts/mcp-launch.mjs",
++        "arc-1"
++      ],
++      "env": {}
++    },
++    "vsp": {
++      "type": "stdio",
++      "command": "cmd",
++      "args": [
++        "/c",
++        "node",
++        "scripts/mcp-launch.mjs",
++        "vsp"
++      ],
++      "env": {}
++    },
+     "fiori-mcp": {
+       "type": "stdio",
+       "command": "cmd",
+diff --git a/AGENTS.md b/AGENTS.md
+index d959163..9cb070a 100644
+--- a/AGENTS.md
++++ b/AGENTS.md
+@@ -10,11 +10,22 @@ A sessão principal atua como **Orquestrador Central**.
+ 
+ 1. **Planejar antes de executar**: avalie o requisito, consulte [standards/naming-conventions.json](standards/naming-conventions.json) e [standards/padrao-desenvolvimento.md](standards/padrao-desenvolvimento.md), e apresente um plano com os nomes dos objetos para aprovação do usuário antes de criar/alterar objetos no SAP.
+ 2. **Parâmetros do cliente**: sigla, pacotes, variante ATC, namespace Fiori e sistema de desenvolvimento estão no bloco `cliente` de `standards/naming-conventions.json`. Se algum valor necessário ainda for placeholder (`<...>`), pergunte ao usuário — nunca suponha.
+-3. **Somente no sistema de desenvolvimento**: antes de criar, alterar ou ativar qualquer objeto no SAP, confirme que o sistema conectado ao `abap-adt` é o `sistemaDesenvolvimento` do bloco `cliente` (compare o SID informado pelo servidor). Se for outro sistema, ou se não for possível confirmar, **pare**: não crie nem ative nada e avise o usuário com o SID encontrado. Consultas de leitura não precisam dessa confirmação.
+-4. **Delegar ao especialista**: acione o subagente correspondente (abaixo). O subagente só conhece o que estiver no prompt — informe módulo (`<MD>`), pacote, request, nomes aprovados, objetos já existentes e o `sistemaDesenvolvimento` já confirmado. Tarefas pequenas (uma ou duas linhas, consultas) podem ser feitas diretamente, sem delegar.
+-5. **Ordem de precedência** em entregas ponta a ponta: `abap-rap-dev` (ou `abap-classic-dev`) → `fiori-elements-dev` → `abap-qa-auditor`. Etapas independentes podem rodar em paralelo.
+-6. **Qualidade obrigatória**: nenhuma entrega é concluída sem o `abap-qa-auditor` reportar ATC sem erros (tópico 13 de `standards/padrao-desenvolvimento.md`).
+-7. **Relatar fielmente**: repasse ao usuário os resultados dos subagentes (objetos, ativação, ATC, lint), inclusive falhas.
++3. **Selecionar o MCP pela política**: antes de qualquer chamada ao SAP, siga [standards/politica-mcp-abap.md](standards/politica-mcp-abap.md). O ambiente e o release de cada sistema são **detectados no próprio SAP** pelo launcher e gravados em `.agents/runtime/<servidor>.json`. Localize ali o servidor conectado ao sistema-alvo; para o `abap-adt`, use a informação de sistema do próprio servidor. Use **somente** o servidor que a matriz indica:
++   - S/4HANA 2025+ → `abap-adt`;
++   - S/4HANA ≤ 2023 em QAS/PRD → `arc-1`, somente análise;
++   - S/4HANA ≤ 2023 em DEV/SANDBOX → `vsp`.
++
++   Vale sempre o ambiente detectado, não o que o usuário ou o prompt afirmam; se divergirem, informe. Se nenhum servidor ativo estiver conectado ao sistema-alvo, pare e avise. QAS e PRD são sempre somente leitura, com qualquer servidor.
++4. **Somente no sistema de desenvolvimento**: antes de criar, alterar ou ativar qualquer objeto no SAP, confirme que o sistema conectado ao servidor MCP selecionado é o `sistemaDesenvolvimento` do bloco `cliente` (compare o SID informado pelo servidor). Se for outro sistema, ou se não for possível confirmar, **pare**: não crie nem ative nada e avise o usuário com o SID encontrado. Consultas de leitura não precisam dessa confirmação.
++5. **Delegar ao especialista**: acione o subagente correspondente (abaixo). O subagente só conhece o que estiver no prompt. Informe:
++   - módulo (`<MD>`), pacote, request, nomes aprovados e objetos já existentes;
++   - o sistema-alvo com o ambiente detectado e o servidor MCP (regra 3);
++   - o `sistemaDesenvolvimento` já confirmado.
++
++   Tarefas pequenas (uma ou duas linhas, consultas) podem ser feitas diretamente, sem delegar.
++6. **Ordem de precedência** em entregas ponta a ponta: `abap-rap-dev` (ou `abap-classic-dev`) → `fiori-elements-dev` → `abap-qa-auditor`. Etapas independentes podem rodar em paralelo.
++7. **Qualidade obrigatória**: nenhuma entrega é concluída sem o `abap-qa-auditor` reportar ATC sem erros (tópico 13 de `standards/padrao-desenvolvimento.md`).
++8. **Relatar fielmente**: repasse ao usuário os resultados dos subagentes (objetos, ativação, ATC, lint), inclusive falhas. Informe também o sistema e o servidor MCP usados e as ações recusadas pela política.
+ 
+ ## Papéis & Subagentes
+ 
+@@ -29,7 +40,7 @@ Definição de cada subagente: `.agents/agents/<nome>.md`. Skill: `.agents/skill
+   - Value Helps (`ZI_<MD>_VH_*` e `@Consumption.valueHelpDefinition`)
+   - Tabelas de Banco e de Draft (`ZT<MD>_*`, `ZT<MD>_*_D`), estruturas (`ZS<MD>_*`), elementos de dados (`ZE_*`), domínios (`ZD_*`) e objetos de bloqueio (`EZ<MD>_*`)
+   - Service Definitions (`ZUI_*`, `ZAPI_<MD>_*`) e Service Bindings (`ZUI_O4_*`, `ZAPI_O4_*`)
+-- **Ferramentas**: MCP `abap-adt` (`abap_object_*`, `abap_repository_*`)
++- **Ferramentas**: MCP do sistema-alvo conforme a política: `abap-adt` (`abap_object_*`, `abap_repository_*`) em S/4HANA 2025+; `vsp` (`SAP`) em DEV/SANDBOX ≤ 2023
+ - **Skill**: [.agents/skills/abap-rap-dev/SKILL.md](.agents/skills/abap-rap-dev/SKILL.md)
+ 
+ ---
+@@ -44,7 +55,7 @@ Definição de cada subagente: `.agents/agents/<nome>.md`. Skill: `.agents/skill
+   - Telas Dynpro / Module Pool (faixa 9000-9999), Batch Inputs e integrações IDoc/ALE (`Z<MD>TI_*`, `Z<MD>TM_*`, `Z<MD>SI_*`)
+   - Formulários (`ZSF<MD>_*`, `ZAF<MD>_*`, `ZSS<MD>_*`)
+   - Estimativa e dimensionamento de demandas RICEFW
+-- **Ferramentas**: MCP `abap-adt` (`abap_object_*`)
++- **Ferramentas**: MCP do sistema-alvo conforme a política: `abap-adt` (`abap_object_*`) em S/4HANA 2025+; `vsp` (`SAP`) em DEV/SANDBOX ≤ 2023
+ - **Skill**: [.agents/skills/abap-classic-dev/SKILL.md](.agents/skills/abap-classic-dev/SKILL.md)
+ 
+ ---
+@@ -72,16 +83,26 @@ Definição de cada subagente: `.agents/agents/<nome>.md`. Skill: `.agents/skill
+   - Aplicação automatizada de QuickFixes via ADT
+   - Execução de testes unitários ABAP Unit (`abap_unit_run_tests`)
+   - Verificação de ESLint no frontend
+-- **Ferramentas**: MCP `abap-adt` (`abap_atc_*`, `abap_unit_*`), terminal
++- **Ferramentas**: MCP do sistema-alvo conforme a política: `abap-adt` (`abap_atc_*`, `abap_unit_*`), `vsp` (`SAP`) ou, para análise em QAS/PRD ≤ 2023, `arc-1` (`SAPDiagnose`); terminal
+ - **Skill**: [.agents/skills/abap-qa-auditor/SKILL.md](.agents/skills/abap-qa-auditor/SKILL.md)
+ 
+ ---
+ 
+ ## MCP
+ 
+-Servidores definidos em `.agents/mcp.servers.json` (fonte única): `abap-adt` (HTTP em `localhost:2236`, token na variável `ABAP_ADT_TOKEN`) e `fiori-mcp` (stdio via npx). Os nomes das ferramentas citados acima são os nomes MCP originais; cada ferramenta de IA pode exibi-los com um prefixo próprio (ex.: `mcp__abap-adt__abap_object_check` no Claude Code).
++Servidores definidos em `.agents/mcp.servers.json` (fonte única):
++
++| Servidor | Uso | Como inicia |
++|---|---|---|
++| `abap-adt` | MCP oficial SAP, para S/4HANA 2025+ | HTTP em `localhost:2236`, token na variável `ABAP_ADT_TOKEN` |
++| `arc-1` | Análise somente leitura em QAS/PRD ≤ 2023 | stdio via `scripts/mcp-launch.mjs`, variáveis `ARC1_*` |
++| `vsp` | Desenvolvimento em DEV/SANDBOX ≤ 2023 | stdio via `scripts/mcp-launch.mjs`, variáveis `VSP_*` |
++| `fiori-mcp` | Apps Fiori | stdio via npx |
++
++`arc-1` e `vsp` só podem ser iniciados pelo launcher, que aplica as travas técnicas da política (ver [ADR-0009](docs/adr/0009-selecao-de-mcp-abap-por-versao-e-ambiente.md)). Se ele recusar iniciar, repasse a mensagem ao usuário e não troque de servidor. Os nomes das ferramentas citados acima são os nomes MCP originais. Cada ferramenta de IA pode exibi-los com um prefixo próprio (ex.: `mcp__abap-adt__abap_object_check`, `mcp__vsp__SAP` no Claude Code). As equivalências de operações entre servidores estão na seção 5 da política.
+ 
+ ## Configuração & Padrões Oficiais
+ - Todos os agentes seguem estritamente as convenções corporativas de desenvolvimento detalhadas em:
+   - Documento mestre: [standards/padrao-desenvolvimento.md](standards/padrao-desenvolvimento.md)
++  - Política de seleção de MCP ABAP: [standards/politica-mcp-abap.md](standards/politica-mcp-abap.md)
+   - Mapeamento JSON e parâmetros do cliente: [standards/naming-conventions.json](standards/naming-conventions.json)
+diff --git a/README.md b/README.md
+index 217381b..a94036d 100644
+--- a/README.md
++++ b/README.md
+@@ -25,10 +25,13 @@ flowchart TD
+         Lead -->|ATC / QuickFixes / Testes Unitários| QA["abap-qa-auditor"]
+     end
+ 
+-    RAP --- ADT_MCP[(abap-adt MCP)]
+-    Classic --- ADT_MCP
++    RAP --- SAP_MCP{{"Política MCP ABAP<br/>(por versão e ambiente)"}}
++    Classic --- SAP_MCP
++    QA --- SAP_MCP
++    SAP_MCP -->|S/4HANA 2025+| ADT_MCP[(abap-adt<br/>MCP oficial SAP)]
++    SAP_MCP -->|≤ 2023 · DEV/Sandbox| VSP_MCP[(vsp)]
++    SAP_MCP -->|≤ 2023 · QAS/PRD · leitura| ARC_MCP[(arc-1)]
+     Fiori --- FIORI_MCP[(fiori-mcp MCP)]
+-    QA --- ADT_MCP
+ ```
+ 
+ ---
+@@ -37,10 +40,12 @@ flowchart TD
+ 
+ | Agente | Especialidade | Escopo de Atuação | Ferramentas MCP | Skill |
+ |---|---|---|---|---|
+-| **`abap-rap-dev`** | Backend Cloud & RAP | CDS View Entities (`ZI_*`, `ZC_*`), Metadata Extensions (`DDLX`), Behavior Definitions (`BDEF`), Classes de Comportamento (`ZCL<MD>_BP_*`), Value Helps e tabelas de banco/draft. | `abap-adt` | [SKILL.md](.agents/skills/abap-rap-dev/SKILL.md) |
+-| **`abap-classic-dev`** | ABAP Clássico & RICEFW | Reports (`PROG`), Includes (`_TOP`, `_SEL`, `_F01`), Function Groups/Modules (`FUGR/F`, `FUGR/FF`), BAPIs, Telas Dynpro (9000-9999), SE11 e estimativas de esforço. | `abap-adt` | [SKILL.md](.agents/skills/abap-classic-dev/SKILL.md) |
++| **`abap-rap-dev`** | Backend Cloud & RAP | CDS View Entities (`ZI_*`, `ZC_*`), Metadata Extensions (`DDLX`), Behavior Definitions (`BDEF`), Classes de Comportamento (`ZCL<MD>_BP_*`), Value Helps e tabelas de banco/draft. | `abap-adt` ou `vsp`¹ | [SKILL.md](.agents/skills/abap-rap-dev/SKILL.md) |
++| **`abap-classic-dev`** | ABAP Clássico & RICEFW | Reports (`PROG`), Includes (`_TOP`, `_SEL`, `_F01`), Function Groups/Modules (`FUGR/F`, `FUGR/FF`), BAPIs, Telas Dynpro (9000-9999), SE11 e estimativas de esforço. | `abap-adt` ou `vsp`¹ | [SKILL.md](.agents/skills/abap-classic-dev/SKILL.md) |
+ | **`fiori-elements-dev`** | Frontend Fiori & UI5 | Gerenciamento agnóstico de apps Fiori (LROP, ALP, OVP, FCL), Page Map no `manifest.json`, rotas, alvos, anotações XML locais e scripts UI5. | `fiori-mcp`, Terminal UI5/npm | [SKILL.md](.agents/skills/fiori-elements-dev/SKILL.md) |
+-| **`abap-qa-auditor`** | Qualidade & Governança | Execução de inspeções ATC, aplicação de QuickFixes automatizados, testes ABAP Unit e validação estática de código frontend (`eslint`). | `abap-adt`, Terminal | [SKILL.md](.agents/skills/abap-qa-auditor/SKILL.md) |
++| **`abap-qa-auditor`** | Qualidade & Governança | Execução de inspeções ATC, aplicação de QuickFixes automatizados, testes ABAP Unit e validação estática de código frontend (`eslint`). | `abap-adt`, `vsp` ou `arc-1`¹, Terminal | [SKILL.md](.agents/skills/abap-qa-auditor/SKILL.md) |
++
++¹ O servidor MCP SAP é escolhido por sistema, conforme a [política de MCP ABAP](standards/politica-mcp-abap.md): `abap-adt` em S/4HANA 2025+, `vsp` em DEV/Sandbox ≤ 2023 e `arc-1` (somente leitura) em QAS/PRD ≤ 2023.
+ 
+ ---
+ 
+@@ -145,6 +150,9 @@ Quando uma nova funcionalidade completa precisa ser entregue, o **Orquestrador C
+ 
+ - **[standards/padrao-desenvolvimento.md](standards/padrao-desenvolvimento.md)**: Manual normativo corporativo de desenvolvimento SAP (Módulos, Pacotes, Requests, Dicionário SE11, ABAP OO, CDS, Fiori e Regras de ATC).
+ - **[standards/naming-conventions.json](standards/naming-conventions.json)**: Mapeamento técnico estruturado com todos os prefixos e padrões de nomenclatura, mais o bloco `cliente` com os parâmetros do projeto.
++- **[standards/politica-mcp-abap.md](standards/politica-mcp-abap.md)**: Qual servidor MCP acessa cada sistema SAP (por versão e ambiente) e o que cada um pode fazer.
++- **[docs/setup-mcp-abap.md](docs/setup-mcp-abap.md)**: Passo a passo para configurar o `vsp` e o `arc-1` na máquina do desenvolvedor.
++- **[standards/sistemas-sap.json](standards/sistemas-sap.json)**: Opcional. Restrições adicionais por sistema; o ambiente é detectado no próprio SAP e esta lista só pode torná-lo mais restritivo.
+ - **[AGENTS.md](AGENTS.md)**: Regras do orquestrador e papéis dos subagentes — fonte única para todas as ferramentas.
+ - **[CLAUDE.md](CLAUDE.md)**: Importa o `AGENTS.md` e adiciona só o que é específico do Claude Code.
+ 
+@@ -154,8 +162,8 @@ Quando uma nova funcionalidade completa precisa ser entregue, o **Orquestrador C
+ 
+ 1. Preencha o bloco `cliente` de [standards/naming-conventions.json](standards/naming-conventions.json): empresa, sigla, pacote e variante ATC, namespace Fiori, pasta dos apps e sistema de desenvolvimento. Enquanto houver placeholders `<...>`, os agentes perguntam em vez de supor.
+ 2. Preencha os placeholders restantes de [standards/padrao-desenvolvimento.md](standards/padrao-desenvolvimento.md) (`<VARIANTE_ATC>`, `<PROJETO_CTS>`, `<ID_PROJETO_CTS>`, `<DESCRICAO_PROJETO_CTS>` e `[EMPRESA]`) ou substitua o documento pelo padrão do cliente.
+-3. Configure o token MCP (seção abaixo) e confirme a conexão com `/mcp`.
+-4. **Libere os agentes apenas no sistema de desenvolvimento.** Eles criam e ativam objetos diretamente via `abap-adt`; use um usuário com autorizações restritas a DEV/sandbox.
++3. Configure o token MCP (seção abaixo). Se o cliente tiver sistemas S/4HANA 2023 ou inferior, configure também `arc-1` e/ou `vsp` ([passo a passo](docs/setup-mcp-abap.md)). Confirme a conexão com `/mcp`.
++4. **Libere os agentes apenas no sistema de desenvolvimento.** Eles criam e ativam objetos diretamente via `abap-adt` ou `vsp`; use um usuário com autorizações restritas a DEV/sandbox. Para `arc-1` em QAS/PRD, use um usuário somente leitura.
+ 
+ ---
+ 
+@@ -192,6 +200,25 @@ O token do servidor `abap-adt` **não é versionado**. Cada desenvolvedor config
+ 
+ > O servidor `abap-adt` (HTTP em `localhost:2236`) precisa estar rodando na sua máquina. Nunca grave o token real em arquivos versionados.
+ 
++## 🧩 Servidores `arc-1` e `vsp` (S/4HANA ≤ 2023)
++
++Definidos pela [política de MCP ABAP](standards/politica-mcp-abap.md) ([ADR-0009](docs/adr/0009-selecao-de-mcp-abap-por-versao-e-ambiente.md)). Os dois são iniciados por `scripts/mcp-launch.mjs`, nunca diretamente. O launcher:
++
++- identifica o sistema lendo o próprio SAP: SID, release (SAP_BASIS) e ambiente pelo papel do mandante na SCC4 (T000). Não depende do que o operador declarou, e o que não puder ler é tratado como PRD;
++- impõe as travas técnicas: `vsp` só em DEV/Sandbox, com `--expect`, `--allowed-packages` e `--block-free-sql`; `arc-1` somente leitura em QAS/PRD, sem prévia de dados nem SQL;
++- isola as credenciais de cada servidor.
++
++**Configuração na máquina:** siga o passo a passo em [docs/setup-mcp-abap.md](docs/setup-mcp-abap.md). Ele cobre:
++
++- os requisitos (Node.js ≥ 22.19 e o binário do `vsp`);
++- o `.env` (as variáveis `VSP_*` e `ARC1_*`);
++- o teste com `node scripts/mcp-launch.mjs <servidor> --diagnostico`;
++- vários sistemas do mesmo tipo;
++- macOS/Linux;
++- a tabela de problemas comuns.
++
++> Antes de usar `arc-1` ou `vsp` em ambiente de cliente, obtenha o aceite formal do cliente. A política de APIs da SAP classifica as APIs ADT como internas (ver seção 7 da política).
++
+ ### ⚠️ Usando no macOS / Linux
+ 
+ Os arquivos versionados usam o wrapper `cmd /c` para o `fiori-mcp`, que só existe no Windows. Na sua cópia local, gere a variante Unix (requer Node.js):
+@@ -213,6 +240,8 @@ AGENTS.md                       ← regras do orquestrador (fonte)
+ CLAUDE.md                       ← @AGENTS.md + específico do Claude (fonte)
+ standards/
+   padrao-desenvolvimento.md     ← padrão corporativo (fonte)
++  politica-mcp-abap.md          ← qual MCP acessa cada sistema SAP (fonte)
++  sistemas-sap.json             ← restrições opcionais por sistema (fonte)
+   naming-conventions.json       ← prefixos + bloco "cliente" (fonte)
+ .agents/
+   agents/<nome>.md              ← subagentes (fonte)
+@@ -220,6 +249,8 @@ standards/
+   mcp.servers.json              ← servidores MCP (fonte)
+   mcp_config.json               ← gerado (Antigravity)
+ scripts/sync-agents.mjs         ← gerador
++scripts/mcp-launch.mjs          ← launcher de arc-1/vsp com as travas da política
++scripts/sap-probe.mjs           ← detecção de SID, release e ambiente no próprio SAP
+ .claude/                        ← gerado (Claude Code: agents, skills, settings.json)
+ .mcp.json                       ← gerado (Claude Code: servidores MCP, na raiz)
+ .codex/                         ← gerado (Codex)
+diff --git a/docs/adr/0009-selecao-de-mcp-abap-por-versao-e-ambiente.md b/docs/adr/0009-selecao-de-mcp-abap-por-versao-e-ambiente.md
+new file mode 100644
+index 0000000..a7a9d1b
+--- /dev/null
++++ b/docs/adr/0009-selecao-de-mcp-abap-por-versao-e-ambiente.md
+@@ -0,0 +1,72 @@
++# ADR-0009: Seleção de MCP ABAP por versão e ambiente
++
++- **Status:** Proposto
++- **Data:** 2026-11-17
++
++## Contexto
++
++O template acessa o SAP somente pelo MCP oficial da SAP (`abap-adt`, [ADR-0007](0007-mcp-como-camada-de-acesso-ao-sap-e-ao-fiori.md)). Esse servidor funciona bem em S/4HANA 2025. Em releases anteriores (S/4HANA 2023 ou inferior), parte das ferramentas fica indisponível, e muitos clientes ainda estão nessas versões.
++
++Foi feito um estudo de caso, com análise do código-fonte, de dois servidores MCP comunitários (licença MIT) que acessam o SAP via ADT a partir do NW 7.50:
++
++- **ARC-1** ([arc-mcp/arc-1](https://github.com/arc-mcp/arc-1)), TypeScript.
++  - Seguro por padrão: todos os flags de escrita, prévia de dados e SQL começam desligados (`src/server/types.ts`).
++  - Proíbe execução de ABAP e RFC no core (ADR-0009 do próprio projeto).
++  - Oferece auditoria, escopos por usuário e principal propagation.
++  - Foi desenhado como alternativa governada ao MCP oficial, com guia de comparação próprio.
++- **vibing-steampunk / vsp** ([oisee/vibing-steampunk](https://github.com/oisee/vibing-steampunk)), Go.
++  - Tem a maior amplitude: debugger, execução de ABAP, RFC, decodificação de tabelas cluster, análise de pacotes, dumps, traces e jobs.
++  - Mas o servidor MCP inicia **sem restrições** por padrão (`internal/mcp/server.go`, `UnrestrictedSafetyConfig`).
++  - Não tem trilha de auditoria estruturada.
++
++## Decisão
++
++1. **O servidor MCP é escolhido por sistema**, conforme a versão (SAP_BASIS) e o ambiente:
++   - **S/4HANA 2025+** → `abap-adt`, para desenvolvimento e análise. Em QAS/PRD, somente leitura.
++   - **S/4HANA ≤ 2023, QAS/PRD** → `arc-1`, somente análise.
++   - **S/4HANA ≤ 2023, DEV/SANDBOX** → `vsp`, para desenvolvimento e análise.
++2. **O ambiente e o release são detectados no próprio SAP, não declarados.** O operador informa só a conexão. O launcher lê:
++   - o SID (`/sap/bc/adt/core/http/systeminformation` ou `T000-LOGSYS`);
++   - o SAP_BASIS (`/sap/bc/adt/system/components`);
++   - o papel do mandante na SCC4 (`T000-CCCATEGORY` e `CCNOCLIIND`).
++
++   O que não puder ser lido é tratado como PRD. `standards/sistemas-sap.json` é opcional e só pode tornar um sistema mais restritivo. O resultado vai para `.agents/runtime/<servidor>.json`, que o orquestrador usa para rotear.
++3. **`arc-1` e `vsp` só são iniciados por `scripts/mcp-launch.mjs`.** O launcher:
++   - detecta o sistema e confere SID e mandante com o que foi configurado;
++   - impõe as travas técnicas (vsp só em DEV/SANDBOX com `--expect`, `--allowed-packages` e `--block-free-sql`; ARC-1 somente leitura fora de DEV, sem prévia de dados nem SQL);
++   - isola as credenciais de cada servidor por prefixo de variável;
++   - fixa a versão do ARC-1.
++4. **As regras completas** ficam em `standards/politica-mcp-abap.md`. O `AGENTS.md` exige segui-las antes de qualquer chamada SAP.
++
++## Alternativas consideradas
++
++- **Somente o MCP oficial em todos os releases.** Perde funcionalidades justamente onde está a maior parte da base instalada.
++- **Somente ARC-1 abaixo de 2025.** Mais seguro, mas sem debugger, sem execução e com menos análise de runtime para o desenvolvimento.
++- **Somente vsp abaixo de 2025.** O padrão sem restrições e a capacidade de executar código e ler dados de negócio são inadequados para QAS/PRD de clientes.
++- **Travas apenas por instrução ao agente.** Insuficientes para o vsp, cujo padrão é sem restrições. Por isso as travas principais ficam no launcher.
++
++## Consequências
++
++- (+) Cada faixa de release usa o servidor com melhor cobertura funcional, e os ambientes de cliente ficam somente leitura por trava técnica, não só por instrução.
++- (+) A classificação não depende do operador: um engano na configuração (URL de QAS no lugar do DEV, ambiente declarado errado) é barrado pela detecção. O orquestrador roteia sem suposição ([ADR-0008](0008-parametros-do-cliente-centralizados-sem-suposicao.md)).
++- (−) A detecção depende de a SCC4 estar correta e de o usuário ter autorização de data preview na T000; sem ela, o sistema é tratado como PRD. A opção de modificação global (SE06) não é lida.
++- (+) A trava do sistema de desenvolvimento ([ADR-0004](0004-trava-do-sistema-de-desenvolvimento.md)) continua válida e passa a valer para o servidor selecionado.
++- (−) **Dependências novas:** ARC-1 e vsp são comunitários, sem suporte SAP. As versões precisam de acompanhamento e atualização por PR.
++- (−) **Política de APIs da SAP:** a FAQ Q33 classifica as APIs ADT como internas e as limita a canais endossados. Usar ARC-1/vsp em clientes exige aceite formal do cliente.
++- (−) **Credenciais:** ficam no ambiente do sistema ou no `.env` local. O launcher lê o `.env` porque as ferramentas de IA não o carregam sozinhas.
++- (−) **Travas que continuam procedurais.** Algumas operações do vsp não podem ser bloqueadas individualmente sem bloquear a escrita de código, e dependem de confirmação do usuário:
++  - execução de ABAP;
++  - RFC;
++  - escrita de variáveis no debugger;
++  - leitura de dados de negócio.
++- (−) **Requisito de ambiente:** o binário `vsp` precisa estar instalado (no `PATH` ou em `VSP_BIN`), e o ARC-1 precisa de Node.js ≥ 22.19 e de `npx` na primeira execução. Passo a passo em `docs/setup-mcp-abap.md`. Na primeira execução, o `npx` precisa baixar o ARC-1, o que pode exigir aumentar o timeout do servidor em algumas ferramentas.
++- (−) **Herança de ambiente (a validar):** Codex e Kimi não foram testados quanto ao repasse de variáveis de ambiente aos processos stdio. O fallback do launcher para o `.env` cobre o caso.
++
++## Evidências
++
++- Estudo de caso de 2026-11-17 (ARC-1 v1.10.1, vsp v2.62.1):
++  - vsp `internal/mcp/server.go`, linha 227, e `pkg/adt/safety.go`;
++  - ARC-1 `src/server/types.ts`, linhas 315–319, e `docs_page/arc-1-vs-sap-abap-mcp-server.md`.
++- `standards/politica-mcp-abap.md`, `scripts/mcp-launch.mjs`, `.agents/mcp.servers.json`.
++- `scripts/sap-probe.mjs`, `standards/sistemas-sap.json` (restrições opcionais).
++- `AGENTS.md`, regras 3 e 4.
+diff --git a/docs/adr/README.md b/docs/adr/README.md
+index f271a66..ece8e6d 100644
+--- a/docs/adr/README.md
++++ b/docs/adr/README.md
+@@ -22,6 +22,7 @@ Formato: MADR simplificado, em português. Um arquivo por decisão: `NNNN-titulo
+ | [0006](0006-atc-tolerancia-zero-como-criterio-de-entrega.md) | ATC com tolerância zero como critério de entrega | Aceito |
+ | [0007](0007-mcp-como-camada-de-acesso-ao-sap-e-ao-fiori.md) | MCP como camada de acesso ao SAP e ao Fiori | Aceito |
+ | [0008](0008-parametros-do-cliente-centralizados-sem-suposicao.md) | Parâmetros do cliente centralizados, sem suposição | Aceito |
++| [0009](0009-selecao-de-mcp-abap-por-versao-e-ambiente.md) | Seleção de MCP ABAP por versão e ambiente | Proposto |
+ 
+ ## Modelo
+ 
+diff --git a/docs/setup-mcp-abap.md b/docs/setup-mcp-abap.md
+new file mode 100644
+index 0000000..d4a3b2c
+--- /dev/null
++++ b/docs/setup-mcp-abap.md
+@@ -0,0 +1,185 @@
++# Configuração dos MCPs `vsp` e `arc-1` na máquina
++
++Guia para preparar a máquina de cada desenvolvedor para os servidores `vsp` e `arc-1`, usados em sistemas S/4HANA 2023 ou inferior. As regras de uso estão na [política de MCP ABAP](../standards/politica-mcp-abap.md), e o racional da decisão no [ADR-0009](adr/0009-selecao-de-mcp-abap-por-versao-e-ambiente.md).
++
++| Servidor | Sistema | Modo |
++|---|---|---|
++| `vsp` | DEV / Sandbox ≤ 2023 | Desenvolvimento |
++| `arc-1` | QAS / PRD ≤ 2023 | Somente leitura |
++| `abap-adt` | S/4HANA 2025+ | Ver [Configuração do Token MCP](../README.md#-configuração-do-token-mcp-abap-adt) |
++
++Você **não edita** nenhum arquivo de MCP (`.mcp.json`, `.codex/config.toml` etc.). Eles já vêm gerados com `arc-1` e `vsp` apontando para `scripts/mcp-launch.mjs`. Preparar a máquina é só instalar os executáveis, preencher o `.env` e conferir a detecção.
++
++---
++
++## Passo a passo
++
++### Uma vez por máquina
++
++**1. Node.js 22.19 ou superior.** O ARC-1 exige essa versão.
++
++```powershell
++node -v
++```
++
++Se estiver abaixo, instale a versão LTS de [nodejs.org](https://nodejs.org).
++
++**2. Binário do vsp.**
++
++1. Baixe o asset da sua plataforma (ex.: `windows-amd64`) em [releases do vibing-steampunk](https://github.com/oisee/vibing-steampunk/releases). Use a versão homologada pelo projeto (v2.62.1), não a "latest".
++2. Salve como `C:\tools\vsp\vsp.exe`.
++3. Adicione a pasta ao PATH do usuário:
++
++   ```powershell
++   [Environment]::SetEnvironmentVariable('Path', $env:Path + ';C:\tools\vsp', 'User')
++   ```
++
++4. Abra um terminal novo e confira:
++
++   ```powershell
++   vsp --version
++   ```
++
++Alternativa ao PATH: defina `VSP_BIN=C:\tools\vsp\vsp.exe` no `.env` (passo 4).
++
++**3. Certificado HTTPS — só se o SAP usar certificado de CA interna.** O launcher nunca desliga a verificação TLS. Peça ao time de Basis ou de infraestrutura a CA raiz em formato `.pem` e aponte o Node para ela:
++
++```powershell
++[Environment]::SetEnvironmentVariable('NODE_EXTRA_CA_CERTS', 'C:\certs\ca-cliente.pem', 'User')
++```
++
++O ARC-1 não tem passo de instalação: o launcher o baixa sozinho na primeira execução (`npx arc-1@1.10.1`).
++
++### Uma vez por projeto / cliente
++
++**4. Criar o `.env`** na raiz do projeto, a partir do modelo:
++
++```powershell
++Copy-Item .env.example .env
++```
++
++O `.env` está no `.gitignore`. Nunca faça commit dele.
++
++**5. Preencher a conexão do DEV (`vsp`):**
++
++```ini
++VSP_SAP_URL=https://ds4.cliente.com.br:44300
++VSP_SAP_CLIENT=110
++VSP_SAP_USER=SEU_USUARIO
++VSP_SAP_PASSWORD=...
++VSP_ALLOWED_PACKAGES=$TMP,Z*
++```
++
++**6. Preencher a conexão do QAS/PRD (`arc-1`):**
++
++```ini
++ARC1_SAP_URL=https://qs4.cliente.com.br:44300
++ARC1_SAP_CLIENT=400
++ARC1_SAP_USER=USUARIO_LEITURA
++ARC1_SAP_PASSWORD=...
++```
++
++Informe só a conexão. SID, release e ambiente são **detectados no próprio SAP**. Se o cliente não tiver um dos sistemas, deixe as variáveis dele vazias.
++
++**7. Testar a detecção:**
++
++```powershell
++node scripts/mcp-launch.mjs vsp --diagnostico
++node scripts/mcp-launch.mjs arc-1 --diagnostico
++```
++
++Resultado esperado:
++
++```
++mcp-launch: vsp encontrado: vsp v2.62.1 (...)
++mcp-launch: vsp -> DS4/110 · S/4HANA 2023 · DEV (mandante de customizing ...) · desenvolvimento
++mcp-launch: arc-1 -> QS4/400 · S/4HANA 2023 · QAS (mandante de teste ...) · somente leitura
++```
++
++Antes de conectar ao SAP, o diagnóstico confere os executáveis: o binário do `vsp` (ou o `VSP_BIN`) e a versão do Node exigida pelo ARC-1. Se faltar algo, ele para com a indicação do passo deste guia que resolve.
++
++Confira se SID, produto e ambiente estão corretos. Se aparecer uma recusa, veja a seção [Problemas comuns](#problemas-comuns).
++
++### Toda vez que for usar
++
++**8. Abrir a ferramenta e conferir as conexões.**
++
++1. Abra a ferramenta de IA **na raiz do projeto**. O launcher é chamado por caminho relativo e não é encontrado se a ferramenta for aberta em outra pasta.
++2. Rode `/mcp` (Claude Code). Os servidores `abap-adt`, `arc-1`, `vsp` e `fiori-mcp` devem aparecer conectados.
++
++Se você alterar o `.env`, reinicie a ferramenta: os servidores só são iniciados na abertura da sessão.
++
++---
++
++## Variáveis opcionais
++
++| Variável | Para quê |
++|---|---|
++| `VSP_SAP_SID` / `ARC1_SAP_SID` | Conferência: se o SID detectado for diferente, o launcher recusa iniciar. Pega URL trocada. |
++| `VSP_ALLOWED_TRANSPORTS=DS4K*` | Permite ao `vsp` editar objetos em pacotes transportáveis, só nas requests do padrão informado. |
++| `VSP_ENABLE_TRANSPORTS=true` | Permite ao `vsp` criar e liberar requests. Use só quando necessário. |
++| `VSP_READ_ONLY=true` | Usa o `vsp` no DEV apenas para análise. |
++| `VSP_BIN` | Caminho do `vsp.exe` quando ele não estiver no PATH. |
++| `ARC1_BIN` | Caminho de um ARC-1 já instalado, para redes que bloqueiam o `npx`. Instale com `npm install -g arc-1@1.10.1`. |
++| `ARC1_BLOCKED_DATA_SOURCES` | Tabelas a bloquear na leitura (experimental). Ex.: `USR02,PA0002`. |
++
++---
++
++## Autorizações SAP dos usuários
++
++| Usuário | Precisa de |
++|---|---|
++| Ambos | Acesso ao ADT: serviço ICF `/sap/bc/adt` ativo e autorizações de desenvolvedor ADT. |
++| Ambos | Data preview na `T000`, usado na detecção do ambiente. Sem ela, o sistema é tratado como **PRD**, e o `vsp` não sobe. |
++| `vsp` (DEV) | Autorizações de desenvolvimento, restritas aos pacotes do projeto. |
++| `arc-1` (QAS/PRD) | Somente leitura. O launcher já força leitura, mas a autorização SAP é a segunda barreira. |
++
++---
++
++## Vários sistemas do mesmo tipo
++
++Exemplo: dois QAS, NE e SE.
++
++1. Em `.agents/mcp.servers.json`, troque a entrada `arc-1` por duas:
++
++   ```json
++   "arc-1-qas-ne": { "transport": "stdio", "command": "node", "args": ["scripts/mcp-launch.mjs", "arc-1-qas-ne"], "timeoutSec": 300 },
++   "arc-1-qas-se": { "transport": "stdio", "command": "node", "args": ["scripts/mcp-launch.mjs", "arc-1-qas-se"], "timeoutSec": 300 }
++   ```
++
++2. Rode `node scripts/sync-agents.mjs` e faça commit.
++3. No `.env`, use os prefixos derivados do nome do servidor: `ARC1_QAS_NE_SAP_URL`, `ARC1_QAS_SE_SAP_URL` etc.
++
++---
++
++## macOS / Linux
++
++As etapas são as mesmas, com três diferenças:
++
++- **vsp:** baixe o asset `darwin-arm64` ou `linux-amd64`, dê `chmod +x` e coloque-o como `vsp` no PATH (ex.: `/usr/local/bin/vsp`).
++- **Variáveis de ambiente:** use `export` no `~/.zshrc`. Exemplo: `export NODE_EXTRA_CA_CERTS=~/certs/ca-cliente.pem`.
++- **Adaptadores:** gere a variante Unix localmente com `node scripts/sync-agents.mjs --platform=unix`. **Não faça commit** dessa variante: os arquivos versionados usam `cmd /c`, que só existe no Windows.
++
++---
++
++## Problemas comuns
++
++Todas as mensagens do launcher começam com `mcp-launch:`. Para vê-las, rode o diagnóstico do passo 7.
++
++| Mensagem | Causa e solução |
++|---|---|
++| `variável VSP_SAP_URL não definida` | `.env` ausente ou incompleto. Refaça os passos 4 a 6. |
++| `logon recusado (401)` | Usuário ou senha errados, ou usuário bloqueado no SAP. |
++| `fetch failed` / erro de certificado | URL ou porta erradas, VPN desligada ou CA interna. Ver passo 3. |
++| `T000 ilegível ... tratado como PRD` | O usuário não tem autorização de data preview. Peça-a ao time de segurança SAP. |
++| `vsp recusado: ... é QAS` | A URL do `vsp` aponta para um QAS, ou o mandante do DEV não está como customizing (`C`) na SCC4. |
++| `o sistema conectado é QS4, mas VSP_SAP_SID diz DS4` | A URL está trocada. Corrija `VSP_SAP_URL`. |
++| `vsp recusado: SAP_BASIS 816` | É um S/4HANA 2025. Use o `abap-adt` (MCP oficial). |
++| `"vsp" não encontrado` | O binário não foi baixado (passo 2), ou não está no PATH. Abra um terminal novo depois de alterar o PATH, ou defina `VSP_BIN`. |
++| `"vsp" não pôde ser executado (EACCES/EPERM)` | O arquivo está bloqueado. No Windows, abra as propriedades do arquivo e marque "Desbloquear". No macOS, rode `xattr -d com.apple.quarantine`. No Linux, rode `chmod +x`. |
++| `"vsp --version" terminou com código ...` | O arquivo não é o `vsp` correto, ou é de outra plataforma. Baixe novamente o asset da sua plataforma. |
++| `o ARC-1 exige Node.js >= 22.19` | Atualize o Node (passo 1). |
++| `arc-1` dá timeout na 1ª vez | A rede está bloqueando o npm. Instale o ARC-1 antes e use `ARC1_BIN`. |
++| Servidor falho no `/mcp`, mas o diagnóstico passa | A ferramenta foi aberta fora da raiz do projeto, ou não foi reiniciada após mudar o `.env`. |
++
++> Antes de usar `arc-1` ou `vsp` em ambiente de cliente, obtenha o aceite formal do cliente. A política de APIs da SAP classifica as APIs ADT como internas (ver seção 7 da [política](../standards/politica-mcp-abap.md)).
+diff --git a/scripts/mcp-launch.mjs b/scripts/mcp-launch.mjs
+new file mode 100644
+index 0000000..388d0d7
+--- /dev/null
++++ b/scripts/mcp-launch.mjs
+@@ -0,0 +1,217 @@
++#!/usr/bin/env node
++// Inicia os servidores MCP ARC-1 e vibing-steampunk (vsp) aplicando as travas técnicas da
++// política standards/politica-mcp-abap.md (ADR-0009).
++//
++//   node scripts/mcp-launch.mjs <servidor>                 inicia o servidor (uso pelas ferramentas de IA)
++//   node scripts/mcp-launch.mjs <servidor> --diagnostico   só detecta o sistema e mostra a decisão
++//
++// <servidor> é a chave do servidor em .agents/mcp.servers.json e define a ferramenta e o
++// prefixo das variáveis de ambiente:
++//   arc-1          -> ARC1_*          vsp          -> VSP_*
++//   arc-1-qas-ne   -> ARC1_QAS_NE_*   vsp-sandbox  -> VSP_SANDBOX_*
++//
++// Variáveis (do ambiente do sistema ou, como fallback, do .env da raiz do projeto):
++//   <P>_SAP_URL, <P>_SAP_CLIENT, <P>_SAP_USER, <P>_SAP_PASSWORD   obrigatórias
++//   <P>_SAP_SID   opcional: se informado, precisa bater com o SID detectado
++//   ARC-1: <P>_ALLOWED_PACKAGES (só se o sistema for DEV/SANDBOX), <P>_BLOCKED_DATA_SOURCES, ARC1_BIN
++//   vsp:   <P>_ALLOWED_PACKAGES (obrigatória), <P>_ALLOWED_TRANSPORTS, <P>_ENABLE_TRANSPORTS,
++//          <P>_READ_ONLY, VSP_BIN
++//
++// O launcher NÃO confia no que foi declarado: lê do próprio SAP (scripts/sap-probe.mjs) o SID,
++// o mandante, o release (SAP_BASIS) e o papel do mandante (T000/SCC4). O registro opcional
++// standards/sistemas-sap.json só pode tornar a classificação MAIS restritiva.
++//
++// Travas aplicadas (não dependem do agente):
++//   - vsp: só em DEV/SANDBOX detectado e SAP_BASIS 750–815; sempre com --expect (SID detectado),
++//     --allowed-packages e --block-free-sql; nunca --insecure.
++//   - ARC-1: fora de DEV/SANDBOX, ou com SAP_BASIS >= 816, somente leitura; prévia de dados,
++//     SQL livre, escrita em transporte/Git e execução de plugins sempre desligados.
++//   - O que não puder ser detectado é tratado como o caso mais restritivo.
++//   - Nenhuma variável SAP_* do ambiente do usuário é herdada; o processo filho roda num
++//     diretório neutro para não carregar o .env do projeto.
++//
++// Para o orquestrador rotear, o resultado da detecção é gravado em .agents/runtime/<servidor>.json
++// (não versionado), apagado no início de cada execução e ao encerrar o servidor.
++//
++// IMPORTANTE: stdout é o canal MCP. Este script só escreve em stderr.
++// Sem dependências: só Node.js >= 18.
++
++import fs from "node:fs";
++import os from "node:os";
++import path from "node:path";
++import { spawn, spawnSync } from "node:child_process";
++import { fileURLToPath } from "node:url";
++import { detectar, maisRestritivo } from "./sap-probe.mjs";
++
++const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
++const ARC1_PACKAGE = "arc-1@1.10.1"; // versão fixada (mesmo critério do fiori-mcp, ADR-0007)
++const REGISTRO = "standards/sistemas-sap.json";
++const PLACEHOLDER = /<[^>]*>/;
++
++function fail(msg) {
++  console.error(`mcp-launch: ${msg}`);
++  process.exit(2);
++}
++const log = (msg) => console.error(`mcp-launch: ${msg}`);
++
++// ---------------------------------------------------------------- servidor e prefixo
++const server = process.argv[2];
++const DIAGNOSTICO = process.argv.includes("--diagnostico");
++if (!server || server.startsWith("--")) fail("informe o servidor (ex.: node scripts/mcp-launch.mjs vsp)");
++const tool = server.startsWith("arc-1") ? "arc-1" : server.startsWith("vsp") ? "vsp" : null;
++if (!tool) fail(`servidor "${server}" não é arc-1* nem vsp*`);
++const prefix = (tool === "arc-1" ? "ARC1" : "VSP") + server.slice(tool.length).toUpperCase().replace(/[^A-Z0-9]+/g, "_");
++
++// ---------------------------------------------------------------- estado para o orquestrador
++const runtimeDir = path.join(ROOT, ".agents/runtime");
++const runtimeFile = path.join(runtimeDir, `${server}.json`);
++const limparRuntime = () => { try { fs.rmSync(runtimeFile, { force: true }); } catch { /* sem efeito */ } };
++if (!DIAGNOSTICO) limparRuntime(); // nunca deixar a detecção de uma sessão anterior valendo
++
++// ---------------------------------------------------------------- variáveis
++function readDotEnv(file) {
++  if (!fs.existsSync(file)) return {};
++  const out = {};
++  for (const line of fs.readFileSync(file, "utf8").split(/\r?\n/)) {
++    if (line.trim().startsWith("#")) continue;
++    const m = line.match(/^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$/);
++    if (m) out[m[1]] = m[2].replace(/^(['"])(.*)\1$/, "$2");
++  }
++  return out;
++}
++const dotenv = readDotEnv(path.join(ROOT, ".env"));
++const v = (name) => {
++  const val = process.env[`${prefix}_${name}`] ?? dotenv[`${prefix}_${name}`];
++  return val === undefined || val === "" || PLACEHOLDER.test(val) ? undefined : val;
++};
++const req = (name) => v(name) ?? fail(`variável ${prefix}_${name} não definida (ambiente ou .env)`);
++const flag = (name) => /^(true|1|yes)$/i.test(v(name) ?? "");
++
++const conn = {
++  url: req("SAP_URL"),
++  client: req("SAP_CLIENT"),
++  user: req("SAP_USER").toUpperCase(),
++  password: req("SAP_PASSWORD"),
++};
++const sidDeclarado = v("SAP_SID")?.toUpperCase();
++
++// ---------------------------------------------------------------- executáveis (antes de tocar no SAP)
++const GUIA = "docs/setup-mcp-abap.md";
++function verificarBinario(cmd, variavel, passo) {
++  const r = spawnSync(cmd, ["--version"], { encoding: "utf8", timeout: 15000, windowsHide: true });
++  if (r.error?.code === "ENOENT")
++    fail(`"${cmd}" não encontrado. Instale-o ou defina ${variavel} com o caminho completo (${GUIA}, ${passo}).`);
++  if (r.error) fail(`"${cmd}" não pôde ser executado (${r.error.code || r.error.message}). Se foi baixado agora, o sistema pode tê-lo bloqueado — no Windows, "Desbloquear" nas propriedades do arquivo; no macOS, xattr -d com.apple.quarantine (${GUIA}, ${passo}).`);
++  if (r.status !== 0) fail(`"${cmd} --version" terminou com código ${r.status}; confira se é o binário correto (${GUIA}, ${passo}).`);
++  return (r.stdout || r.stderr || "").trim().split(/\r?\n/)[0];
++}
++if (tool === "vsp") {
++  const versao = verificarBinario(process.env.VSP_BIN || "vsp", "VSP_BIN", "passo 2");
++  log(`vsp encontrado: ${versao}`);
++} else if (process.env.ARC1_BIN) {
++  verificarBinario(process.env.ARC1_BIN, "ARC1_BIN", "variáveis opcionais");
++} else {
++  const [maj, min] = process.versions.node.split(".").map(Number);
++  if (maj < 22 || (maj === 22 && min < 19))
++    fail(`o ARC-1 exige Node.js >= 22.19; esta máquina tem ${process.versions.node} (${GUIA}, passo 1).`);
++}
++
++// ---------------------------------------------------------------- detecção no próprio SAP
++let det;
++try {
++  det = await detectar(conn);
++} catch (e) {
++  fail(`não foi possível identificar o sistema em ${conn.url}: ${e.message}`);
++}
++det.avisos.forEach((a) => log(`aviso: ${a}`));
++
++const sid = det.sid ?? sidDeclarado;
++if (!sid) fail("SID não detectado (sistema sem systeminformation e T000 ilegível) — informe " + `${prefix}_SAP_SID`);
++if (!det.sid) log(`aviso: SID não confirmado pelo sistema; usando o declarado ${sidDeclarado}`);
++if (det.sid && sidDeclarado && det.sid !== sidDeclarado)
++  fail(`o sistema conectado é ${det.sid}, mas ${prefix}_SAP_SID diz ${sidDeclarado} — confira a URL`);
++if (det.client && det.client !== String(conn.client).padStart(3, "0"))
++  fail(`o mandante conectado é ${det.client}, não ${conn.client}`);
++
++// ---------------------------------------------------------------- registro opcional (só restringe)
++let ambiente = det.ambiente;
++let motivo = det.motivo;
++if (fs.existsSync(path.join(ROOT, REGISTRO))) {
++  const lista = JSON.parse(fs.readFileSync(path.join(ROOT, REGISTRO), "utf8"))?.restricoes ?? [];
++  const r = lista.find((x) => String(x.sid).toUpperCase() === sid && String(x.mandante).padStart(3, "0") === String(conn.client).padStart(3, "0"));
++  if (r && !PLACEHOLDER.test(JSON.stringify(r))) {
++    const declarado = String(r.ambiente).toUpperCase();
++    const efetivo = maisRestritivo(ambiente, declarado);
++    if (efetivo !== ambiente) motivo = `${REGISTRO} restringe a ${declarado} (detectado: ${ambiente})`;
++    else if (declarado !== ambiente) log(`aviso: ${REGISTRO} declara ${declarado}, mas o sistema é ${ambiente}; vale o mais restritivo (${ambiente})`);
++    ambiente = efetivo;
++  }
++}
++const isDev = ambiente === "DEV" || ambiente === "SANDBOX";
++const basis = det.sapBasis;
++
++// ---------------------------------------------------------------- decisão por ferramenta
++const childEnv = {};
++for (const [k, val] of Object.entries(process.env)) {
++  if (/^(SAP_|ARC1_|VSP_|ABAP_ADT_TOKEN$)/.test(k)) continue; // nada de SAP_* herdado
++  childEnv[k] = val;
++}
++Object.assign(childEnv, { SAP_URL: conn.url, SAP_CLIENT: conn.client, SAP_USER: conn.user, SAP_PASSWORD: conn.password });
++
++let command, args, shell = false, modo;
++
++if (tool === "arc-1") {
++  const writes = isDev && basis < 816;
++  modo = writes ? "escrita restrita a pacotes" : "somente leitura";
++  Object.assign(childEnv, {
++    SAP_TRANSPORT: "stdio",
++    SAP_INSECURE: "false",
++    SAP_ALLOW_WRITES: String(writes),
++    SAP_ALLOW_TRANSPORT_WRITES: "false",
++    SAP_ALLOW_GIT_WRITES: "false",
++    SAP_ALLOW_DATA_PREVIEW: "false",
++    SAP_ALLOW_FREE_SQL: "false",
++    SAP_ALLOW_PLUGIN_EXECUTE: "false",
++    SAP_DENY_ACTIONS: "SAPWrite.delete",
++  });
++  if (writes) childEnv.SAP_ALLOWED_PACKAGES = req("ALLOWED_PACKAGES");
++  if (v("BLOCKED_DATA_SOURCES")) childEnv.SAP_BLOCKED_DATA_SOURCES = v("BLOCKED_DATA_SOURCES");
++  if (process.env.ARC1_BIN) {
++    command = process.env.ARC1_BIN;
++    args = [];
++  } else {
++    command = process.platform === "win32" ? "npx.cmd" : "npx";
++    args = ["--yes", ARC1_PACKAGE];
++    shell = process.platform === "win32"; // .cmd exige shell no Node >= 20; argumentos fixos
++  }
++} else {
++  if (!isDev) fail(`vsp recusado: ${sid}/${conn.client} é ${ambiente} — ${motivo}. Política MCP: vsp só em DEV/SANDBOX.`);
++  if (basis < 750 || basis >= 816) fail(`vsp recusado: SAP_BASIS ${basis} (${det.produto}); permitido só 750–815.`);
++  modo = flag("READ_ONLY") ? "somente leitura" : "desenvolvimento";
++  command = process.env.VSP_BIN || "vsp";
++  args = ["--mode", "hyperfocused", "--expect", `${sid}.${String(conn.client).padStart(3, "0")}/${conn.user}`,
++    "--allowed-packages", req("ALLOWED_PACKAGES"), "--block-free-sql"];
++  if (v("ALLOWED_TRANSPORTS")) args.push("--allow-transportable-edits", "--allowed-transports", v("ALLOWED_TRANSPORTS"));
++  if (flag("ENABLE_TRANSPORTS")) args.push("--enable-transports");
++  if (flag("READ_ONLY")) args.push("--read-only");
++}
++
++const estado = {
++  servidor: server, ferramenta: tool, sid, mandante: String(conn.client).padStart(3, "0"), usuario: conn.user,
++  sapBasis: basis, produto: det.produto, ambiente, motivo, modo,
++  sidConfirmado: Boolean(det.sid), detectadoEm: new Date().toISOString(), pid: process.pid,
++};
++log(`${server} -> ${sid}/${estado.mandante} · ${det.produto} · ${ambiente} (${motivo}) · ${modo}`);
++
++if (DIAGNOSTICO) {
++  console.error(JSON.stringify({ ...estado, t000: det.t000, args: tool === "vsp" ? args : undefined }, null, 2));
++  process.exit(0);
++}
++
++// ---------------------------------------------------------------- execução
++fs.mkdirSync(runtimeDir, { recursive: true });
++fs.writeFileSync(runtimeFile, JSON.stringify(estado, null, 2) + "\n");
++const child = spawn(command, args, { env: childEnv, cwd: os.tmpdir(), stdio: "inherit", shell });
++child.on("error", (e) => { limparRuntime(); fail(`não foi possível iniciar "${command}": ${e.message}`); });
++for (const sig of ["SIGINT", "SIGTERM"]) process.on(sig, () => child.kill(sig));
++child.on("exit", (code, signal) => { limparRuntime(); process.exit(signal ? 1 : code ?? 1); });
+diff --git a/scripts/sap-probe.mjs b/scripts/sap-probe.mjs
+new file mode 100644
+index 0000000..09b4b6a
+--- /dev/null
++++ b/scripts/sap-probe.mjs
+@@ -0,0 +1,145 @@
++// Detecta, lendo o próprio sistema SAP, a identidade, o release e o ambiente de uma conexão.
++// Usado por scripts/mcp-launch.mjs (política standards/politica-mcp-abap.md, ADR-0009).
++//
++//   Diagnóstico: node scripts/mcp-launch.mjs <servidor> --diagnostico
++//
++// Fontes (somente leitura, endpoints ADT que o Eclipse e os próprios ARC-1/vsp usam):
++//   1. GET  /sap/bc/adt/core/http/systeminformation  -> SID, mandante, usuário (releases recentes)
++//   2. GET  /sap/bc/adt/system/components            -> SAP_BASIS e S4CORE (release)
++//   3. POST /sap/bc/adt/datapreview/freestyle        -> T000 do mandante: papel (CCCATEGORY),
++//      alterabilidade (CCCORACTIV) e alterações entre mandantes (CCNOCLIIND); LOGSYS como
++//      fallback do SID. É uma linha de configuração do mandante, sem dado de negócio.
++//
++// Princípio: falha fechada. O que não puder ser lido é tratado como o caso mais restritivo.
++// Sem dependências: só Node.js >= 18. TLS nunca é desligado (use NODE_EXTRA_CA_CERTS se
++// o certificado do SAP for de CA interna).
++
++const TIMEOUT_MS = 20000;
++
++// Ordem de restrição: quanto maior, mais restritivo.
++export const RESTRICAO = { DEV: 0, SANDBOX: 1, QAS: 2, PRD: 3 };
++export const maisRestritivo = (a, b) => (RESTRICAO[a] >= RESTRICAO[b] ? a : b);
++
++const PRODUTO_POR_BASIS = {
++  750: "S/4HANA 1511", 751: "S/4HANA 1610", 752: "S/4HANA 1709", 753: "S/4HANA 1809",
++  754: "S/4HANA 1909", 755: "S/4HANA 2020", 756: "S/4HANA 2021", 757: "S/4HANA 2022",
++  758: "S/4HANA 2023", 816: "S/4HANA 2025",
++};
++
++class Sessao {
++  constructor({ url, client, user, password }) {
++    this.base = url.replace(/\/+$/, "");
++    this.client = client;
++    this.auth = "Basic " + Buffer.from(`${user}:${password}`).toString("base64");
++    this.cookies = new Map();
++    this.csrf = null;
++  }
++  url(p) {
++    return `${this.base}${p}${p.includes("?") ? "&" : "?"}sap-client=${encodeURIComponent(this.client)}`;
++  }
++  guardarCookies(res) {
++    const lista = typeof res.headers.getSetCookie === "function" ? res.headers.getSetCookie() : [];
++    for (const c of lista) {
++      const [par] = c.split(";");
++      const i = par.indexOf("=");
++      if (i > 0) this.cookies.set(par.slice(0, i).trim(), par.slice(i + 1).trim());
++    }
++  }
++  headers(extra = {}) {
++    const h = { Authorization: this.auth, ...extra };
++    if (this.cookies.size) h.Cookie = [...this.cookies].map(([k, v]) => `${k}=${v}`).join("; ");
++    return h;
++  }
++  async req(method, p, { accept, body, contentType } = {}) {
++    const h = this.headers({ ...(accept ? { Accept: accept } : {}), ...(contentType ? { "Content-Type": contentType } : {}) });
++    if (method === "GET" && !this.csrf) h["x-csrf-token"] = "fetch";
++    if (method !== "GET" && this.csrf) h["x-csrf-token"] = this.csrf;
++    const res = await fetch(this.url(p), { method, headers: h, body, redirect: "manual", signal: AbortSignal.timeout(TIMEOUT_MS) });
++    this.guardarCookies(res);
++    const token = res.headers.get("x-csrf-token");
++    if (token && token.toLowerCase() !== "required") this.csrf = token;
++    return { status: res.status, text: await res.text() };
++  }
++}
++
++function lerXmlAttr(xml, tag) {
++  return [...xml.matchAll(new RegExp(`<(?:\\w+:)?${tag}>([\\s\\S]*?)</(?:\\w+:)?${tag}>`, "g"))].map((m) => m[1].trim());
++}
++
++// Resposta do datapreview: uma <columns> por coluna, com o nome em metadata e os valores em dataSet.
++function lerDataPreview(xml) {
++  const linha = {};
++  for (const col of xml.matchAll(/<(?:\w+:)?columns>([\s\S]*?)<\/(?:\w+:)?columns>/g)) {
++    const nome = col[1].match(/(?:\w+:)?name="([^"]+)"/)?.[1];
++    if (!nome) continue;
++    const dado = col[1].match(/<(?:\w+:)?data>([\s\S]*?)<\/(?:\w+:)?data>|<(?:\w+:)?data\/>/);
++    linha[nome.toUpperCase()] = dado ? (dado[1] ?? "").trim() : "";
++  }
++  return linha;
++}
++
++// Classificação do ambiente a partir da T000 (SCC4):
++//   CCCATEGORY: P produção, T teste, C customizing, D demonstração, E treinamento, S referência SAP.
++//   CCNOCLIIND: ' ' ou '1' = objetos de repositório alteráveis neste mandante; '2' ou '3' = não.
++export function classificar(t000) {
++  if (!t000) return { ambiente: "PRD", motivo: "T000 ilegível — tratado como PRD por precaução" };
++  const cat = (t000.CCCATEGORY || "").toUpperCase();
++  const repoAlteravel = ["", "1"].includes((t000.CCNOCLIIND || "").trim());
++  const desc = `CCCATEGORY='${cat}', CCNOCLIIND='${(t000.CCNOCLIIND || "").trim()}'`;
++  if (cat === "P") return { ambiente: "PRD", motivo: `mandante produtivo (${desc})` };
++  if (cat === "T") return { ambiente: "QAS", motivo: `mandante de teste (${desc})` };
++  if (cat === "C" && repoAlteravel) return { ambiente: "DEV", motivo: `mandante de customizing com repositório alterável (${desc})` };
++  if (["D", "E"].includes(cat) && repoAlteravel) return { ambiente: "SANDBOX", motivo: `mandante de demo/treinamento com repositório alterável (${desc})` };
++  return { ambiente: "QAS", motivo: `repositório não alterável ou papel não reconhecido (${desc}) — somente leitura` };
++}
++
++export async function detectar(conn) {
++  const s = new Sessao(conn);
++  const out = { sid: null, client: null, user: null, sapBasis: null, s4core: null, produto: null, t000: null, avisos: [] };
++
++  // 1. Identidade
++  const si = await s.req("GET", "/sap/bc/adt/core/http/systeminformation", {
++    accept: "application/vnd.sap.adt.core.http.systeminformation.v1+json, application/json",
++  });
++  if (si.status === 401) throw new Error("logon recusado (401) — confira usuário e senha");
++  if (si.status === 200) {
++    try {
++      const j = JSON.parse(si.text);
++      const f = (...ns) => { for (const [k, v] of Object.entries(j)) if (ns.some((n) => n.toLowerCase() === k.toLowerCase()) && typeof v === "string") return v.trim().toUpperCase(); return null; };
++      out.sid = f("systemID", "sid");
++      out.client = f("client");
++      out.user = f("userName", "user");
++    } catch { /* release sem o recurso em JSON: cai no fallback da T000 */ }
++  }
++
++  // 2. Release
++  const comp = await s.req("GET", "/sap/bc/adt/system/components", { accept: "application/atom+xml;type=feed" });
++  if (comp.status !== 200) throw new Error(`não foi possível ler os componentes instalados (HTTP ${comp.status})`);
++  for (const entry of comp.text.matchAll(/<(?:\w+:)?entry>([\s\S]*?)<\/(?:\w+:)?entry>/g)) {
++    const id = lerXmlAttr(entry[1], "id")[0];
++    const release = (lerXmlAttr(entry[1], "title")[0] || "").split(";")[0].trim();
++    if (id === "SAP_BASIS") out.sapBasis = parseInt(release, 10);
++    if (id === "S4CORE") out.s4core = release;
++  }
++  if (!Number.isFinite(out.sapBasis)) throw new Error("SAP_BASIS não encontrado nos componentes instalados");
++  out.produto = out.s4core
++    ? PRODUTO_POR_BASIS[out.sapBasis] || `S/4HANA (SAP_BASIS ${out.sapBasis})`
++    : `NetWeaver/ECC (SAP_BASIS ${out.sapBasis})`;
++
++  // 3. Papel do mandante (T000)
++  const mandt = String(conn.client).replace(/\D/g, "").padStart(3, "0");
++  const sql = `SELECT MANDT, LOGSYS, CCCATEGORY, CCCORACTIV, CCNOCLIIND FROM T000 WHERE MANDT = '${mandt}'`;
++  const dp = await s.req("POST", "/sap/bc/adt/datapreview/freestyle?rowNumber=1", { body: sql, contentType: "text/plain", accept: "application/xml" });
++  if (dp.status === 200) {
++    const linha = lerDataPreview(dp.text);
++    if (linha.MANDT) out.t000 = linha;
++    else out.avisos.push("T000 retornou vazia para o mandante");
++  } else {
++    out.avisos.push(`T000 ilegível (HTTP ${dp.status}; o usuário pode não ter autorização de data preview)`);
++  }
++  if (!out.sid && out.t000?.LOGSYS) out.sid = out.t000.LOGSYS.match(/^([A-Z][A-Z0-9]{2})CLNT\d{3}$/)?.[1] ?? null;
++  if (!out.client && out.t000?.MANDT) out.client = out.t000.MANDT;
++
++  Object.assign(out, classificar(out.t000));
++  return out;
++}
+diff --git a/standards/politica-mcp-abap.md b/standards/politica-mcp-abap.md
+new file mode 100644
+index 0000000..6fa2762
+--- /dev/null
++++ b/standards/politica-mcp-abap.md
+@@ -0,0 +1,194 @@
++# Política de Seleção de MCP ABAP
++
++> **Natureza:** regra obrigatória para o orquestrador e para todos os subagentes que acessam o SAP.
++> **Decisão:** [ADR-0009](../docs/adr/0009-selecao-de-mcp-abap-por-versao-e-ambiente.md).
++> **Princípio:** em caso de dúvida, use a opção mais restritiva e pergunte ao usuário.
++
++Esta política define **qual servidor MCP** acessa cada sistema SAP, conforme a versão do S/4HANA e o ambiente. Ela complementa a trava do sistema de desenvolvimento ([ADR-0004](../docs/adr/0004-trava-do-sistema-de-desenvolvimento.md)), sem substituí-la.
++
++---
++
++## 1. Matriz de decisão
++
++| Versão do sistema | Ambiente | Finalidade | Servidor MCP | Modo |
++|---|---|---|---|---|
++| S/4HANA 2025+ (SAP_BASIS ≥ 816) | DEV / SANDBOX | Desenvolvimento e análise | `abap-adt` (MCP oficial SAP) | Escrita conforme ADR-0004 |
++| S/4HANA 2025+ (SAP_BASIS ≥ 816) | QAS / PRD | Somente análise | `abap-adt` (MCP oficial SAP) | Somente leitura |
++| S/4HANA 2023 ou inferior (SAP_BASIS 750–815) | QAS / PRD | Somente análise | `arc-1` | Somente leitura (forçado pelo launcher) |
++| S/4HANA 2023 ou inferior (SAP_BASIS 750–815) | DEV / SANDBOX | Desenvolvimento e análise | `vsp` (vibing-steampunk) | Endurecido (forçado pelo launcher) |
++
++**Regras absolutas:**
++
++1. **`vsp` nunca acessa QAS ou PRD.** O launcher recusa iniciar.
++2. **Nenhuma escrita em QAS ou PRD**, por nenhum servidor: criar, alterar, ativar, excluir, liberar transporte ou aplicar quickfix.
++3. **O ambiente e o release vêm do próprio sistema**, não de declaração do operador (seção 2). O que não puder ser detectado é tratado como o caso mais restritivo.
++4. **Cada sistema é acessado só pelo servidor que a matriz indica para ele.** Não use outro servidor só porque ele "também funcionaria".
++5. **SAP_BASIS < 750** está fora do escopo. Informe o usuário e não prossiga.
++
++---
++
++## 2. Identificação automática do sistema
++
++O operador só informa **como conectar**: URL, mandante, usuário e senha (`ARC1_*` / `VSP_*`). Antes de iniciar o `arc-1` ou o `vsp`, o launcher ([scripts/mcp-launch.mjs](../scripts/mcp-launch.mjs), com [scripts/sap-probe.mjs](../scripts/sap-probe.mjs)) lê o próprio SAP pelos mesmos endpoints ADT que o Eclipse usa:
++
++| O que | De onde | Se não puder ler |
++|---|---|---|
++| SID, mandante e usuário | `/sap/bc/adt/core/http/systeminformation`; em releases antigos, `T000-LOGSYS` (`<SID>CLNT<mandante>`) | Usa `<P>_SAP_SID` declarado, com aviso; sem ele, não inicia |
++| Release | `/sap/bc/adt/system/components` (SAP_BASIS e S4CORE) | Não inicia |
++| Ambiente | `T000` do mandante (SCC4): `CCCATEGORY` e `CCNOCLIIND` | Tratado como **PRD** |
++
++**Classificação do ambiente:**
++
++| T000 (SCC4) | Ambiente |
++|---|---|
++| `CCCATEGORY = P` (produção) | PRD |
++| `CCCATEGORY = T` (teste) | QAS |
++| `CCCATEGORY = C` (customizing) e repositório alterável no mandante (`CCNOCLIIND` vazio ou `1`) | DEV |
++| `CCCATEGORY = D` ou `E` (demo, treinamento) e repositório alterável | SANDBOX |
++| Qualquer outra combinação (ex.: `C` com repositório bloqueado, `S`) | QAS (somente leitura) |
++
++**Conferências do launcher:**
++
++- Se `<P>_SAP_SID` for informado e o SID detectado for outro, ele **recusa** iniciar. Isso pega a URL trocada.
++- O mandante detectado precisa bater com o configurado.
++- O `vsp` recebe o SID detectado em `--expect` e o confere de novo a cada sessão.
++
++**Restrições adicionais (opcional):** [sistemas-sap.json](sistemas-sap.json) permite declarar um sistema como mais restritivo do que o detectado. Exemplo: um QAS cujo mandante foi cadastrado como customizing (`C`) na SCC4. Uma declaração **nunca libera**: vale sempre o mais restritivo entre o detectado e o declarado (DEV < SANDBOX < QAS < PRD).
++
++**Limites da detecção:**
++
++- A classificação depende de a SCC4 estar correta. A opção de modificação global do sistema (SE06) não é lida, mas, se estiver bloqueada, o próprio SAP recusa as escritas.
++- A leitura da T000 usa o data preview do ADT. Um usuário sem essa autorização faz o sistema ser tratado como PRD.
++- O `abap-adt` (MCP oficial) não passa pelo launcher. Para ele, o agente confirma SID e release pelas ferramentas de informação de sistema do próprio servidor.
++
++**Resultado para o orquestrador:** a cada início, o launcher grava em `.agents/runtime/<servidor>.json` (não versionado) o SID, o mandante, o produto, o SAP_BASIS, o ambiente, o motivo da classificação e o modo (desenvolvimento ou somente leitura). O arquivo é apagado ao iniciar e ao encerrar o servidor, então só existe enquanto o servidor está no ar.
++
++**Diagnóstico:** `node scripts/mcp-launch.mjs <servidor> --diagnostico` mostra o que foi detectado e a decisão, sem iniciar o servidor.
++
++| SAP_BASIS | Produto | Faixa |
++|---|---|---|
++| ≥ 816 | S/4HANA 2025+ | MCP oficial (`abap-adt`) |
++| 758 | S/4HANA 2023 | ≤ 2023 |
++| 757 / 756 / 755 / 754 | S/4HANA 2022 / 2021 / 2020 / 1909 | ≤ 2023 |
++| 750–753 | S/4HANA 1511–1809, ECC EhP8 (NW 7.50) | ≤ 2023 |
++
++**Mais de um sistema da mesma faixa:** cada sistema tem a sua entrada em `.agents/mcp.servers.json`, com sufixo no nome (ex.: `arc-1-qas-ne`, `arc-1-qas-se`), e variáveis próprias (`ARC1_QAS_NE_*`, `ARC1_QAS_SE_*`). Depois de alterar, rode `node scripts/sync-agents.mjs`.
++
++---
++
++## 3. Procedimento obrigatório antes de qualquer chamada SAP
++
++1. **Identificar o sistema-alvo** (SID e mandante) pelo pedido do usuário. Se houver ambiguidade, pergunte.
++2. **Descobrir qual servidor está conectado a ele:**
++   - para `arc-1` e `vsp`, leia `.agents/runtime/*.json` e use o servidor cujo `sid`/`mandante` corresponda;
++   - para `abap-adt`, consulte a informação de sistema do próprio servidor.
++
++   Se nenhum servidor ativo estiver conectado ao sistema-alvo, **pare** e informe o usuário.
++3. **Aplicar a classificação detectada.** Use o `ambiente` e o `modo` do arquivo de runtime, nunca o que o usuário ou o prompt afirmam. Se o usuário disser que um sistema é DEV e a detecção disser QAS ou PRD, vale a detecção. Informe a divergência.
++4. **Classificar a tarefa** como análise ou desenvolvimento. Desenvolvimento em QAS/PRD é **recusado**, com a sugestão de reproduzir num DEV.
++5. **Delegar.** Ao acionar um subagente, informe: sistema, ambiente detectado, servidor MCP e as restrições aplicáveis (seção 4). O subagente não usa nenhum outro servidor SAP.
++6. **Relatar.** No relatório final, informe o sistema, o servidor usado, as escritas realizadas e as ações recusadas pela política.
++
++---
++
++## 4. Regras por servidor
++
++### 4.1 `abap-adt` — MCP oficial SAP (S/4HANA 2025+)
++
++- **Escrita:** apenas em DEV/SANDBOX, com a trava do [ADR-0004](../docs/adr/0004-trava-do-sistema-de-desenvolvimento.md).
++- **QAS/PRD:** somente leitura, busca, checks, ATC (sem aplicar quickfix) e consultas de transporte.
++- **Restrições de acesso:** a configuração do ADT deve manter `adt.mcpServer.accessRestrictionsEnabled = true`, com destinos e pacotes listados. Essa configuração fica no IDE de cada desenvolvedor, fora deste repositório.
++- **Recursos Joule** (explicação de objeto, AI-fix do ATC, documentação): podem ter custo adicional. Use somente com autorização do usuário.
++
++### 4.2 `arc-1` — ARC-1 (S/4HANA ≤ 2023, QAS/PRD)
++
++**Travas técnicas** aplicadas por `scripts/mcp-launch.mjs`, que o agente não consegue desligar:
++
++- Somente leitura em todo sistema que não seja detectado como DEV/SANDBOX, e em qualquer sistema com SAP_BASIS ≥ 816.
++- Prévia de dados, SQL livre, escrita em transporte e Git, e execução de plugins sempre desligados.
++- `SAPWrite.delete` sempre negado.
++
++**Ferramentas permitidas:**
++
++- `SAPRead` e `SAPSearch`.
++- `SAPNavigate` e `SAPContext` (dependências, where-used, impacto de CDS).
++- `SAPLint`.
++- `SAPDiagnose`: syntax check, ATC sem aplicar quickfix, dumps e traces. ABAP Unit somente em QAS, nunca em PRD.
++- `SAPTransport` em leitura: list, get, diff e history.
++
++**Exceção controlada:** se um cliente não autorizar o `vsp` no DEV, o `arc-1` pode ser apontado para o DEV. Como o sistema é detectado como DEV, o launcher habilita a escrita, restrita a `ARC1_ALLOWED_PACKAGES`.
++
++### 4.3 `vsp` — vibing-steampunk (S/4HANA ≤ 2023, DEV/SANDBOX)
++
++> ⚠️ O `vsp` puro inicia **sem restrições**. Por isso ele só pode ser iniciado pelo launcher, nunca diretamente no `.mcp.json` de uma ferramenta.
++
++**Travas técnicas** aplicadas pelo launcher:
++
++- Só inicia para sistemas **detectados** como DEV/SANDBOX, com SAP_BASIS 750–815.
++- Sempre com `--expect SID.MANDANTE/USUARIO`, `--allowed-packages` e `--block-free-sql`.
++- `--insecure` nunca é usado.
++- Edição de objetos transportáveis só com `VSP_ALLOWED_TRANSPORTS` definido.
++
++**Permitido em DEV/SANDBOX:**
++
++- Leitura, busca e edição (inclusive de métodos individuais).
++- Criação e ativação de objetos.
++- Syntax check, ABAP Unit e ATC.
++- Análises de pacote via `SAP(action="analyze")`: `health`, `effects`, `check_boundaries` e `impact`. O inventário Clean Core (`vsp api-surface`) existe apenas na CLI do vsp.
++- Dumps, traces e debugger em modo leitura.
++
++**Exige confirmação explícita do usuário a cada uso,** mesmo que já autorizado antes na sessão:
++
++- `execute_abap` — cria um programa temporário no sistema.
++- Chamada RFC de módulo de função e execução de relatório (`CALL_RFC`, `RUN_REPORT`).
++- Escrita de variáveis no debugger — altera a execução real, inclusive gravações no banco.
++- Leitura de tabelas com dados de negócio ou pessoais, inclusive tabelas cluster.
++- `install_zadt_vsp`, `deploy_zip` e qualquer instalação de objetos de terceiros no SAP.
++- Exclusão de objetos.
++
++**Proibido:**
++
++- Liberar transportes, salvo pedido explícito do usuário.
++
++---
++
++## 5. Equivalência de operações entre servidores
++
++Os subagentes descrevem o trabalho em termos do `abap-adt`. Quando o servidor do sistema for outro, use o equivalente abaixo. No `vsp`, confirme a sintaxe exata com `SAP(action="help", target="<ação>")`.
++
++| Operação | `abap-adt` | `vsp` (DEV/SANDBOX ≤ 2023) | `arc-1` (QAS/PRD ≤ 2023) |
++|---|---|---|---|
++| Buscar objeto | `abap_repository_*` | `SAP(action="search")` / `grep` | `SAPSearch` |
++| Ler código | `abap_object_*` (leitura) | `SAP(action="read")` | `SAPRead` |
++| Criar / editar | `abap_object_*` (escrita) | `SAP(action="create")` / `edit` | Proibido |
++| Syntax check | `abap_object_check` | `SAP(action="analyze")`, `type=syntax_check` | `SAPDiagnose` |
++| Ativar | `abap_object_*` (ativação) | `SAP(action="edit")` (ver help) | Proibido |
++| ATC | `abap_atc_*` | `SAP(action="test", target="ATC")` | `SAPDiagnose` (sem quickfix) |
++| ABAP Unit | `abap_unit_*` | `SAP(action="test")` | `SAPDiagnose` (somente QAS) |
++| Onde é usado / impacto | `abap_repository_*` | `SAP(action="analyze")`, `type=impact` | `SAPContext` |
++| Dumps | feeds | `SAP(action="analyze")`, `type=list_dumps` | `SAPDiagnose` |
++| Transportes | `abap_transport_*` | `SAP(action="system")` | `SAPTransport` (leitura) |
++
++Prefixos por ferramenta de IA: no Claude Code, por exemplo, os servidores aparecem como `mcp__abap-adt__*`, `mcp__arc-1__*` e `mcp__vsp__SAP`.
++
++---
++
++## 6. Casos fora da matriz
++
++| Situação | Ação |
++|---|---|
++| SAP_BASIS < 750 | Não prosseguir. Informar o usuário. |
++| BTP ABAP Environment / S/4HANA Cloud Public | `abap-adt`. |
++| `abap-adt` indisponível num sistema 2025+ | `arc-1`, apenas para análise (o launcher força somente leitura em SAP_BASIS ≥ 816). Desenvolvimento aguarda o `abap-adt`. |
++| Tarefa envolvendo vários sistemas | Aplicar a matriz **por sistema**. A autorização de um sistema não vale para outro. |
++| Servidor do sistema indisponível (erro ao iniciar) | Repassar ao usuário a mensagem do `mcp-launch`. Não trocar de servidor por conta própria. |
++
++---
++
++## 7. Compliance
++
++- **Fluxo de dados:** código-fonte, diagnósticos e dados lidos vão para o provedor do modelo de IA. Em QAS e PRD de clientes, considere as obrigações de LGPD antes de ler qualquer dado de negócio.
++- **Política de APIs da SAP:** a SAP API Policy (FAQ Q33) classifica as APIs ADT como internas e as limita a canais de desenvolvimento endossados. O uso de `arc-1` e `vsp` em ambiente de cliente exige aceite formal do cliente.
++- **Escopo das restrições:** a lista de pacotes permitidos restringe **escritas, não leituras**. O controle de leitura depende das autorizações SAP do usuário configurado. Use usuários com autorização mínima, de preferência somente leitura em QAS/PRD.
++- **Credenciais:** ficam no ambiente do sistema ou no `.env` local, que não é versionado. Nunca grave credenciais em arquivos do repositório.
++- **Suporte:** `arc-1` e `vsp` são projetos comunitários (licença MIT), sem suporte SAP. As versões ficam fixadas (ARC-1 no launcher; `vsp` pelo binário instalado) e são atualizadas por PR.
+diff --git a/standards/sistemas-sap.json b/standards/sistemas-sap.json
+new file mode 100644
+index 0000000..59da845
+--- /dev/null
++++ b/standards/sistemas-sap.json
+@@ -0,0 +1,4 @@
++{
++  "_instrucao": "OPCIONAL. O launcher (scripts/mcp-launch.mjs) detecta SID, mandante, release e ambiente lendo o próprio SAP (T000/SCC4 e componentes instalados). Use esta lista só para tornar um sistema MAIS restritivo do que o detectado — por exemplo, um QAS cujo mandante está cadastrado como customizing (C) na SCC4. Uma entrada nunca libera nada: vale sempre o mais restritivo entre o detectado e o declarado (DEV < SANDBOX < QAS < PRD). Formato: { \"sid\": \"QS4\", \"mandante\": \"400\", \"ambiente\": \"QAS\", \"observacao\": \"...\" }.",
++  "restricoes": []
++}
+-- 
+2.43.0
+

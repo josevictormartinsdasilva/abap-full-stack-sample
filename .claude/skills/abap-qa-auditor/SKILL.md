@@ -19,6 +19,10 @@ Não há pacote nem pasta fixos nesta skill. Determine o escopo nesta ordem:
 2. Bloco `cliente` de [naming-conventions.json](../../../standards/naming-conventions.json): `pacotePadraoATC`, `varianteATC` e `pastaAppsFiori`.
 3. Se o valor ainda estiver como placeholder (`<...>`), **pare e pergunte** — nunca rode ATC num pacote suposto.
 
+## Servidor MCP
+
+Os nomes de ferramentas abaixo são os do `abap-adt` (MCP oficial, S/4HANA 2025+). Em sistemas ≤ 2023, use o servidor informado pelo orquestrador (`vsp` em DEV/SANDBOX, `arc-1` em QAS/PRD) e as equivalências da seção 5 de [politica-mcp-abap.md](../../../standards/politica-mcp-abap.md). Em QAS/PRD, a auditoria é somente leitura: não aplique QuickFixes e não rode ABAP Unit em PRD.
+
 ## Tarefas Principais
 
 1. **Verificações ATC (ABAP Test Cockpit)**:
