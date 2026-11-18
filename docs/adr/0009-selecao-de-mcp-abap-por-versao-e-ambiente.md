@@ -26,14 +26,15 @@ Foi feito um estudo de caso, com análise do código-fonte, de dois servidores M
    - **S/4HANA ≤ 2023, QAS/PRD** → `arc-1`, somente análise.
    - **S/4HANA ≤ 2023, DEV/SANDBOX** → `vsp`, para desenvolvimento e análise.
 2. **O ambiente e o release são detectados no próprio SAP, não declarados.** O operador informa só a conexão. O launcher lê:
-   - o SID (`/sap/bc/adt/core/http/systeminformation` ou `T000-LOGSYS`);
+   - o SID (`/sap/bc/adt/core/http/systeminformation`; o inferido do `T000-LOGSYS` não conta como confirmado e exige declaração igual);
    - o SAP_BASIS (`/sap/bc/adt/system/components`);
    - o papel do mandante na SCC4 (`T000-CCCATEGORY` e `CCNOCLIIND`).
 
    O que não puder ser lido é tratado como PRD. `standards/sistemas-sap.json` é opcional e só pode tornar um sistema mais restritivo. O resultado vai para `.agents/runtime/<servidor>.json`, que o orquestrador usa para rotear.
 3. **`arc-1` e `vsp` só são iniciados por `scripts/mcp-launch.mjs`.** O launcher:
    - detecta o sistema e confere SID e mandante com o que foi configurado;
-   - impõe as travas técnicas (vsp só em DEV/SANDBOX com `--expect`, `--allowed-packages` e `--block-free-sql`; ARC-1 somente leitura fora de DEV, sem prévia de dados nem SQL);
+   - impõe as travas técnicas (vsp só em DEV/SANDBOX com `--expect`, `--allowed-packages` e `--block-free-sql`; ARC-1 somente leitura fora de DEV, sem prévia de dados nem SQL; SAP_BASIS < 750 recusado; só `https://` e sem TLS desligado);
+   - mantém as decisões numa função pura (`scripts/mcp-politica.mjs`), coberta por testes em `scripts/test/` que a CI executa;
    - isola as credenciais de cada servidor por prefixo de variável;
    - fixa a versão do ARC-1.
 4. **As regras completas** ficam em `standards/politica-mcp-abap.md`. O `AGENTS.md` exige segui-las antes de qualquer chamada SAP.
@@ -68,5 +69,5 @@ Foi feito um estudo de caso, com análise do código-fonte, de dois servidores M
   - vsp `internal/mcp/server.go`, linha 227, e `pkg/adt/safety.go`;
   - ARC-1 `src/server/types.ts`, linhas 315–319, e `docs_page/arc-1-vs-sap-abap-mcp-server.md`.
 - `standards/politica-mcp-abap.md`, `scripts/mcp-launch.mjs`, `.agents/mcp.servers.json`.
-- `scripts/sap-probe.mjs`, `standards/sistemas-sap.json` (restrições opcionais).
+- `scripts/sap-probe.mjs`, `scripts/mcp-politica.mjs`, `scripts/test/`, `standards/sistemas-sap.json` (restrições opcionais).
 - `AGENTS.md`, regras 3 e 4.

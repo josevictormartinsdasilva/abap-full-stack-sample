@@ -205,8 +205,10 @@ O token do servidor `abap-adt` **não é versionado**. Cada desenvolvedor config
 Definidos pela [política de MCP ABAP](standards/politica-mcp-abap.md) ([ADR-0009](docs/adr/0009-selecao-de-mcp-abap-por-versao-e-ambiente.md)). Os dois são iniciados por `scripts/mcp-launch.mjs`, nunca diretamente. O launcher:
 
 - identifica o sistema lendo o próprio SAP: SID, release (SAP_BASIS) e ambiente pelo papel do mandante na SCC4 (T000). Não depende do que o operador declarou, e o que não puder ler é tratado como PRD;
-- impõe as travas técnicas: `vsp` só em DEV/Sandbox, com `--expect`, `--allowed-packages` e `--block-free-sql`; `arc-1` somente leitura em QAS/PRD, sem prévia de dados nem SQL;
+- impõe as travas técnicas: `vsp` só em DEV/Sandbox, com `--expect`, `--allowed-packages` e `--block-free-sql`; `arc-1` somente leitura em QAS/PRD, sem prévia de dados nem SQL; SAP_BASIS < 750 recusado; conexão só por `https://` e sem TLS desligado;
 - isola as credenciais de cada servidor.
+
+As decisões ficam em `scripts/mcp-politica.mjs` e são cobertas por testes (`node --test scripts/test/*.test.mjs`), que a CI executa.
 
 **Configuração na máquina:** siga o passo a passo em [docs/setup-mcp-abap.md](docs/setup-mcp-abap.md). Ele cobre:
 
@@ -251,6 +253,8 @@ standards/
 scripts/sync-agents.mjs         ← gerador
 scripts/mcp-launch.mjs          ← launcher de arc-1/vsp com as travas da política
 scripts/sap-probe.mjs           ← detecção de SID, release e ambiente no próprio SAP
+scripts/mcp-politica.mjs        ← decisões do launcher (funções puras, testáveis)
+scripts/test/                   ← testes das travas (node --test)
 .claude/                        ← gerado (Claude Code: agents, skills, settings.json)
 .mcp.json                       ← gerado (Claude Code: servidores MCP, na raiz)
 .codex/                         ← gerado (Codex)
@@ -315,7 +319,7 @@ O marcador `{{skill}}` vira a instrução de carregar a skill na sintaxe de cada
   node scripts/sync-agents.mjs
   ```
   Faça commit da fonte **e** dos arquivos gerados juntos.
-- **A CI** (`.github/workflows/sync-agents.yml`) roda `node scripts/sync-agents.mjs --check` e reprova o PR se algum arquivo gerado foi editado à mão ou ficou desatualizado.
+- **A CI** (`.github/workflows/sync-agents.yml`) roda `node scripts/sync-agents.mjs --check` e reprova o PR se algum arquivo gerado foi editado à mão ou ficou desatualizado. Também roda os testes das travas do launcher (`node --test scripts/test/*.test.mjs`).
 - **Novo agente?** Crie `.agents/agents/<nome>.md` e `.agents/skills/<nome>/SKILL.md`, registre-o no `AGENTS.md` e rode o script. Os arquivos de todas as ferramentas são criados automaticamente.
 - **Removeu um agente?** Apague a fonte e rode o script: os arquivos gerados órfãos são removidos.
 - **Não use valores de cliente nas skills.** Pacotes, variantes e pastas vêm do bloco `cliente` de `standards/naming-conventions.json`.

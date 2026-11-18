@@ -1,6 +1,6 @@
 # Plano de correções — launcher MCP ABAP e documentação
 
-> **Status:** pendente de implementação
+> **Status:** Bloco 1 implementado (branch `fix/launcher-travas-seguranca`); Blocos 2 e 3 pendentes
 > **Origem:** análise do repositório em 2026-11-18 (branch `feature/politica-mcp-abap`, commit `7651085`)
 > **Escopo:** `scripts/mcp-launch.mjs`, `scripts/sap-probe.mjs`, `scripts/sync-agents.mjs`, `.agents/mcp.servers.json`, `standards/politica-mcp-abap.md`, ADR-0009 e documentação relacionada.
 
@@ -182,4 +182,10 @@ Itens em que uma trava da política pode ser contornada. Este PR inclui os teste
 
 ## Observação
 
-Nenhum item deste plano foi implementado. Ao implementar, seguir a ordem dos blocos; o Bloco 1 deve vir com os testes do item 1.7 no mesmo PR.
+O Bloco 1 foi implementado com os testes do item 1.7 (`scripts/mcp-politica.mjs` e `scripts/test/`). Decisões tomadas na implementação:
+
+- **1.1:** só uma entrada com `sid` em placeholder é tratada como modelo e ignorada (com aviso). Um `mandante` ou `ambiente` em placeholder numa entrada com `sid` real recusa, para que uma restrição nunca deixe de valer em silêncio.
+- **1.2:** um `LOGSYS` divergente do `<P>_SAP_SID` recusa os dois servidores. Um `LOGSYS` fora do padrão não gera SID, e vale o comportamento de SID não detectado (usa o declarado, com aviso).
+- **1.6:** valor fora da enumeração vira `PRD`.
+
+Os Blocos 2 e 3 continuam pendentes. Seguir a ordem dos blocos.

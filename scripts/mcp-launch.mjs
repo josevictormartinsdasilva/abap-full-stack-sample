@@ -12,7 +12,8 @@
 //
 // Variáveis (do ambiente do sistema ou, como fallback, do .env da raiz do projeto):
 //   <P>_SAP_URL, <P>_SAP_CLIENT, <P>_SAP_USER, <P>_SAP_PASSWORD   obrigatórias
-//   <P>_SAP_SID   opcional: se informado, precisa bater com o SID detectado
+//   <P>_SAP_SID   opcional: se informado, precisa bater com o SID detectado; obrigatório quando
+//                 o SID só puder ser inferido do T000-LOGSYS (senão vsp recusa e ARC-1 só lê)
 //   ARC-1: <P>_ALLOWED_PACKAGES (só se o sistema for DEV/SANDBOX), <P>_BLOCKED_DATA_SOURCES, ARC1_BIN
 //   vsp:   <P>_ALLOWED_PACKAGES (obrigatória), <P>_ALLOWED_TRANSPORTS, <P>_ENABLE_TRANSPORTS,
 //          <P>_READ_ONLY, VSP_BIN
@@ -21,14 +22,16 @@
 // o mandante, o release (SAP_BASIS) e o papel do mandante (T000/SCC4). O registro opcional
 // standards/sistemas-sap.json só pode tornar a classificação MAIS restritiva.
 //
-// Travas aplicadas (não dependem do agente):
+// Travas aplicadas (não dependem do agente; as decisões ficam em scripts/mcp-politica.mjs):
+//   - SAP_BASIS < 750: recusa, para os dois servidores.
+//   - URL só https:// (http:// apenas para localhost); NODE_TLS_REJECT_UNAUTHORIZED=0 recusa.
 //   - vsp: só em DEV/SANDBOX detectado e SAP_BASIS 750–815; sempre com --expect (SID detectado),
 //     --allowed-packages e --block-free-sql; nunca --insecure.
-//   - ARC-1: fora de DEV/SANDBOX, ou com SAP_BASIS >= 816, somente leitura; prévia de dados,
-//     SQL livre, escrita em transporte/Git e execução de plugins sempre desligados.
+//   - ARC-1: fora de DEV/SANDBOX, com SAP_BASIS >= 816 ou com SID não confirmado, somente
+//     leitura; prévia de dados, SQL livre, escrita em transporte/Git e plugins sempre desligados.
 //   - O que não puder ser detectado é tratado como o caso mais restritivo.
-//   - Nenhuma variável SAP_* do ambiente do usuário é herdada; o processo filho roda num
-//     diretório neutro para não carregar o .env do projeto.
+//   - Nenhuma variável SAP_*, NODE_OPTIONS ou NODE_TLS_REJECT_UNAUTHORIZED do ambiente do
+//     usuário é herdada; o processo filho roda num diretório neutro para não carregar o .env.
 //
 // Para o orquestrador rotear, o resultado da detecção é gravado em .agents/runtime/<servidor>.json
 // (não versionado), apagado no início de cada execução e ao encerrar o servidor.
@@ -41,18 +44,26 @@ import os from "node:os";
 import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { detectar, maisRestritivo } from "./sap-probe.mjs";
+import { detectar, validarUrlSap } from "./sap-probe.mjs";
+import { PLACEHOLDER, Recusa, aplicarRegistro, decidir, lerRegistro, resolverSid, verificarTls } from "./mcp-politica.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const ARC1_PACKAGE = "arc-1@1.10.1"; // versão fixada (mesmo critério do fiori-mcp, ADR-0007)
 const REGISTRO = "standards/sistemas-sap.json";
-const PLACEHOLDER = /<[^>]*>/;
 
 function fail(msg) {
   console.error(`mcp-launch: ${msg}`);
   process.exit(2);
 }
 const log = (msg) => console.error(`mcp-launch: ${msg}`);
+// Executa uma decisão da política; Recusa vira mensagem e saída 2, sem stack trace.
+const politica = (fn) => {
+  try {
+    return fn();
+  } catch (e) {
+    if (e instanceof Recusa) fail(e.message);
+    throw e;
+  }
+};
 
 // ---------------------------------------------------------------- servidor e prefixo
 const server = process.argv[2];
@@ -67,6 +78,9 @@ const runtimeDir = path.join(ROOT, ".agents/runtime");
 const runtimeFile = path.join(runtimeDir, `${server}.json`);
 const limparRuntime = () => { try { fs.rmSync(runtimeFile, { force: true }); } catch { /* sem efeito */ } };
 if (!DIAGNOSTICO) limparRuntime(); // nunca deixar a detecção de uma sessão anterior valendo
+
+// ---------------------------------------------------------------- TLS (antes de qualquer conexão)
+politica(() => verificarTls(process.env));
 
 // ---------------------------------------------------------------- variáveis
 function readDotEnv(file) {
@@ -85,7 +99,6 @@ const v = (name) => {
   return val === undefined || val === "" || PLACEHOLDER.test(val) ? undefined : val;
 };
 const req = (name) => v(name) ?? fail(`variável ${prefix}_${name} não definida (ambiente ou .env)`);
-const flag = (name) => /^(true|1|yes)$/i.test(v(name) ?? "");
 
 const conn = {
   url: req("SAP_URL"),
@@ -93,7 +106,13 @@ const conn = {
   user: req("SAP_USER").toUpperCase(),
   password: req("SAP_PASSWORD"),
 };
+const mandante = String(conn.client).padStart(3, "0");
 const sidDeclarado = v("SAP_SID")?.toUpperCase();
+try {
+  validarUrlSap(conn.url);
+} catch (e) {
+  fail(`${prefix}_SAP_URL: ${e.message}`);
+}
 
 // ---------------------------------------------------------------- executáveis (antes de tocar no SAP)
 const GUIA = "docs/setup-mcp-abap.md";
@@ -125,83 +144,35 @@ try {
 }
 det.avisos.forEach((a) => log(`aviso: ${a}`));
 
-const sid = det.sid ?? sidDeclarado;
-if (!sid) fail("SID não detectado (sistema sem systeminformation e T000 ilegível) — informe " + `${prefix}_SAP_SID`);
-if (!det.sid) log(`aviso: SID não confirmado pelo sistema; usando o declarado ${sidDeclarado}`);
-if (det.sid && sidDeclarado && det.sid !== sidDeclarado)
-  fail(`o sistema conectado é ${det.sid}, mas ${prefix}_SAP_SID diz ${sidDeclarado} — confira a URL`);
-if (det.client && det.client !== String(conn.client).padStart(3, "0"))
-  fail(`o mandante conectado é ${det.client}, não ${conn.client}`);
+const sidInfo = politica(() => resolverSid(det, sidDeclarado, prefix));
+sidInfo.avisos.forEach((a) => log(`aviso: ${a}`));
+const sid = sidInfo.sid;
+if (det.client && det.client !== mandante) fail(`o mandante conectado é ${det.client}, não ${conn.client}`);
 
 // ---------------------------------------------------------------- registro opcional (só restringe)
 let ambiente = det.ambiente;
 let motivo = det.motivo;
-if (fs.existsSync(path.join(ROOT, REGISTRO))) {
-  const lista = JSON.parse(fs.readFileSync(path.join(ROOT, REGISTRO), "utf8"))?.restricoes ?? [];
-  const r = lista.find((x) => String(x.sid).toUpperCase() === sid && String(x.mandante).padStart(3, "0") === String(conn.client).padStart(3, "0"));
-  if (r && !PLACEHOLDER.test(JSON.stringify(r))) {
-    const declarado = String(r.ambiente).toUpperCase();
-    const efetivo = maisRestritivo(ambiente, declarado);
-    if (efetivo !== ambiente) motivo = `${REGISTRO} restringe a ${declarado} (detectado: ${ambiente})`;
-    else if (declarado !== ambiente) log(`aviso: ${REGISTRO} declara ${declarado}, mas o sistema é ${ambiente}; vale o mais restritivo (${ambiente})`);
-    ambiente = efetivo;
-  }
+const arquivoRegistro = path.join(ROOT, REGISTRO);
+if (fs.existsSync(arquivoRegistro)) {
+  const { restricoes, avisos } = politica(() => lerRegistro(fs.readFileSync(arquivoRegistro, "utf8"), REGISTRO));
+  const aplicado = aplicarRegistro({ sid, mandante, ambiente, motivo }, restricoes, REGISTRO);
+  [...avisos, ...aplicado.avisos].forEach((a) => log(`aviso: ${a}`));
+  ({ ambiente, motivo } = aplicado);
 }
-const isDev = ambiente === "DEV" || ambiente === "SANDBOX";
-const basis = det.sapBasis;
 
 // ---------------------------------------------------------------- decisão por ferramenta
-const childEnv = {};
-for (const [k, val] of Object.entries(process.env)) {
-  if (/^(SAP_|ARC1_|VSP_|ABAP_ADT_TOKEN$)/.test(k)) continue; // nada de SAP_* herdado
-  childEnv[k] = val;
-}
-Object.assign(childEnv, { SAP_URL: conn.url, SAP_CLIENT: conn.client, SAP_USER: conn.user, SAP_PASSWORD: conn.password });
-
-let command, args, shell = false, modo;
-
-if (tool === "arc-1") {
-  const writes = isDev && basis < 816;
-  modo = writes ? "escrita restrita a pacotes" : "somente leitura";
-  Object.assign(childEnv, {
-    SAP_TRANSPORT: "stdio",
-    SAP_INSECURE: "false",
-    SAP_ALLOW_WRITES: String(writes),
-    SAP_ALLOW_TRANSPORT_WRITES: "false",
-    SAP_ALLOW_GIT_WRITES: "false",
-    SAP_ALLOW_DATA_PREVIEW: "false",
-    SAP_ALLOW_FREE_SQL: "false",
-    SAP_ALLOW_PLUGIN_EXECUTE: "false",
-    SAP_DENY_ACTIONS: "SAPWrite.delete",
-  });
-  if (writes) childEnv.SAP_ALLOWED_PACKAGES = req("ALLOWED_PACKAGES");
-  if (v("BLOCKED_DATA_SOURCES")) childEnv.SAP_BLOCKED_DATA_SOURCES = v("BLOCKED_DATA_SOURCES");
-  if (process.env.ARC1_BIN) {
-    command = process.env.ARC1_BIN;
-    args = [];
-  } else {
-    command = process.platform === "win32" ? "npx.cmd" : "npx";
-    args = ["--yes", ARC1_PACKAGE];
-    shell = process.platform === "win32"; // .cmd exige shell no Node >= 20; argumentos fixos
-  }
-} else {
-  if (!isDev) fail(`vsp recusado: ${sid}/${conn.client} é ${ambiente} — ${motivo}. Política MCP: vsp só em DEV/SANDBOX.`);
-  if (basis < 750 || basis >= 816) fail(`vsp recusado: SAP_BASIS ${basis} (${det.produto}); permitido só 750–815.`);
-  modo = flag("READ_ONLY") ? "somente leitura" : "desenvolvimento";
-  command = process.env.VSP_BIN || "vsp";
-  args = ["--mode", "hyperfocused", "--expect", `${sid}.${String(conn.client).padStart(3, "0")}/${conn.user}`,
-    "--allowed-packages", req("ALLOWED_PACKAGES"), "--block-free-sql"];
-  if (v("ALLOWED_TRANSPORTS")) args.push("--allow-transportable-edits", "--allowed-transports", v("ALLOWED_TRANSPORTS"));
-  if (flag("ENABLE_TRANSPORTS")) args.push("--enable-transports");
-  if (flag("READ_ONLY")) args.push("--read-only");
-}
+const sistema = { sid, sidPendente: sidInfo.sidPendente, mandante, ambiente, motivo, sapBasis: det.sapBasis, produto: det.produto };
+const { command, args, shell, modo, childEnv, avisos } = politica(() =>
+  decidir({ tool, prefix, sistema, conn, v, env: process.env, platform: process.platform }));
+avisos.forEach((a) => log(`aviso: ${a}`));
 
 const estado = {
-  servidor: server, ferramenta: tool, sid, mandante: String(conn.client).padStart(3, "0"), usuario: conn.user,
-  sapBasis: basis, produto: det.produto, ambiente, motivo, modo,
-  sidConfirmado: Boolean(det.sid), detectadoEm: new Date().toISOString(), pid: process.pid,
+  servidor: server, ferramenta: tool, sid, mandante, usuario: conn.user,
+  sapBasis: det.sapBasis, produto: det.produto, ambiente, motivo, modo,
+  sidConfirmado: sidInfo.sidConfirmado, sidOrigem: sidInfo.sidOrigem,
+  detectadoEm: new Date().toISOString(), pid: process.pid,
 };
-log(`${server} -> ${sid}/${estado.mandante} · ${det.produto} · ${ambiente} (${motivo}) · ${modo}`);
+log(`${server} -> ${sid}/${mandante} · ${det.produto} · ${ambiente} (${motivo}) · ${modo}`);
 
 if (DIAGNOSTICO) {
   console.error(JSON.stringify({ ...estado, t000: det.t000, args: tool === "vsp" ? args : undefined }, null, 2));
