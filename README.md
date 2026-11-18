@@ -25,10 +25,13 @@ flowchart TD
         Lead -->|ATC / QuickFixes / Testes Unitários| QA["abap-qa-auditor"]
     end
 
-    RAP --- ADT_MCP[(abap-adt MCP)]
-    Classic --- ADT_MCP
+    RAP --- SAP_MCP{{"Política MCP ABAP<br/>(por versão e ambiente)"}}
+    Classic --- SAP_MCP
+    QA --- SAP_MCP
+    SAP_MCP -->|S/4HANA 2025+| ADT_MCP[(abap-adt<br/>MCP oficial SAP)]
+    SAP_MCP -->|≤ 2023 · DEV/Sandbox| VSP_MCP[(vsp)]
+    SAP_MCP -->|≤ 2023 · QAS/PRD · leitura| ARC_MCP[(arc-1)]
     Fiori --- FIORI_MCP[(fiori-mcp MCP)]
-    QA --- ADT_MCP
 ```
 
 ---
@@ -37,10 +40,12 @@ flowchart TD
 
 | Agente | Especialidade | Escopo de Atuação | Ferramentas MCP | Skill |
 |---|---|---|---|---|
-| **`abap-rap-dev`** | Backend Cloud & RAP | CDS View Entities (`ZI_*`, `ZC_*`), Metadata Extensions (`DDLX`), Behavior Definitions (`BDEF`), Classes de Comportamento (`ZCL<MD>_BP_*`), Value Helps e tabelas de banco/draft. | `abap-adt` | [SKILL.md](.agents/skills/abap-rap-dev/SKILL.md) |
-| **`abap-classic-dev`** | ABAP Clássico & RICEFW | Reports (`PROG`), Includes (`_TOP`, `_SEL`, `_F01`), Function Groups/Modules (`FUGR/F`, `FUGR/FF`), BAPIs, Telas Dynpro (9000-9999), SE11 e estimativas de esforço. | `abap-adt` | [SKILL.md](.agents/skills/abap-classic-dev/SKILL.md) |
+| **`abap-rap-dev`** | Backend Cloud & RAP | CDS View Entities (`ZI_*`, `ZC_*`), Metadata Extensions (`DDLX`), Behavior Definitions (`BDEF`), Classes de Comportamento (`ZCL<MD>_BP_*`), Value Helps e tabelas de banco/draft. | `abap-adt` ou `vsp`¹ | [SKILL.md](.agents/skills/abap-rap-dev/SKILL.md) |
+| **`abap-classic-dev`** | ABAP Clássico & RICEFW | Reports (`PROG`), Includes (`_TOP`, `_SEL`, `_F01`), Function Groups/Modules (`FUGR/F`, `FUGR/FF`), BAPIs, Telas Dynpro (9000-9999), SE11 e estimativas de esforço. | `abap-adt` ou `vsp`¹ | [SKILL.md](.agents/skills/abap-classic-dev/SKILL.md) |
 | **`fiori-elements-dev`** | Frontend Fiori & UI5 | Gerenciamento agnóstico de apps Fiori (LROP, ALP, OVP, FCL), Page Map no `manifest.json`, rotas, alvos, anotações XML locais e scripts UI5. | `fiori-mcp`, Terminal UI5/npm | [SKILL.md](.agents/skills/fiori-elements-dev/SKILL.md) |
-| **`abap-qa-auditor`** | Qualidade & Governança | Execução de inspeções ATC, aplicação de QuickFixes automatizados, testes ABAP Unit e validação estática de código frontend (`eslint`). | `abap-adt`, Terminal | [SKILL.md](.agents/skills/abap-qa-auditor/SKILL.md) |
+| **`abap-qa-auditor`** | Qualidade & Governança | Execução de inspeções ATC, aplicação de QuickFixes automatizados, testes ABAP Unit e validação estática de código frontend (`eslint`). | `abap-adt`, `vsp` ou `arc-1`¹, Terminal | [SKILL.md](.agents/skills/abap-qa-auditor/SKILL.md) |
+
+¹ O servidor MCP SAP é escolhido por sistema, conforme a [política de MCP ABAP](standards/politica-mcp-abap.md): `abap-adt` em S/4HANA 2025+, `vsp` em DEV/Sandbox ≤ 2023 e `arc-1` (somente leitura) em QAS/PRD ≤ 2023.
 
 ---
 
@@ -145,6 +150,9 @@ Quando uma nova funcionalidade completa precisa ser entregue, o **Orquestrador C
 
 - **[standards/padrao-desenvolvimento.md](standards/padrao-desenvolvimento.md)**: Manual normativo corporativo de desenvolvimento SAP (Módulos, Pacotes, Requests, Dicionário SE11, ABAP OO, CDS, Fiori e Regras de ATC).
 - **[standards/naming-conventions.json](standards/naming-conventions.json)**: Mapeamento técnico estruturado com todos os prefixos e padrões de nomenclatura, mais o bloco `cliente` com os parâmetros do projeto.
+- **[standards/politica-mcp-abap.md](standards/politica-mcp-abap.md)**: Qual servidor MCP acessa cada sistema SAP (por versão e ambiente) e o que cada um pode fazer.
+- **[docs/setup-mcp-abap.md](docs/setup-mcp-abap.md)**: Passo a passo para configurar o `vsp` e o `arc-1` na máquina do desenvolvedor.
+- **[standards/sistemas-sap.json](standards/sistemas-sap.json)**: Opcional. Restrições adicionais por sistema; o ambiente é detectado no próprio SAP e esta lista só pode torná-lo mais restritivo.
 - **[AGENTS.md](AGENTS.md)**: Regras do orquestrador e papéis dos subagentes — fonte única para todas as ferramentas.
 - **[CLAUDE.md](CLAUDE.md)**: Importa o `AGENTS.md` e adiciona só o que é específico do Claude Code.
 
@@ -154,8 +162,8 @@ Quando uma nova funcionalidade completa precisa ser entregue, o **Orquestrador C
 
 1. Preencha o bloco `cliente` de [standards/naming-conventions.json](standards/naming-conventions.json): empresa, sigla, pacote e variante ATC, namespace Fiori, pasta dos apps e sistema de desenvolvimento. Enquanto houver placeholders `<...>`, os agentes perguntam em vez de supor.
 2. Preencha os placeholders restantes de [standards/padrao-desenvolvimento.md](standards/padrao-desenvolvimento.md) (`<VARIANTE_ATC>`, `<PROJETO_CTS>`, `<ID_PROJETO_CTS>`, `<DESCRICAO_PROJETO_CTS>` e `[EMPRESA]`) ou substitua o documento pelo padrão do cliente.
-3. Configure o token MCP (seção abaixo) e confirme a conexão com `/mcp`.
-4. **Libere os agentes apenas no sistema de desenvolvimento.** Eles criam e ativam objetos diretamente via `abap-adt`; use um usuário com autorizações restritas a DEV/sandbox.
+3. Configure o token MCP (seção abaixo). Se o cliente tiver sistemas S/4HANA 2023 ou inferior, configure também `arc-1` e/ou `vsp` ([passo a passo](docs/setup-mcp-abap.md)). Confirme a conexão com `/mcp`.
+4. **Libere os agentes apenas no sistema de desenvolvimento.** Eles criam e ativam objetos diretamente via `abap-adt` ou `vsp`; use um usuário com autorizações restritas a DEV/sandbox. Para `arc-1` em QAS/PRD, use um usuário somente leitura.
 
 ---
 
@@ -192,6 +200,25 @@ O token do servidor `abap-adt` **não é versionado**. Cada desenvolvedor config
 
 > O servidor `abap-adt` (HTTP em `localhost:2236`) precisa estar rodando na sua máquina. Nunca grave o token real em arquivos versionados.
 
+## 🧩 Servidores `arc-1` e `vsp` (S/4HANA ≤ 2023)
+
+Definidos pela [política de MCP ABAP](standards/politica-mcp-abap.md) ([ADR-0009](docs/adr/0009-selecao-de-mcp-abap-por-versao-e-ambiente.md)). Os dois são iniciados por `scripts/mcp-launch.mjs`, nunca diretamente. O launcher:
+
+- identifica o sistema lendo o próprio SAP: SID, release (SAP_BASIS) e ambiente pelo papel do mandante na SCC4 (T000). Não depende do que o operador declarou, e o que não puder ler é tratado como PRD;
+- impõe as travas técnicas: `vsp` só em DEV/Sandbox, com `--expect`, `--allowed-packages` e `--block-free-sql`; `arc-1` somente leitura em QAS/PRD, sem prévia de dados nem SQL;
+- isola as credenciais de cada servidor.
+
+**Configuração na máquina:** siga o passo a passo em [docs/setup-mcp-abap.md](docs/setup-mcp-abap.md). Ele cobre:
+
+- os requisitos (Node.js ≥ 22.19 e o binário do `vsp`);
+- o `.env` (as variáveis `VSP_*` e `ARC1_*`);
+- o teste com `node scripts/mcp-launch.mjs <servidor> --diagnostico`;
+- vários sistemas do mesmo tipo;
+- macOS/Linux;
+- a tabela de problemas comuns.
+
+> Antes de usar `arc-1` ou `vsp` em ambiente de cliente, obtenha o aceite formal do cliente. A política de APIs da SAP classifica as APIs ADT como internas (ver seção 7 da política).
+
 ### ⚠️ Usando no macOS / Linux
 
 Os arquivos versionados usam o wrapper `cmd /c` para o `fiori-mcp`, que só existe no Windows. Na sua cópia local, gere a variante Unix (requer Node.js):
@@ -213,6 +240,8 @@ AGENTS.md                       ← regras do orquestrador (fonte)
 CLAUDE.md                       ← @AGENTS.md + específico do Claude (fonte)
 standards/
   padrao-desenvolvimento.md     ← padrão corporativo (fonte)
+  politica-mcp-abap.md          ← qual MCP acessa cada sistema SAP (fonte)
+  sistemas-sap.json             ← restrições opcionais por sistema (fonte)
   naming-conventions.json       ← prefixos + bloco "cliente" (fonte)
 .agents/
   agents/<nome>.md              ← subagentes (fonte)
@@ -220,6 +249,8 @@ standards/
   mcp.servers.json              ← servidores MCP (fonte)
   mcp_config.json               ← gerado (Antigravity)
 scripts/sync-agents.mjs         ← gerador
+scripts/mcp-launch.mjs          ← launcher de arc-1/vsp com as travas da política
+scripts/sap-probe.mjs           ← detecção de SID, release e ambiente no próprio SAP
 .claude/                        ← gerado (Claude Code: agents, skills, settings.json)
 .mcp.json                       ← gerado (Claude Code: servidores MCP, na raiz)
 .codex/                         ← gerado (Codex)

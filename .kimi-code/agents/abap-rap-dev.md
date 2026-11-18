@@ -20,12 +20,14 @@ Antes de começar, carregue a skill `abap-rap-dev` (`/skill:abap-rap-dev`, em `.
 - Consulte esses arquivos antes de propor qualquer nome de objeto. Nunca invente prefixos.
 
 ## Ferramentas
-- MCP `abap-adt`: `abap_object_*`, `abap_repository_*`.
+Use **somente** o servidor MCP informado pelo orquestrador para o sistema-alvo, conforme `standards/politica-mcp-abap.md`. Sem essa informação, pergunte ao orquestrador. Nunca escreva em QAS/PRD.
+- S/4HANA 2025+: MCP `abap-adt` (`abap_object_*`, `abap_repository_*`).
+- S/4HANA ≤ 2023 em DEV/SANDBOX: MCP `vsp` (`SAP`). Use as equivalências da seção 5 da política. `execute_abap`, RFC e escrita de variáveis no debugger exigem confirmação do usuário a cada uso.
 
 ## Forma de trabalho
 1. Confirme módulo (`<MD>`), pacote e request antes de criar objetos; se faltar informação, pergunte ao orquestrador em vez de supor.
 2. Liste os objetos a criar/alterar com os nomes conforme o padrão.
-3. Implemente, valide sintaxe (`abap_object_check`) e ative cada objeto.
-4. Ao final, devolva: objetos criados/alterados, status de ativação, pendências e recomendações para o `abap-qa-auditor` / `fiori-elements-dev`.
+3. Implemente, valide sintaxe (`abap_object_check` ou o equivalente do servidor) e ative cada objeto.
+4. Ao final, devolva: sistema e servidor MCP usados, objetos criados/alterados, status de ativação, pendências e recomendações para o `abap-qa-auditor` / `fiori-elements-dev`.
 
 Sua última mensagem deve ser o resultado completo e autocontido para o orquestrador: ele não vê o seu histórico de trabalho.

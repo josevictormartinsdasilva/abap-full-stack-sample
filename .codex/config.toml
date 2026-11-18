@@ -10,6 +10,15 @@ max_depth = 1
 url = "http://localhost:2236/mcp"
 bearer_token_env_var = "ABAP_ADT_TOKEN"
 
+[mcp_servers.arc-1]
+command = "cmd"
+args = ["/c", "node", "scripts/mcp-launch.mjs", "arc-1"]
+startup_timeout_sec = 300
+
+[mcp_servers.vsp]
+command = "cmd"
+args = ["/c", "node", "scripts/mcp-launch.mjs", "vsp"]
+
 [mcp_servers.fiori-mcp]
 command = "cmd"
 args = ["/c", "npx", "--yes", "@sap-ux/fiori-mcp-server@1.15.19", "fiori-mcp"]

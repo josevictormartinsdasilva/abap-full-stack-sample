@@ -7,6 +7,28 @@
         "Authorization": "Bearer ${ABAP_ADT_TOKEN}"
       }
     },
+    "arc-1": {
+      "type": "stdio",
+      "command": "cmd",
+      "args": [
+        "/c",
+        "node",
+        "scripts/mcp-launch.mjs",
+        "arc-1"
+      ],
+      "env": {}
+    },
+    "vsp": {
+      "type": "stdio",
+      "command": "cmd",
+      "args": [
+        "/c",
+        "node",
+        "scripts/mcp-launch.mjs",
+        "vsp"
+      ],
+      "env": {}
+    },
     "fiori-mcp": {
       "type": "stdio",
       "command": "cmd",

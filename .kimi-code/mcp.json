@@ -4,6 +4,25 @@
       "url": "http://localhost:2236/mcp",
       "bearerTokenEnvVar": "ABAP_ADT_TOKEN"
     },
+    "arc-1": {
+      "command": "cmd",
+      "args": [
+        "/c",
+        "node",
+        "scripts/mcp-launch.mjs",
+        "arc-1"
+      ],
+      "startupTimeoutMs": 300000
+    },
+    "vsp": {
+      "command": "cmd",
+      "args": [
+        "/c",
+        "node",
+        "scripts/mcp-launch.mjs",
+        "vsp"
+      ]
+    },
     "fiori-mcp": {
       "command": "cmd",
       "args": [
