@@ -29,6 +29,7 @@ Antes de **criar, alterar ou ativar** qualquer objeto, o orquestrador compara o 
 
 ## Evidências
 
-- `AGENTS.md`, regra 3
+- `AGENTS.md`, regra 4
+- Generalizada pelo [ADR-0009](0009-selecao-de-mcp-abap-por-versao-e-ambiente.md): a comparação usa o SID do servidor MCP selecionado (`abap-adt`, `vsp` ou `arc-1`), não só do `abap-adt`.
 - `standards/naming-conventions.json`, campo `cliente.sistemaDesenvolvimento`
 - Commit `7783fc9`, PR #3

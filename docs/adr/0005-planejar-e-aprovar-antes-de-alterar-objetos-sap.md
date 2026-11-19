@@ -29,5 +29,5 @@ Só então delega ao especialista. Tarefas pequenas (uma ou duas linhas) e consu
 
 ## Evidências
 
-- `AGENTS.md`, regras 1 e 4
+- `AGENTS.md`, regras 1 e 5
 - Commit `88bfcb2`

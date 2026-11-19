@@ -36,7 +36,7 @@ Foi feito um estudo de caso, com análise do código-fonte, de dois servidores M
    - impõe as travas técnicas (vsp só em DEV/SANDBOX com `--expect`, `--allowed-packages` e `--block-free-sql`; ARC-1 somente leitura fora de DEV, sem prévia de dados nem SQL; SAP_BASIS < 750 recusado; só `https://` e sem TLS desligado);
    - mantém as decisões numa função pura (`scripts/mcp-politica.mjs`), coberta por testes em `scripts/test/` que a CI executa;
    - isola as credenciais de cada servidor por prefixo de variável;
-   - fixa a versão do ARC-1.
+   - usa a última versão estável do ARC-1 e do `vsp`, conferindo as travas a cada versão nova (originalmente fixava a versão do ARC-1; mudança de 2026-11-19, ver Consequências).
 4. **As regras completas** ficam em `standards/politica-mcp-abap.md`. O `AGENTS.md` exige segui-las antes de qualquer chamada SAP.
 
 ## Alternativas consideradas

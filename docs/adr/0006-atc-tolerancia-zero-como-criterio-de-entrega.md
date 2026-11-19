@@ -26,5 +26,5 @@ O `abap-qa-auditor` também aplica QuickFixes via ADT, executa ABAP Unit (`abap_
 
 ## Evidências
 
-- `AGENTS.md`, regra 6
+- `AGENTS.md`, regra 7
 - `standards/padrao-desenvolvimento.md`, tópico 13
