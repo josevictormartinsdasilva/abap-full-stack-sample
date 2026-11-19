@@ -102,6 +102,8 @@ function readDotEnv(file) {
   return out;
 }
 const dotenv = readDotEnv(path.join(ROOT, ".env"));
+// VSP_BIN/ARC1_BIN: ambiente do sistema ou, como fallback, o .env (docs/setup-mcp-abap.md, passo 4).
+for (const k of ["VSP_BIN", "ARC1_BIN"]) if (!process.env[k] && dotenv[k]) process.env[k] = dotenv[k];
 const lerVar = (name) => valorDeVariavel(`${prefix}_${name}`, process.env[`${prefix}_${name}`] ?? dotenv[`${prefix}_${name}`]);
 const v = (name) => lerVar(name).valor;
 const req = (name) => {
