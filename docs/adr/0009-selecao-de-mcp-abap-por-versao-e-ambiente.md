@@ -61,7 +61,7 @@ Foi feito um estudo de caso, com análise do código-fonte, de dois servidores M
   - RFC;
   - escrita de variáveis no debugger;
   - leitura de dados de negócio.
-- (−) **Requisito de ambiente:** o binário `vsp` precisa estar instalado (no `PATH` ou em `VSP_BIN`), e o ARC-1 precisa de Node.js ≥ 22.19 e de `npx` na primeira execução. Passo a passo em `docs/setup-mcp-abap.md`. Na primeira execução, o `npx` precisa baixar o ARC-1, o que pode exigir aumentar o timeout do servidor em algumas ferramentas.
+- (−) **Requisito de ambiente:** o launcher baixa a última release estável do `vsp`, confere o SHA-256 pelo `checksums.txt` da release e recusa iniciar se faltar alguma flag de segurança (ou usa `VSP_BIN`, em redes que bloqueiam o GitHub; `VSP_VERSION` fixa uma versão), e o ARC-1 precisa de Node.js ≥ 22.19 e de `npx` na primeira execução. Passo a passo em `docs/setup-mcp-abap.md`. Na primeira execução, o `npx` precisa baixar o ARC-1, o que pode exigir aumentar o timeout do servidor em algumas ferramentas.
 - (−) **Herança de ambiente (a validar):** Codex e Kimi não foram testados quanto ao repasse de variáveis de ambiente aos processos stdio. O fallback do launcher para o `.env` cobre o caso.
 
 ## Evidências

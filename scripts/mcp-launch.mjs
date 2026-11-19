@@ -17,7 +17,8 @@
 //   ARC-1: <P>_ALLOW_DEV_WRITES=true + <P>_ALLOWED_PACKAGES (escrita, só em DEV/SANDBOX ≤ 2023),
 //          <P>_BLOCKED_DATA_SOURCES, ARC1_BIN
 //   vsp:   <P>_ALLOWED_PACKAGES (obrigatória), <P>_ALLOWED_TRANSPORTS, <P>_ENABLE_TRANSPORTS,
-//          <P>_READ_ONLY, VSP_BIN
+//          <P>_READ_ONLY, VSP_BIN (sem ele, o launcher baixa a última release estável do vsp e
+//          confere o SHA-256; ver scripts/vsp-binario.mjs), VSP_VERSION (fixa uma versão)
 //
 // O launcher NÃO confia no que foi declarado: lê do próprio SAP (scripts/sap-probe.mjs) o SID,
 // o mandante, o release (SAP_BASIS) e o papel do mandante (T000/SCC4). O registro opcional
@@ -50,6 +51,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { detectar, validarUrlSap } from "./sap-probe.mjs";
 import { Recusa, valorDeVariavel, aplicarRegistro, comandoParaSpawn, decidir, lerRegistro, resolverSid, verificarTls } from "./mcp-politica.mjs";
+import { FalhaVsp, flagsAusentes, garantirVsp } from "./vsp-binario.mjs";
 import { RUNTIME_DIR, gravarEstado, listarAtivos, removerEstado } from "./mcp-runtime.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -102,8 +104,8 @@ function readDotEnv(file) {
   return out;
 }
 const dotenv = readDotEnv(path.join(ROOT, ".env"));
-// VSP_BIN/ARC1_BIN: ambiente do sistema ou, como fallback, o .env (docs/setup-mcp-abap.md, passo 4).
-for (const k of ["VSP_BIN", "ARC1_BIN"]) if (!process.env[k] && dotenv[k]) process.env[k] = dotenv[k];
+// VSP_BIN/VSP_VERSION/ARC1_BIN: ambiente do sistema ou, como fallback, o .env (docs/setup-mcp-abap.md, passo 4).
+for (const k of ["VSP_BIN", "VSP_VERSION", "ARC1_BIN"]) if (!process.env[k] && dotenv[k]) process.env[k] = dotenv[k];
 const lerVar = (name) => valorDeVariavel(`${prefix}_${name}`, process.env[`${prefix}_${name}`] ?? dotenv[`${prefix}_${name}`]);
 const v = (name) => lerVar(name).valor;
 const req = (name) => {
@@ -140,8 +142,24 @@ function verificarBinario(cmd, variavel, passo) {
   return (r.stdout || r.stderr || "").trim().split(/\r?\n/)[0];
 }
 if (tool === "vsp") {
-  const versao = verificarBinario(process.env.VSP_BIN || "vsp", "VSP_BIN", "passo 2");
+  // VSP_BIN explícito tem precedência; sem ele, binário gerenciado (última estável + SHA-256).
+  if (!process.env.VSP_BIN) {
+    try {
+      process.env.VSP_BIN = (await garantirVsp({ log })).caminho;
+    } catch (e) {
+      if (e instanceof FalhaVsp) fail(`${e.message} (${GUIA}, passo 2)`);
+      throw e;
+    }
+  }
+  const versao = verificarBinario(process.env.VSP_BIN, "VSP_BIN", "passo 2");
   log(`vsp encontrado: ${versao}`);
+  // Sem versão fixada, uma release nova pode renomear uma flag de segurança: confere antes de usar.
+  const c = politica(() => comandoParaSpawn(process.env.VSP_BIN, ["--help"], process.platform));
+  const ajuda = spawnSync(c.command, c.args, { encoding: "utf8", timeout: 15000, windowsHide: true, shell: c.shell });
+  const ausentes = flagsAusentes(`${ajuda.stdout || ""}\n${ajuda.stderr || ""}`);
+  if (ausentes.length)
+    fail(`o vsp em uso (${versao}) não tem as flags ${ausentes.join(", ")}, que o launcher usa para aplicar a política. `
+      + `Fixe uma versão anterior com VSP_VERSION no .env (${GUIA}, passo 2).`);
 } else if (process.env.ARC1_BIN) {
   verificarBinario(process.env.ARC1_BIN, "ARC1_BIN", "variáveis opcionais");
 } else {

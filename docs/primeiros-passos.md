@@ -115,7 +115,7 @@ Se o `/mcp` mostrar `ECONNREFUSED` no `abap-adt`, o servidor não está rodando 
 
 Siga os passos 1 a 7 de [docs/setup-mcp-abap.md](setup-mcp-abap.md). Em resumo:
 
-1. Instale o binário do `vsp` (versão homologada v2.62.1) e coloque-o no PATH.
+1. Nada a instalar para o `vsp`: o launcher baixa a última versão estável na primeira execução (e quando sai uma nova) e confere o SHA-256. Se a rede bloquear o GitHub, veja o passo 2 do guia.
 2. Se o SAP usar CA interna, aponte `NODE_EXTRA_CA_CERTS` para o `.pem`.
 3. Preencha no `.env` as variáveis `VSP_*` (DEV) e, se for usar, `ARC1_*` (QAS/PRD).
 4. Teste:
