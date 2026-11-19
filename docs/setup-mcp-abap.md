@@ -24,17 +24,24 @@ node -v
 
 Se estiver abaixo, instale a versão LTS de [nodejs.org](https://nodejs.org).
 
-**2. Binário do vsp — automático.** Não há passo de instalação. Na primeira execução, o launcher baixa das [releases do vibing-steampunk](https://github.com/oisee/vibing-steampunk/releases) o binário da sua plataforma, na versão homologada (v2.62.1). Ele só usa o arquivo se o SHA-256 bater com o valor fixado em `scripts/vsp-binario.mjs`, e confere o hash de novo a cada início. O binário fica num cache do usuário, compartilhado entre projetos:
+**2. Binário do vsp — automático.** Não há passo de instalação. Na primeira execução, o launcher baixa das [releases do vibing-steampunk](https://github.com/oisee/vibing-steampunk/releases) o binário da sua plataforma, sempre na **última release estável** (pré-releases são ignoradas). A cada início ele consulta a versão; quando sai uma nova, baixa uma vez e apaga a anterior do cache.
+
+- **Integridade:** o binário só é usado se o SHA-256 bater com o `checksums.txt` da mesma release. O hash é conferido de novo a cada início.
+- **Trava:** antes de iniciar, o launcher confere no `vsp --help` se as flags de segurança que ele usa (`--expect`, `--allowed-packages`, `--block-free-sql` etc.) continuam existindo. Se uma versão nova renomear alguma, ele recusa iniciar.
+- **Sem internet:** usa a versão mais nova que já está no cache, com um aviso.
+- **Voltar atrás:** se uma release nova quebrar algo, fixe a versão anterior no `.env` com `VSP_VERSION=2.62.1`.
+
+O binário fica num cache do usuário, compartilhado entre projetos:
 
 | Sistema | Pasta |
 |---|---|
-| Windows | `%LOCALAPPDATA%\abap-full-stack\vsp\2.62.1\` |
-| Linux | `~/.cache/abap-full-stack/vsp/2.62.1/` (ou `$XDG_CACHE_HOME`) |
-| macOS | `~/Library/Caches/abap-full-stack/vsp/2.62.1/` |
+| Windows | `%LOCALAPPDATA%\abap-full-stack\vsp\<versão>\` |
+| Linux | `~/.cache/abap-full-stack/vsp/<versão>/` (ou `$XDG_CACHE_HOME`) |
+| macOS | `~/Library/Caches/abap-full-stack/vsp/<versão>/` |
 
-Rode o diagnóstico (passo 7) antes de abrir a ferramenta de IA. Assim o download acontece fora do tempo limite de inicialização do MCP.
+Rode o diagnóstico (passo 7) antes de abrir a ferramenta de IA. Assim o primeiro download acontece fora do tempo limite de inicialização do MCP.
 
-**Rede que bloqueia o GitHub:** baixe manualmente o asset da sua plataforma (ex.: `vsp-windows-amd64.exe`) da release v2.62.1 e defina `VSP_BIN` no `.env` com o caminho completo (passo 4). Com `VSP_BIN` definido, o launcher não baixa nada. O `vsp` que estiver no PATH não é usado.
+**Rede que bloqueia o GitHub:** baixe manualmente o asset da sua plataforma (ex.: `vsp-windows-amd64.exe`) da [última release](https://github.com/oisee/vibing-steampunk/releases/latest) e defina `VSP_BIN` no `.env` com o caminho completo (passo 4). Com `VSP_BIN` definido, o launcher não baixa nada, mas continua conferindo as flags. O `vsp` que estiver no PATH não é usado.
 
 **3. Certificado HTTPS — só se o SAP usar certificado de CA interna.** O launcher nunca desliga a verificação TLS. Peça ao time de Basis ou de infraestrutura a CA raiz em formato `.pem` e aponte o Node para ela:
 
@@ -85,14 +92,14 @@ node scripts/mcp-launch.mjs arc-1 --diagnostico
 Resultado esperado:
 
 ```
-mcp-launch: baixando vsp v2.62.1 (vsp-windows-amd64.exe) — só na primeira vez
+mcp-launch: baixando vsp v2.62.1 (vsp-windows-amd64.exe)
 mcp-launch: vsp v2.62.1 salvo em C:\Users\...\AppData\Local\abap-full-stack\vsp\2.62.1\vsp.exe
 mcp-launch: vsp encontrado: vsp version v2.62.1 (...)
 mcp-launch: vsp -> DS4/110 · S/4HANA 2023 · DEV (mandante de customizing ...) · desenvolvimento
 mcp-launch: arc-1 -> QS4/400 · S/4HANA 2023 · QAS (mandante de teste ...) · somente leitura
 ```
 
-Antes de conectar ao SAP, o diagnóstico confere os executáveis: o binário do `vsp` (baixado e conferido pelo SHA-256, ou o `VSP_BIN`) e a versão do Node exigida pelo ARC-1. Se faltar algo, ele para com a indicação do passo deste guia que resolve.
+Antes de conectar ao SAP, o diagnóstico confere os executáveis: o binário do `vsp` (baixado e conferido pelo SHA-256, ou o `VSP_BIN`) e as flags de segurança dele e a versão do Node exigida pelo ARC-1. Se faltar algo, ele para com a indicação do passo deste guia que resolve.
 
 Confira se SID, produto e ambiente estão corretos. Se aparecer uma recusa, veja a seção [Problemas comuns](#problemas-comuns).
 
@@ -115,7 +122,8 @@ Se você alterar o `.env`, reinicie a ferramenta: os servidores só são iniciad
 | `VSP_ALLOWED_TRANSPORTS=DS4K*` | Permite ao `vsp` editar objetos em pacotes transportáveis, só nas requests do padrão informado. |
 | `VSP_ENABLE_TRANSPORTS=true` | Permite ao `vsp` criar e liberar requests. Use só quando necessário. |
 | `VSP_READ_ONLY=true` | Usa o `vsp` no DEV apenas para análise. |
-| `VSP_BIN` | Caminho de um `vsp` baixado manualmente, para redes que bloqueiam o GitHub. Com ela, o launcher não baixa o binário e não confere o hash; se a versão não for a homologada, mostra um aviso. Um `.cmd`/`.bat` também é aceito, desde que o caminho e os valores das variáveis `VSP_*` não tenham `%`, `!`, `^` ou aspas. |
+| `VSP_BIN` | Caminho de um `vsp` baixado manualmente, para redes que bloqueiam o GitHub. Com ela, o launcher não baixa o binário e não confere o hash, mas confere as flags de segurança. |
+| `VSP_VERSION` | Fixa uma versão do `vsp` (ex.: `2.62.1`) em vez da última estável. Use para voltar atrás quando uma release nova quebrar algo. Um `.cmd`/`.bat` também é aceito, desde que o caminho e os valores das variáveis `VSP_*` não tenham `%`, `!`, `^` ou aspas. |
 | `ARC1_BIN` | Caminho de um ARC-1 já instalado, para redes que bloqueiam o `npx`. Instale com `npm install -g arc-1@1.10.1`. No Windows, o `npm` instala um `arc-1.cmd`, que pode ser usado aqui. |
 | `ARC1_ALLOW_DEV_WRITES=true` + `ARC1_ALLOWED_PACKAGES=Z*` | Exceção controlada da política (4.2): habilita a escrita do `arc-1` quando ele aponta para um DEV/SANDBOX ≤ 2023, restrita aos pacotes informados. Sem a flag, o `arc-1` no DEV fica somente leitura e não pede pacotes. |
 | `ARC1_BLOCKED_DATA_SOURCES` | Tabelas a bloquear na leitura (experimental). Ex.: `USR02,PA0002`. |
@@ -206,12 +214,14 @@ Todas as mensagens do launcher começam com `mcp-launch:`. Para vê-las, rode o 
 | `NODE_TLS_REJECT_UNAUTHORIZED=0 desliga a verificação TLS` | Remova a variável do ambiente. Para certificado de CA interna, use `NODE_EXTRA_CA_CERTS` (passo 3). |
 | `standards/sistemas-sap.json ...` | O registro de restrições tem JSON inválido ou uma entrada sem `sid`/`ambiente` válidos. A mensagem aponta a entrada (`restricoes[n]`). |
 | `não foi possível baixar .../vsp-...` | A rede bloqueou o GitHub ou exige proxy (o download do launcher não usa proxy). Baixe o arquivo manualmente e defina `VSP_BIN` (passo 2). |
-| `o download de vsp-... não confere com o SHA-256 fixado` | O arquivo recebido não é o publicado na release (proxy que altera o conteúdo, ou release adulterada). Nada foi gravado. Avise quem mantém o projeto. |
+| `não foi possível consultar a última versão do vsp ... e não há versão no cache` | Primeiro uso sem acesso ao GitHub. Baixe o arquivo manualmente e defina `VSP_BIN` (passo 2). |
+| `aviso: não foi possível consultar a última versão do vsp ...; usando a vX do cache` | Sem acesso ao GitHub no momento. O launcher seguiu com a versão já baixada. |
+| `o download de vsp-... não confere com o checksums.txt da release` | O arquivo recebido não é o publicado na release (proxy que altera o conteúdo, por exemplo). Nada foi gravado. Tente de novo; se persistir, avise quem mantém o projeto. |
+| `a release vX do vsp não tem vsp-... no checksums.txt` | A release nova não publicou o binário da sua plataforma. Fixe a versão anterior com `VSP_VERSION`. |
+| `o vsp em uso (...) não tem as flags ...` | A versão nova renomeou ou removeu uma flag que o launcher usa para aplicar a política. Fixe a versão anterior com `VSP_VERSION` e avise quem mantém o projeto, para ajustar `scripts/mcp-politica.mjs`. |
 | `"...\vsp.exe" não encontrado` | O caminho em `VSP_BIN` está errado. Corrija-o ou remova a variável para usar o download automático. |
 | `"vsp" não pôde ser executado (EACCES/EPERM)` | O arquivo está bloqueado. No Windows, abra as propriedades do arquivo e marque "Desbloquear". No macOS, rode `xattr -d com.apple.quarantine`. No Linux, rode `chmod +x`. |
-| `"vsp --version" terminou com código ...` | O arquivo em `VSP_BIN` não é o `vsp` correto, ou é de outra plataforma. Baixe novamente o asset da sua plataforma ou remova `VSP_BIN`. |
-| `aviso: a versão homologada é v2.62.1; VSP_BIN aponta para outra` | Use a v2.62.1 ou remova `VSP_BIN` para usar o download automático. |
-| `o ARC-1 exige Node.js >= 22.19` | Atualize o Node (passo 1). |
+| `"vsp --version" terminou com código ...` | O arquivo em `VSP_BIN` não é o `vsp` correto, ou é de outra plataforma. Baixe novamente o asset da sua plataforma ou remova `VSP_BIN`. || `o ARC-1 exige Node.js >= 22.19` | Atualize o Node (passo 1). |
 | `arc-1` dá timeout na 1ª vez | A rede está bloqueando o npm. Instale o ARC-1 antes e use `ARC1_BIN`. |
 | Servidor falho no `/mcp`, mas o diagnóstico passa | A ferramenta foi aberta fora da raiz do projeto, ou não foi reiniciada após mudar o `.env`. |
 | `"...\arc-1.cmd" não pôde ser executado (EINVAL)` | O caminho não aponta para um arquivo executável (pasta ou atalho). Confira `ARC1_BIN`/`VSP_BIN`. |

@@ -5,7 +5,9 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { FalhaVsp, VSP_SHA256, VSP_VERSAO, assetDaPlataforma, garantirVsp, pastaCache } from "../vsp-binario.mjs";
+import { FLAGS_EXIGIDAS, FalhaVsp, assetDaPlataforma, flagsAusentes, garantirVsp, lerChecksums, pastaCache } from "../vsp-binario.mjs";
+
+const sha = (x) => crypto.createHash("sha256").update(x).digest("hex");
 
 describe("assetDaPlataforma", () => {
   test("mapeia as plataformas publicadas", () => {
@@ -18,75 +20,123 @@ describe("assetDaPlataforma", () => {
     assert.equal(assetDaPlataforma("win32", "ia32"), null);
     assert.equal(assetDaPlataforma("freebsd", "x64"), null);
   });
-  test("todo asset tem SHA-256 de 64 hex", () => {
-    for (const h of Object.values(VSP_SHA256)) assert.match(h, /^[0-9a-f]{64}$/);
-  });
 });
 
 describe("pastaCache", () => {
-  test("Windows usa LOCALAPPDATA e a versão", () => {
-    const p = pastaCache("win32", { LOCALAPPDATA: "C:\\U\\AppData\\Local" }, "C:\\U");
-    assert.ok(p.includes("abap-full-stack") && p.endsWith(VSP_VERSAO));
-    assert.ok(p.startsWith("C:\\U\\AppData\\Local"));
+  test("Windows usa LOCALAPPDATA", () => {
+    assert.equal(pastaCache("win32", { LOCALAPPDATA: "C:\\U\\L" }, "C:\\U"), path.join("C:\\U\\L", "abap-full-stack", "vsp"));
   });
   test("Linux usa XDG_CACHE_HOME ou ~/.cache", () => {
-    assert.ok(pastaCache("linux", { XDG_CACHE_HOME: "/x" }, "/h").startsWith(path.join("/x")));
-    assert.ok(pastaCache("linux", {}, "/h").startsWith(path.join("/h", ".cache")));
+    assert.equal(pastaCache("linux", { XDG_CACHE_HOME: "/x" }, "/h"), path.join("/x", "abap-full-stack", "vsp"));
+    assert.equal(pastaCache("linux", {}, "/h"), path.join("/h", ".cache", "abap-full-stack", "vsp"));
+  });
+});
+
+describe("lerChecksums", () => {
+  test("formato do sha256sum, com e sem *", () => {
+    const h = "a".repeat(64);
+    assert.deepEqual(lerChecksums(`${h}  vsp-linux-amd64\r\n${h} *vsp.exe\nlixo\n`), { "vsp-linux-amd64": h, "vsp.exe": h });
+  });
+});
+
+describe("flagsAusentes", () => {
+  const ajuda = FLAGS_EXIGIDAS.map((f) => `      ${f} string   descrição`).join("\n");
+  test("ajuda com todas as flags -> nenhuma ausente", () => assert.deepEqual(flagsAusentes(ajuda), []));
+  test("flag renomeada é detectada", () => {
+    assert.deepEqual(flagsAusentes(ajuda.replace("--block-free-sql", "--no-free-sql")), ["--block-free-sql"]);
+  });
+  test("prefixo não conta como a flag (--read-only-x não é --read-only)", () => {
+    assert.deepEqual(flagsAusentes(ajuda.replace("--read-only ", "--read-only-x ")), ["--read-only"]);
   });
 });
 
 describe("garantirVsp", () => {
-  const BIN = Buffer.from("binário falso do vsp");
-  const HASH_REAL = VSP_SHA256["vsp-linux-amd64"];
-  let tmp, chamadas;
-  const SHA = crypto.createHash("sha256").update(BIN).digest("hex");
+  const ASSET = "vsp-linux-amd64";
+  let tmp, pedidos, releases, latest;
+  // releases: { "2.62.1": Buffer } — binário publicado por versão; latest: versão estável ou Error
+  const fetchSimulado = async (url, init = {}) => {
+    pedidos.push(url);
+    if (url.endsWith("/releases/latest")) {
+      if (latest instanceof Error) throw latest;
+      return new Response(null, { status: 302, headers: { location: `https://github.com/oisee/vibing-steampunk/releases/tag/v${latest}` } });
+    }
+    const m = url.match(/\/download\/v([\d.]+)\/(.+)$/);
+    const bin = m && releases[m[1]];
+    if (!bin) return new Response("", { status: 404 });
+    if (m[2] === "checksums.txt") return new Response(`${sha(bin.publicado ?? bin)}  ${ASSET}\n`);
+    if (m[2] === ASSET) return new Response(bin);
+    return new Response("", { status: 404 });
+  };
+  const opcoes = (env = {}) => ({ platform: "linux", arch: "x64", env: { XDG_CACHE_HOME: tmp, ...env }, home: tmp, fetch: fetchSimulado });
+  const pasta = () => pastaCache("linux", { XDG_CACHE_HOME: tmp }, tmp);
 
-  // Usa o asset linux-amd64 com o hash trocado pelo do binário falso; restaura no afterEach.
   beforeEach(() => {
     tmp = fs.mkdtempSync(path.join(os.tmpdir(), "vsp-teste-"));
-    chamadas = 0;
-    VSP_SHA256["vsp-linux-amd64"] = SHA;
+    pedidos = [];
+    releases = { "2.62.1": Buffer.from("vsp 2.62.1"), "2.63.0": Buffer.from("vsp 2.63.0") };
+    latest = "2.62.1";
   });
-  afterEach(() => {
-    VSP_SHA256["vsp-linux-amd64"] = HASH_REAL;
-    fs.rmSync(tmp, { recursive: true, force: true });
-  });
-  const opcoes = (conteudo, status = 200) => ({
-    platform: "linux", arch: "x64", env: { XDG_CACHE_HOME: tmp }, home: tmp,
-    fetch: async (url) => {
-      chamadas++;
-      assert.ok(url.endsWith(`/v${VSP_VERSAO}/vsp-linux-amd64`));
-      return new Response(conteudo, { status });
-    },
-  });
+  afterEach(() => fs.rmSync(tmp, { recursive: true, force: true }));
 
-  test("baixa, confere e grava no cache", async () => {
-    const destino = await garantirVsp(opcoes(BIN));
-    assert.deepEqual(fs.readFileSync(destino), BIN);
-    assert.equal(chamadas, 1);
-    assert.deepEqual(fs.readdirSync(path.dirname(destino)), ["vsp"]); // sem .tmp sobrando
+  test("baixa a última estável, confere e grava no cache", async () => {
+    const r = await garantirVsp(opcoes());
+    assert.equal(r.versao, "2.62.1");
+    assert.deepEqual(fs.readFileSync(r.caminho), releases["2.62.1"]);
+    assert.deepEqual(fs.readdirSync(path.dirname(r.caminho)).sort(), ["checksums.txt", "vsp"]); // sem .tmp
   });
-  test("segunda execução usa o cache sem baixar", async () => {
-    await garantirVsp(opcoes(BIN));
-    await garantirVsp(opcoes(BIN));
-    assert.equal(chamadas, 1);
+  test("mesma versão: usa o cache sem baixar o binário de novo", async () => {
+    await garantirVsp(opcoes());
+    pedidos = [];
+    await garantirVsp(opcoes());
+    assert.deepEqual(pedidos.map((u) => u.split("/").pop()), ["latest"]);
+  });
+  test("release nova: baixa e remove a anterior do cache", async () => {
+    await garantirVsp(opcoes());
+    latest = "2.63.0";
+    const r = await garantirVsp(opcoes());
+    assert.equal(r.versao, "2.63.0");
+    assert.deepEqual(fs.readdirSync(pasta()), ["2.63.0"]);
+  });
+  test("sem acesso ao GitHub: usa a versão mais nova do cache, com aviso", async () => {
+    await garantirVsp(opcoes());
+    latest = new Error("fetch failed");
+    const avisos = [];
+    const r = await garantirVsp({ ...opcoes(), log: (m) => avisos.push(m) });
+    assert.equal(r.versao, "2.62.1");
+    assert.ok(avisos.some((a) => a.includes("cache")));
+  });
+  test("sem acesso ao GitHub e sem cache: orienta a usar VSP_BIN", async () => {
+    latest = new Error("fetch failed");
+    await assert.rejects(garantirVsp(opcoes()), (e) => e instanceof FalhaVsp && /VSP_BIN/.test(e.message));
+  });
+  test("VSP_VERSION fixa a versão e não consulta a última", async () => {
+    latest = "2.63.0";
+    const r = await garantirVsp(opcoes({ VSP_VERSION: "v2.62.1" }));
+    assert.equal(r.versao, "2.62.1");
+    assert.ok(!pedidos.some((u) => u.endsWith("/latest")));
+  });
+  test("VSP_VERSION inválida é recusada", async () => {
+    await assert.rejects(garantirVsp(opcoes({ VSP_VERSION: "../../x" })), (e) => e instanceof FalhaVsp && /VSP_VERSION/.test(e.message));
   });
   test("cache adulterado é baixado de novo", async () => {
-    const destino = await garantirVsp(opcoes(BIN));
-    fs.writeFileSync(destino, "adulterado");
-    await garantirVsp(opcoes(BIN));
-    assert.equal(chamadas, 2);
-    assert.deepEqual(fs.readFileSync(destino), BIN);
+    const r = await garantirVsp(opcoes());
+    fs.writeFileSync(r.caminho, "adulterado");
+    await garantirVsp(opcoes());
+    assert.deepEqual(fs.readFileSync(r.caminho), releases["2.62.1"]);
   });
-  test("download com hash diferente é recusado e não grava nada", async () => {
-    await assert.rejects(garantirVsp(opcoes(Buffer.from("outro conteúdo"))), (e) => e instanceof FalhaVsp && /SHA-256/.test(e.message));
-    assert.equal(fs.existsSync(pastaCache("linux", { XDG_CACHE_HOME: tmp }, tmp)), false);
+  test("binário que não confere com o checksums.txt é recusado e não grava nada", async () => {
+    releases["2.62.1"] = Object.assign(Buffer.from("trocado no caminho"), { publicado: "original" });
+    await assert.rejects(garantirVsp(opcoes()), (e) => e instanceof FalhaVsp && /checksums\.txt/.test(e.message));
+    assert.equal(fs.existsSync(path.join(pasta(), "2.62.1", "vsp")), false);
   });
-  test("falha de rede orienta a usar VSP_BIN", async () => {
-    await assert.rejects(garantirVsp(opcoes("", 404)), (e) => e instanceof FalhaVsp && /VSP_BIN/.test(e.message));
+  test("release sem o binário da plataforma orienta a fixar versão anterior", async () => {
+    releases["2.62.1"] = Object.assign(Buffer.from("x"), { publicado: "x" });
+    const original = fetchSimulado;
+    const opc = { ...opcoes(), fetch: async (url, init) => url.endsWith("checksums.txt") ? new Response(`${"b".repeat(64)}  outro\n`) : original(url, init) };
+    await assert.rejects(garantirVsp(opc), (e) => e instanceof FalhaVsp && /VSP_VERSION/.test(e.message));
   });
-  test("plataforma sem binário orienta a usar VSP_BIN", async () => {
-    await assert.rejects(garantirVsp({ ...opcoes(BIN), arch: "ia32" }), (e) => e instanceof FalhaVsp && /VSP_BIN/.test(e.message));
-    assert.equal(chamadas, 0);
+  test("plataforma sem binário orienta a usar VSP_BIN, sem rede", async () => {
+    await assert.rejects(garantirVsp({ ...opcoes(), arch: "ia32" }), (e) => e instanceof FalhaVsp && /VSP_BIN/.test(e.message));
+    assert.equal(pedidos.length, 0);
   });
 });
