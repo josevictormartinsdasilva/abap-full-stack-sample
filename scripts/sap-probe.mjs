@@ -157,7 +157,12 @@ export async function detectar(conn) {
   // 3. Papel do mandante (T000)
   const mandt = String(conn.client).replace(/\D/g, "").padStart(3, "0");
   const sql = `SELECT MANDT, LOGSYS, CCCATEGORY, CCCORACTIV, CCNOCLIIND FROM T000 WHERE MANDT = '${mandt}'`;
-  const dp = await s.req("POST", "/sap/bc/adt/datapreview/freestyle?rowNumber=1", { body: sql, contentType: "text/plain", accept: "application/xml" });
+  const dp = await s.req("POST", "/sap/bc/adt/datapreview/freestyle?rowNumber=1", {
+    body: sql,
+    contentType: "text/plain",
+    // Releases ≤ 2023 respondem 406 a "application/xml" puro; o tipo próprio do ADT vem primeiro.
+    accept: "application/vnd.sap.adt.datapreview.table.v1+xml, application/xml",
+  });
   if (dp.status === 200) {
     const linha = lerDataPreview(dp.text);
     if (linha.MANDT) out.t000 = linha;

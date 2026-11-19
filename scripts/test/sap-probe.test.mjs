@@ -117,11 +117,15 @@ ${Object.entries({ MANDT: "100", LOGSYS: logsys, CCCATEGORY: cat, CCCORACTIV: "1
 </dataPreview:tableData>`;
 
 function simularSap({ systeminformation, basis = 758, t000 }) {
-  globalThis.fetch = async (url) => {
+  globalThis.fetch = async (url, init = {}) => {
     const p = new URL(url).pathname;
+    const accept = new Headers(init.headers).get("accept") ?? "";
     if (p.endsWith("/core/http/systeminformation"))
       return systeminformation ? new Response(JSON.stringify(systeminformation), { status: 200 }) : new Response("", { status: 404 });
     if (p.endsWith("/system/components")) return new Response(COMPONENTES(basis), { status: 200 });
+    // Releases ≤ 2023 respondem 406 se o Accept não trouxer o tipo próprio do data preview.
+    if (p.endsWith("/datapreview/freestyle") && !accept.includes("application/vnd.sap.adt.datapreview.table.v1+xml"))
+      return new Response("", { status: 406 });
     if (p.endsWith("/datapreview/freestyle")) return t000 ? new Response(T000(t000), { status: 200 }) : new Response("", { status: 403 });
     return new Response("", { status: 404 });
   };
