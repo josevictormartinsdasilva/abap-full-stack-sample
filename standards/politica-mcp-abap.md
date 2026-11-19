@@ -68,7 +68,7 @@ O operador só informa **como conectar**: URL, mandante, usuário e senha (`ARC1
 - A leitura da T000 usa o data preview do ADT. Um usuário sem essa autorização faz o sistema ser tratado como PRD.
 - O `abap-adt` (MCP oficial) não passa pelo launcher. Para ele, o agente confirma SID e release pelas ferramentas de informação de sistema do próprio servidor.
 
-**Resultado para o orquestrador:** a cada início, o launcher grava em `.agents/runtime/<servidor>.json` (não versionado) o SID, o mandante, o produto, o SAP_BASIS, o ambiente, o motivo da classificação e o modo (desenvolvimento ou somente leitura). O arquivo é apagado ao iniciar e ao encerrar o servidor, então só existe enquanto o servidor está no ar.
+**Resultado para o orquestrador:** a cada início, o launcher grava em `.agents/runtime/<servidor>.<pid>.json` (não versionado) o SID, o mandante, o produto, o SAP_BASIS, o ambiente, o motivo da classificação, o modo (desenvolvimento ou somente leitura), as ações negadas e o `pid`. Cada sessão tem o seu arquivo, então duas ferramentas no mesmo servidor não apagam o estado uma da outra. O arquivo é apagado quando o servidor encerra normalmente. Se o processo for morto à força, o arquivo fica, por isso o orquestrador não lê os arquivos diretamente: usa `node scripts/mcp-runtime.mjs`, que lista em JSON só os servidores cujo processo está vivo e descarta os demais.
 
 **Diagnóstico:** `node scripts/mcp-launch.mjs <servidor> --diagnostico` mostra o que foi detectado e a decisão, sem iniciar o servidor.
 
@@ -87,7 +87,7 @@ O operador só informa **como conectar**: URL, mandante, usuário e senha (`ARC1
 
 1. **Identificar o sistema-alvo** (SID e mandante) pelo pedido do usuário. Se houver ambiguidade, pergunte.
 2. **Descobrir qual servidor está conectado a ele:**
-   - para `arc-1` e `vsp`, leia `.agents/runtime/*.json` e use o servidor cujo `sid`/`mandante` corresponda;
+   - para `arc-1` e `vsp`, rode `node scripts/mcp-runtime.mjs` e use o servidor cujo `sid`/`mandante` corresponda. Ele só lista servidores com processo vivo; um arquivo em `.agents/runtime/` que não aparece ali é de um servidor que caiu;
    - para `abap-adt`, consulte a informação de sistema do próprio servidor.
 
    Se nenhum servidor ativo estiver conectado ao sistema-alvo, **pare** e informe o usuário.
@@ -103,7 +103,7 @@ O operador só informa **como conectar**: URL, mandante, usuário e senha (`ARC1
 ### 4.1 `abap-adt` — MCP oficial SAP (S/4HANA 2025+)
 
 - **Escrita:** apenas em DEV/SANDBOX, com a trava do [ADR-0004](../docs/adr/0004-trava-do-sistema-de-desenvolvimento.md).
-- **QAS/PRD:** somente leitura, busca, checks, ATC (sem aplicar quickfix) e consultas de transporte.
+- **QAS/PRD:** somente leitura, busca, checks, ATC (sem aplicar quickfix) e consultas de transporte. ABAP Unit não: só em DEV/SANDBOX. No `abap-adt` essa regra é procedural, porque ele não passa pelo launcher.
 - **Restrições de acesso:** a configuração do ADT deve manter `adt.mcpServer.accessRestrictionsEnabled = true`, com destinos e pacotes listados. Essa configuração fica no IDE de cada desenvolvedor, fora deste repositório.
 - **Recursos Joule** (explicação de objeto, AI-fix do ATC, documentação): podem ter custo adicional. Use somente com autorização do usuário.
 
@@ -114,16 +114,19 @@ O operador só informa **como conectar**: URL, mandante, usuário e senha (`ARC1
 - Somente leitura em todo sistema que não seja detectado como DEV/SANDBOX, em qualquer sistema com SAP_BASIS ≥ 816 e quando o SID não for confirmado (seção 2).
 - Prévia de dados, SQL livre, escrita em transporte e Git, e execução de plugins sempre desligados.
 - `SAPWrite.delete` sempre negado.
+- Fora de DEV/SANDBOX (QAS e PRD), ABAP Unit negado (`SAPDiagnose.unittest` e `SAPDiagnose.unittest_ci`). As ações de teste não são bloqueadas pelo modo somente leitura do ARC-1, por isso a negação é explícita.
+
+Outras regras desta seção já são garantidas pelo modo somente leitura e pela prévia de dados desligada (conferido em `arc-1@1.10.1`): aplicar quickfix, iniciar trace e alterar o estado do SQL trace são escrita; `odata_perf` e `authorization_trace` são consulta de dados.
 
 **Ferramentas permitidas:**
 
 - `SAPRead` e `SAPSearch`.
 - `SAPNavigate` e `SAPContext` (dependências, where-used, impacto de CDS).
 - `SAPLint`.
-- `SAPDiagnose`: syntax check, ATC sem aplicar quickfix, dumps e traces. ABAP Unit somente em QAS, nunca em PRD.
+- `SAPDiagnose`: syntax check, ATC sem aplicar quickfix, dumps e traces. ABAP Unit não (só em DEV/SANDBOX).
 - `SAPTransport` em leitura: list, get, diff e history.
 
-**Exceção controlada:** se um cliente não autorizar o `vsp` no DEV, o `arc-1` pode ser apontado para o DEV. Como o sistema é detectado como DEV, o launcher habilita a escrita, restrita a `ARC1_ALLOWED_PACKAGES`.
+**Exceção controlada:** se um cliente não autorizar o `vsp` no DEV, o `arc-1` pode ser apontado para o DEV com escrita. A escrita exige opt-in explícito: `ARC1_ALLOW_DEV_WRITES=true` e `ARC1_ALLOWED_PACKAGES`. Sem a flag, o `arc-1` no DEV inicia somente leitura (uso só para análise) e não pede pacotes. A flag é ignorada fora de DEV/SANDBOX, em SAP_BASIS ≥ 816 e com SID não confirmado.
 
 ### 4.3 `vsp` — vibing-steampunk (S/4HANA ≤ 2023, DEV/SANDBOX)
 
@@ -171,7 +174,7 @@ Os subagentes descrevem o trabalho em termos do `abap-adt`. Quando o servidor do
 | Syntax check | `abap_object_check` | `SAP(action="analyze")`, `type=syntax_check` | `SAPDiagnose` |
 | Ativar | `abap_object_*` (ativação) | `SAP(action="edit")` (ver help) | Proibido |
 | ATC | `abap_atc_*` | `SAP(action="test", target="ATC")` | `SAPDiagnose` (sem quickfix) |
-| ABAP Unit | `abap_unit_*` | `SAP(action="test")` | `SAPDiagnose` (somente QAS) |
+| ABAP Unit | `abap_unit_*` (somente DEV/SANDBOX) | `SAP(action="test")` | — (negado pelo launcher) |
 | Onde é usado / impacto | `abap_repository_*` | `SAP(action="analyze")`, `type=impact` | `SAPContext` |
 | Dumps | feeds | `SAP(action="analyze")`, `type=list_dumps` | `SAPDiagnose` |
 | Transportes | `abap_transport_*` | `SAP(action="system")` | `SAPTransport` (leitura) |

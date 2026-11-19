@@ -30,7 +30,7 @@ Foi feito um estudo de caso, com análise do código-fonte, de dois servidores M
    - o SAP_BASIS (`/sap/bc/adt/system/components`);
    - o papel do mandante na SCC4 (`T000-CCCATEGORY` e `CCNOCLIIND`).
 
-   O que não puder ser lido é tratado como PRD. `standards/sistemas-sap.json` é opcional e só pode tornar um sistema mais restritivo. O resultado vai para `.agents/runtime/<servidor>.json`, que o orquestrador usa para rotear.
+   O que não puder ser lido é tratado como PRD. `standards/sistemas-sap.json` é opcional e só pode tornar um sistema mais restritivo. O resultado vai para `.agents/runtime/<servidor>.<pid>.json`. O orquestrador lista os servidores vivos com `node scripts/mcp-runtime.mjs` para rotear.
 3. **`arc-1` e `vsp` só são iniciados por `scripts/mcp-launch.mjs`.** O launcher:
    - detecta o sistema e confere SID e mandante com o que foi configurado;
    - impõe as travas técnicas (vsp só em DEV/SANDBOX com `--expect`, `--allowed-packages` e `--block-free-sql`; ARC-1 somente leitura fora de DEV, sem prévia de dados nem SQL; SAP_BASIS < 750 recusado; só `https://` e sem TLS desligado);

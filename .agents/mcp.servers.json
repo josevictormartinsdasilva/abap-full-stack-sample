@@ -15,7 +15,8 @@
     "vsp": {
       "transport": "stdio",
       "command": "node",
-      "args": ["scripts/mcp-launch.mjs", "vsp"]
+      "args": ["scripts/mcp-launch.mjs", "vsp"],
+      "timeoutSec": 120
     },
     "fiori-mcp": {
       "transport": "stdio",

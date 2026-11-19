@@ -10,7 +10,7 @@
     },
     "arc-1": {
       "type": "stdio",
-      "timeout": 300,
+      "timeoutSeconds": 300,
       "command": "node",
       "args": [
         "scripts/mcp-launch.mjs",
@@ -20,6 +20,7 @@
     },
     "vsp": {
       "type": "stdio",
+      "timeoutSeconds": 120,
       "command": "node",
       "args": [
         "scripts/mcp-launch.mjs",
@@ -29,7 +30,7 @@
     },
     "fiori-mcp": {
       "type": "stdio",
-      "timeout": 600,
+      "timeoutSeconds": 600,
       "command": "npx",
       "args": [
         "--yes",

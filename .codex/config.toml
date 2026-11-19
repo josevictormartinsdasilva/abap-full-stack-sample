@@ -18,6 +18,7 @@ startup_timeout_sec = 300
 [mcp_servers.vsp]
 command = "cmd"
 args = ["/c", "node", "scripts/mcp-launch.mjs", "vsp"]
+startup_timeout_sec = 120
 
 [mcp_servers.fiori-mcp]
 command = "cmd"

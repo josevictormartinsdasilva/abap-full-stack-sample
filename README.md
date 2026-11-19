@@ -254,6 +254,7 @@ scripts/sync-agents.mjs         ← gerador
 scripts/mcp-launch.mjs          ← launcher de arc-1/vsp com as travas da política
 scripts/sap-probe.mjs           ← detecção de SID, release e ambiente no próprio SAP
 scripts/mcp-politica.mjs        ← decisões do launcher (funções puras, testáveis)
+scripts/mcp-runtime.mjs         ← lista os servidores arc-1/vsp vivos (usado pelo orquestrador)
 scripts/test/                   ← testes das travas (node --test)
 .claude/                        ← gerado (Claude Code: agents, skills, settings.json)
 .mcp.json                       ← gerado (Claude Code: servidores MCP, na raiz)

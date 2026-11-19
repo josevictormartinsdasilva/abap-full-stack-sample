@@ -196,14 +196,16 @@ out.set(
   out.set(".kimi-code/mcp.json", json(k));
 }
 
-// Antigravity (não lê variável de ambiente: o token é substituído localmente, sem commit)
+// Antigravity (não lê variável de ambiente: o token é substituído localmente, sem commit).
+// timeoutSeconds é a chave documentada (https://antigravity.google/docs/mcp); um valor positivo
+// substitui tanto o limite de conexão (padrão 300 s) quanto o de chamada de ferramenta (180 s).
 {
   const g = { mcpServers: {} };
   for (const [n, s] of Object.entries(mcp)) {
     g.mcpServers[n] =
       s.transport === "http"
         ? { type: "streamableHttp", url: s.url, ...(s.tokenEnvVar ? { headers: { Authorization: "Bearer <SEU_TOKEN>" } } : {}), disabled: false }
-        : { type: "stdio", ...(s.timeoutSec ? { timeout: s.timeoutSec } : {}), command: s.command, args: s.args || [], disabled: false };
+        : { type: "stdio", ...(s.timeoutSec ? { timeoutSeconds: s.timeoutSec } : {}), command: s.command, args: s.args || [], disabled: false };
   }
   out.set(".agents/mcp_config.json", json(g));
 }
