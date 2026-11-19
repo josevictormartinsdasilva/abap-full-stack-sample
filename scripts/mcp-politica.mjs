@@ -29,11 +29,10 @@ export function valorDeVariavel(nome, bruto) {
 const AMBIENTES = Object.keys(RESTRICAO).join(", ");
 export const BASIS_MINIMO = 750; // política, regra absoluta 5
 export const BASIS_MCP_OFICIAL = 816; // S/4HANA 2025+: abap-adt
-export const ARC1_PACKAGE = "arc-1@1.10.1"; // versão fixada (mesmo critério do fiori-mcp, ADR-0007)
 
 // Ações do ARC-1 negadas por SAP_DENY_ACTIONS (nomes conferidos em arc-1@1.10.1,
-// dist/authz/policy.js). Ao atualizar a versão do ARC-1, confira os nomes de novo: um nome
-// desconhecido faz o ARC-1 recusar iniciar.
+// dist/authz/policy.js). O ARC-1 roda sempre na última versão estável (scripts/arc1-pacote.mjs):
+// se uma versão nova renomear uma ação, o próprio ARC-1 recusa iniciar com o nome desconhecido.
 export const ARC1_NEGADAS_SEMPRE = ["SAPWrite.delete"];
 // Política 4.2: ABAP Unit só em DEV/SANDBOX. Teste unitário executa código e pode ter efeito
 // colateral (gravação, RFC, bloqueio). As ações são do tipo Test, que o modo somente leitura não
@@ -169,9 +168,10 @@ export function resolverSid({ sid, sidOrigem }, sidDeclarado, prefix) {
 //   conn        { url, client, user, password }
 //   v(nome)     valor da variável <prefix>_<nome> (undefined se ausente ou placeholder)
 //   env         ambiente do processo (base do ambiente do filho; ARC1_BIN/VSP_BIN)
+//   arc1        { command, args } do ARC-1 gerenciado (scripts/arc1-pacote.mjs); ignorado com ARC1_BIN
 //   platform    process.platform
 // Saída: { command, args, shell, modo, acoesNegadas, childEnv, avisos } ou Recusa.
-export function decidir({ tool, prefix, sistema, conn, v, env, platform }) {
+export function decidir({ tool, prefix, sistema, conn, v, env, platform, arc1 }) {
   const { sid, sidPendente, mandante, ambiente, motivo, sapBasis, produto } = sistema;
   const req = (nome) => v(nome) ?? recusar(`variável ${prefix}_${nome} não definida ou ainda com placeholder <...> (ambiente ou .env)`);
   const flag = (nome) => /^(true|1|yes)$/i.test(v(nome) ?? "");
@@ -216,9 +216,10 @@ export function decidir({ tool, prefix, sistema, conn, v, env, platform }) {
     if (env.ARC1_BIN) {
       command = env.ARC1_BIN;
       args = [];
+    } else if (arc1) {
+      ({ command, args } = arc1);
     } else {
-      command = platform === "win32" ? "npx.cmd" : "npx";
-      args = ["--yes", ARC1_PACKAGE];
+      recusar("ARC-1 não instalado: defina ARC1_BIN ou deixe o launcher instalá-lo (scripts/arc1-pacote.mjs).");
     }
   } else if (tool === "vsp") {
     if (!isDev) recusar(`vsp recusado: ${sid}/${mandante} é ${ambiente} — ${motivo}. Política MCP: vsp só em DEV/SANDBOX.`);
