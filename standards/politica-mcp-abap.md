@@ -103,7 +103,7 @@ O operador só informa **como conectar**: URL, mandante, usuário e senha (`ARC1
 ### 4.1 `abap-adt` — MCP oficial SAP (S/4HANA 2025+)
 
 - **Escrita:** apenas em DEV/SANDBOX, com a trava do [ADR-0004](../docs/adr/0004-trava-do-sistema-de-desenvolvimento.md).
-- **QAS/PRD:** somente leitura, busca, checks, ATC (sem aplicar quickfix) e consultas de transporte.
+- **QAS/PRD:** somente leitura, busca, checks, ATC (sem aplicar quickfix) e consultas de transporte. ABAP Unit não: só em DEV/SANDBOX. No `abap-adt` essa regra é procedural, porque ele não passa pelo launcher.
 - **Restrições de acesso:** a configuração do ADT deve manter `adt.mcpServer.accessRestrictionsEnabled = true`, com destinos e pacotes listados. Essa configuração fica no IDE de cada desenvolvedor, fora deste repositório.
 - **Recursos Joule** (explicação de objeto, AI-fix do ATC, documentação): podem ter custo adicional. Use somente com autorização do usuário.
 
@@ -114,7 +114,7 @@ O operador só informa **como conectar**: URL, mandante, usuário e senha (`ARC1
 - Somente leitura em todo sistema que não seja detectado como DEV/SANDBOX, em qualquer sistema com SAP_BASIS ≥ 816 e quando o SID não for confirmado (seção 2).
 - Prévia de dados, SQL livre, escrita em transporte e Git, e execução de plugins sempre desligados.
 - `SAPWrite.delete` sempre negado.
-- Em PRD, ABAP Unit negado (`SAPDiagnose.unittest` e `SAPDiagnose.unittest_ci`). As ações de teste não são bloqueadas pelo modo somente leitura do ARC-1, por isso a negação é explícita.
+- Fora de DEV/SANDBOX (QAS e PRD), ABAP Unit negado (`SAPDiagnose.unittest` e `SAPDiagnose.unittest_ci`). As ações de teste não são bloqueadas pelo modo somente leitura do ARC-1, por isso a negação é explícita.
 
 Outras regras desta seção já são garantidas pelo modo somente leitura e pela prévia de dados desligada (conferido em `arc-1@1.10.1`): aplicar quickfix, iniciar trace e alterar o estado do SQL trace são escrita; `odata_perf` e `authorization_trace` são consulta de dados.
 
@@ -123,7 +123,7 @@ Outras regras desta seção já são garantidas pelo modo somente leitura e pela
 - `SAPRead` e `SAPSearch`.
 - `SAPNavigate` e `SAPContext` (dependências, where-used, impacto de CDS).
 - `SAPLint`.
-- `SAPDiagnose`: syntax check, ATC sem aplicar quickfix, dumps e traces. ABAP Unit somente em QAS, nunca em PRD.
+- `SAPDiagnose`: syntax check, ATC sem aplicar quickfix, dumps e traces. ABAP Unit não (só em DEV/SANDBOX).
 - `SAPTransport` em leitura: list, get, diff e history.
 
 **Exceção controlada:** se um cliente não autorizar o `vsp` no DEV, o `arc-1` pode ser apontado para o DEV com escrita. A escrita exige opt-in explícito: `ARC1_ALLOW_DEV_WRITES=true` e `ARC1_ALLOWED_PACKAGES`. Sem a flag, o `arc-1` no DEV inicia somente leitura (uso só para análise) e não pede pacotes. A flag é ignorada fora de DEV/SANDBOX, em SAP_BASIS ≥ 816 e com SID não confirmado.
@@ -174,7 +174,7 @@ Os subagentes descrevem o trabalho em termos do `abap-adt`. Quando o servidor do
 | Syntax check | `abap_object_check` | `SAP(action="analyze")`, `type=syntax_check` | `SAPDiagnose` |
 | Ativar | `abap_object_*` (ativação) | `SAP(action="edit")` (ver help) | Proibido |
 | ATC | `abap_atc_*` | `SAP(action="test", target="ATC")` | `SAPDiagnose` (sem quickfix) |
-| ABAP Unit | `abap_unit_*` | `SAP(action="test")` | `SAPDiagnose` (somente QAS) |
+| ABAP Unit | `abap_unit_*` (somente DEV/SANDBOX) | `SAP(action="test")` | — (negado pelo launcher) |
 | Onde é usado / impacto | `abap_repository_*` | `SAP(action="analyze")`, `type=impact` | `SAPContext` |
 | Dumps | feeds | `SAP(action="analyze")`, `type=list_dumps` | `SAPDiagnose` |
 | Transportes | `abap_transport_*` | `SAP(action="system")` | `SAPTransport` (leitura) |

@@ -21,7 +21,7 @@ Não há pacote nem pasta fixos nesta skill. Determine o escopo nesta ordem:
 
 ## Servidor MCP
 
-Os nomes de ferramentas abaixo são os do `abap-adt` (MCP oficial, S/4HANA 2025+). Em sistemas ≤ 2023, use o servidor informado pelo orquestrador (`vsp` em DEV/SANDBOX, `arc-1` em QAS/PRD) e as equivalências da seção 5 de [politica-mcp-abap.md](../../../standards/politica-mcp-abap.md). Em QAS/PRD, a auditoria é somente leitura: não aplique QuickFixes e não rode ABAP Unit em PRD.
+Os nomes de ferramentas abaixo são os do `abap-adt` (MCP oficial, S/4HANA 2025+). Em sistemas ≤ 2023, use o servidor informado pelo orquestrador (`vsp` em DEV/SANDBOX, `arc-1` em QAS/PRD) e as equivalências da seção 5 de [politica-mcp-abap.md](../../../standards/politica-mcp-abap.md). Em QAS/PRD, a auditoria é somente leitura: não aplique QuickFixes e não rode ABAP Unit, que só é executado em DEV/SANDBOX.
 
 ## Tarefas Principais
 
@@ -32,7 +32,7 @@ Os nomes de ferramentas abaixo são os do `abap-adt` (MCP oficial, S/4HANA 2025+
    - Tolerância zero: qualquer erro de ATC reprova a entrega.
 
 2. **Testes Unitários ABAP Unit**:
-   - Executar suítes de teste unitário via `abap_unit_run_tests` no escopo definido acima.
+   - Executar suítes de teste unitário via `abap_unit_run_tests` no escopo definido acima, **somente em DEV/SANDBOX**. Teste unitário executa código e pode ter efeito colateral (gravação, RFC, bloqueio); em QAS/PRD, não execute e registre no relatório que não foi executado.
 
 3. **Linting de Frontend**:
    - Executar `npm run lint` na pasta de cada app Fiori afetado (raiz com `package.json` e `ui5.yaml`) para garantir zero erros ou avisos de ESLint.

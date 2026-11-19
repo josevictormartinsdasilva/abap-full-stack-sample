@@ -191,7 +191,7 @@ O Bloco 1 foi implementado com os testes do item 1.7 (`scripts/mcp-politica.mjs`
 O Bloco 2 foi implementado no branch `fix/launcher-operacao`. Decisões e evidências:
 
 - **2.1:** nova variável `<P>_ALLOW_DEV_WRITES`. A flag é ignorada, com aviso, fora de DEV/SANDBOX, em SAP_BASIS ≥ 816 e com SID não confirmado.
-- **2.2:** nomes conferidos no pacote `arc-1@1.10.1` (`dist/authz/policy.js`): `SAPDiagnose.unittest` e `SAPDiagnose.unittest_ci`, do tipo `Test`. O modo somente leitura do ARC-1 não bloqueia esse tipo (`dist/adt/safety.js`, `MUTATING_OPS = 'CDUAWX'`), então a negação explícita em PRD é necessária. No levantamento das demais regras da política 4.2, não sobrou nenhuma que dependa só do prompt:
+- **2.2:** nomes conferidos no pacote `arc-1@1.10.1` (`dist/authz/policy.js`): `SAPDiagnose.unittest` e `SAPDiagnose.unittest_ci`, do tipo `Test`. O modo somente leitura do ARC-1 não bloqueia esse tipo (`dist/adt/safety.js`, `MUTATING_OPS = 'CDUAWX'`), então a negação explícita é necessária. **Regra revista em 2026-11-19:** o ABAP Unit passou a valer só em DEV/SANDBOX (antes: "somente QAS, nunca PRD"). O launcher nega em QAS e PRD; a política (4.1, 4.2 e seção 5), o agente `abap-qa-auditor` e a skill dele foram atualizados. No levantamento das demais regras da política 4.2, não sobrou nenhuma que dependa só do prompt:
   - aplicar quickfix, iniciar trace e alterar o estado do SQL trace são do tipo escrita e já ficam bloqueados em somente leitura;
   - `odata_perf` e `authorization_trace` são do tipo consulta e já ficam bloqueados pela prévia de dados desligada.
 

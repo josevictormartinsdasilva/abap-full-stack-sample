@@ -25,9 +25,10 @@ export const ARC1_PACKAGE = "arc-1@1.10.1"; // versão fixada (mesmo critério d
 // dist/authz/policy.js). Ao atualizar a versão do ARC-1, confira os nomes de novo: um nome
 // desconhecido faz o ARC-1 recusar iniciar.
 export const ARC1_NEGADAS_SEMPRE = ["SAPWrite.delete"];
-// Política 4.2: ABAP Unit nunca em PRD. As ações são do tipo Test, que o modo somente leitura
-// não bloqueia; por isso a negação explícita.
-export const ARC1_NEGADAS_PRD = ["SAPDiagnose.unittest", "SAPDiagnose.unittest_ci"];
+// Política 4.2: ABAP Unit só em DEV/SANDBOX. Teste unitário executa código e pode ter efeito
+// colateral (gravação, RFC, bloqueio). As ações são do tipo Test, que o modo somente leitura não
+// bloqueia; por isso a negação explícita em QAS e PRD.
+export const ARC1_NEGADAS_FORA_DEV = ["SAPDiagnose.unittest", "SAPDiagnose.unittest_ci"];
 
 // ---------------------------------------------------------------- comando (2.4)
 // No Windows, .cmd/.bat só rodam via cmd.exe (spawn sem shell falha com EINVAL no Node >=
@@ -188,7 +189,7 @@ export function decidir({ tool, prefix, sistema, conn, v, env, platform }) {
     if (!isDev && pediuEscrita)
       avisos.push(`${prefix}_ALLOW_DEV_WRITES ignorada: ${sid} é ${ambiente}`);
     modo = writes ? "escrita restrita a pacotes" : "somente leitura";
-    acoesNegadas = [...ARC1_NEGADAS_SEMPRE, ...(ambiente === "PRD" ? ARC1_NEGADAS_PRD : [])];
+    acoesNegadas = [...ARC1_NEGADAS_SEMPRE, ...(isDev ? [] : ARC1_NEGADAS_FORA_DEV)];
     Object.assign(childEnv, {
       SAP_TRANSPORT: "stdio",
       SAP_INSECURE: "false",

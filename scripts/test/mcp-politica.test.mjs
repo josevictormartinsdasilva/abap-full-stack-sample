@@ -3,7 +3,7 @@ import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import {
   Recusa, verificarTls, filtrarEnvFilho, lerRegistro, aplicarRegistro, resolverSid, decidir, comandoParaSpawn,
-  ARC1_PACKAGE, ARC1_NEGADAS_PRD,
+  ARC1_PACKAGE, ARC1_NEGADAS_FORA_DEV,
 } from "../mcp-politica.mjs";
 
 const REG = "standards/sistemas-sap.json";
@@ -216,19 +216,23 @@ describe("decidir — ARC-1", () => {
     assert.equal(d.childEnv.SAP_ALLOW_WRITES, "false");
     assert.match(d.avisos[0], /ARC1_SAP_SID/);
   });
-  test("PRD: ABAP Unit negado (2.2)", () => {
-    const d = decidirCom({ tool: "arc-1", sistema: { ambiente: "PRD" } });
-    assert.deepEqual(d.acoesNegadas, ["SAPWrite.delete", ...ARC1_NEGADAS_PRD]);
-    assert.equal(d.childEnv.SAP_DENY_ACTIONS, "SAPWrite.delete,SAPDiagnose.unittest,SAPDiagnose.unittest_ci");
+  test("QAS e PRD: ABAP Unit negado (2.2)", () => {
+    for (const ambiente of ["QAS", "PRD"]) {
+      const d = decidirCom({ tool: "arc-1", sistema: { ambiente } });
+      assert.deepEqual(d.acoesNegadas, ["SAPWrite.delete", ...ARC1_NEGADAS_FORA_DEV], ambiente);
+      assert.equal(d.childEnv.SAP_DENY_ACTIONS, "SAPWrite.delete,SAPDiagnose.unittest,SAPDiagnose.unittest_ci", ambiente);
+    }
   });
-  test("QAS/DEV: ABAP Unit permitido (2.2)", () => {
-    for (const ambiente of ["QAS", "DEV", "SANDBOX"])
+  test("DEV e SANDBOX: ABAP Unit permitido, com ou sem escrita (2.2)", () => {
+    for (const ambiente of ["DEV", "SANDBOX"]) {
       assert.equal(decidirCom({ tool: "arc-1", sistema: { ambiente } }).childEnv.SAP_DENY_ACTIONS, "SAPWrite.delete", ambiente);
+      assert.equal(decidirCom({ tool: "arc-1", sistema: { ambiente, sapBasis: 816 } }).childEnv.SAP_DENY_ACTIONS, "SAPWrite.delete", `${ambiente} 2025+`);
+    }
   });
-  test("PRD declarado no registro também nega ABAP Unit (2.2)", () => {
+  test("DEV restringido a QAS pelo registro também nega ABAP Unit (2.2)", () => {
     // o ambiente que chega a decidir() já é o efetivo (detectado + registro)
-    const r = aplicarRegistro({ sid: "QS4", mandante: "400", ambiente: "QAS", motivo: "x" },
-      lerRegistro(registro([{ sid: "QS4", ambiente: "PRD" }]), REG).restricoes, REG);
+    const r = aplicarRegistro({ sid: "QS4", mandante: "400", ambiente: "DEV", motivo: "x" },
+      lerRegistro(registro([{ sid: "QS4", ambiente: "QAS" }]), REG).restricoes, REG);
     const d = decidirCom({ tool: "arc-1", sistema: { ambiente: r.ambiente } });
     assert.ok(d.acoesNegadas.includes("SAPDiagnose.unittest"));
   });

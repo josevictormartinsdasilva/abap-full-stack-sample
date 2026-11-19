@@ -30,7 +30,7 @@
 //     --allowed-packages e --block-free-sql; nunca --insecure.
 //   - ARC-1: somente leitura, exceto em DEV/SANDBOX ≤ 2023 com SID confirmado e opt-in
 //     <P>_ALLOW_DEV_WRITES=true; prévia de dados, SQL livre, escrita em transporte/Git e plugins
-//     sempre desligados; SAPWrite.delete sempre negado e ABAP Unit negado em PRD.
+//     sempre desligados; SAPWrite.delete sempre negado e ABAP Unit negado fora de DEV/SANDBOX.
 //   - O que não puder ser detectado é tratado como o caso mais restritivo.
 //   - Nenhuma variável SAP_*, NODE_OPTIONS ou NODE_TLS_REJECT_UNAUTHORIZED do ambiente do
 //     usuário é herdada; o processo filho roda num diretório neutro para não carregar o .env.
