@@ -17,7 +17,8 @@
 //   ARC-1: <P>_ALLOW_DEV_WRITES=true + <P>_ALLOWED_PACKAGES (escrita, só em DEV/SANDBOX ≤ 2023),
 //          <P>_BLOCKED_DATA_SOURCES, ARC1_BIN
 //   vsp:   <P>_ALLOWED_PACKAGES (obrigatória), <P>_ALLOWED_TRANSPORTS, <P>_ENABLE_TRANSPORTS,
-//          <P>_READ_ONLY, VSP_BIN
+//          <P>_READ_ONLY, VSP_BIN (sem ele, o launcher baixa o vsp da versão fixada e confere o
+//          SHA-256; ver scripts/vsp-binario.mjs)
 //
 // O launcher NÃO confia no que foi declarado: lê do próprio SAP (scripts/sap-probe.mjs) o SID,
 // o mandante, o release (SAP_BASIS) e o papel do mandante (T000/SCC4). O registro opcional
@@ -50,6 +51,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { detectar, validarUrlSap } from "./sap-probe.mjs";
 import { Recusa, valorDeVariavel, aplicarRegistro, comandoParaSpawn, decidir, lerRegistro, resolverSid, verificarTls } from "./mcp-politica.mjs";
+import { FalhaVsp, VSP_VERSAO, garantirVsp } from "./vsp-binario.mjs";
 import { RUNTIME_DIR, gravarEstado, listarAtivos, removerEstado } from "./mcp-runtime.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -140,8 +142,18 @@ function verificarBinario(cmd, variavel, passo) {
   return (r.stdout || r.stderr || "").trim().split(/\r?\n/)[0];
 }
 if (tool === "vsp") {
-  const versao = verificarBinario(process.env.VSP_BIN || "vsp", "VSP_BIN", "passo 2");
+  // VSP_BIN explícito tem precedência; sem ele, binário gerenciado (versão fixada + SHA-256).
+  if (!process.env.VSP_BIN) {
+    try {
+      process.env.VSP_BIN = await garantirVsp({ log });
+    } catch (e) {
+      if (e instanceof FalhaVsp) fail(`${e.message} (${GUIA}, passo 2)`);
+      throw e;
+    }
+  }
+  const versao = verificarBinario(process.env.VSP_BIN, "VSP_BIN", "passo 2");
   log(`vsp encontrado: ${versao}`);
+  if (!versao.includes(VSP_VERSAO)) log(`aviso: a versão homologada é v${VSP_VERSAO}; VSP_BIN aponta para outra.`);
 } else if (process.env.ARC1_BIN) {
   verificarBinario(process.env.ARC1_BIN, "ARC1_BIN", "variáveis opcionais");
 } else {
