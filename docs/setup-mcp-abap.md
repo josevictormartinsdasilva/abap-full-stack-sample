@@ -104,7 +104,7 @@ Confira se SID, produto e ambiente estão corretos. Se aparecer uma recusa, veja
 
 **8. Abrir a ferramenta e conferir as conexões.**
 
-1. Abra a ferramenta de IA **na raiz do projeto**. O launcher é chamado por caminho relativo e não é encontrado se a ferramenta for aberta em outra pasta.
+1. Abra a ferramenta de IA **na raiz do projeto**. O launcher é chamado por caminho relativo (`scripts/mcp-launch.mjs`) e não é encontrado se o servidor for iniciado em outra pasta (ver [Diretório de trabalho por ferramenta](#diretório-de-trabalho-por-ferramenta)).
 2. Rode `/mcp` (Claude Code). Os servidores `abap-adt`, `arc-1`, `vsp` e `fiori-mcp` devem aparecer conectados.
 
 Se você alterar o `.env`, reinicie a ferramenta: os servidores só são iniciados na abertura da sessão.
@@ -119,9 +119,25 @@ Se você alterar o `.env`, reinicie a ferramenta: os servidores só são iniciad
 | `VSP_ALLOWED_TRANSPORTS=DS4K*` | Permite ao `vsp` editar objetos em pacotes transportáveis, só nas requests do padrão informado. |
 | `VSP_ENABLE_TRANSPORTS=true` | Permite ao `vsp` criar e liberar requests. Use só quando necessário. |
 | `VSP_READ_ONLY=true` | Usa o `vsp` no DEV apenas para análise. |
-| `VSP_BIN` | Caminho do `vsp.exe` quando ele não estiver no PATH. |
-| `ARC1_BIN` | Caminho de um ARC-1 já instalado, para redes que bloqueiam o `npx`. Instale com `npm install -g arc-1@1.10.1`. |
+| `VSP_BIN` | Caminho do `vsp.exe` quando ele não estiver no PATH. Um `.cmd`/`.bat` também é aceito, desde que o caminho e os valores das variáveis `VSP_*` não tenham `%`, `!`, `^` ou aspas. |
+| `ARC1_BIN` | Caminho de um ARC-1 já instalado, para redes que bloqueiam o `npx`. Instale com `npm install -g arc-1@1.10.1`. No Windows, o `npm` instala um `arc-1.cmd`, que pode ser usado aqui. |
+| `ARC1_ALLOW_DEV_WRITES=true` + `ARC1_ALLOWED_PACKAGES=Z*` | Exceção controlada da política (4.2): habilita a escrita do `arc-1` quando ele aponta para um DEV/SANDBOX ≤ 2023, restrita aos pacotes informados. Sem a flag, o `arc-1` no DEV fica somente leitura e não pede pacotes. |
 | `ARC1_BLOCKED_DATA_SOURCES` | Tabelas a bloquear na leitura (experimental). Ex.: `USR02,PA0002`. |
+
+---
+
+## Diretório de trabalho por ferramenta
+
+As configurações geradas chamam `node scripts/mcp-launch.mjs <servidor>` com caminho **relativo**. Ele só funciona se a ferramenta iniciar o servidor com a raiz do projeto como diretório de trabalho. Levantamento feito em 2026-11-19 na documentação de cada ferramenta (item 2.5 do [plano de correções](plano-correcoes-mcp-abap.md)):
+
+| Ferramenta | Diretório do servidor stdio | Recurso para fixar a raiz | Situação |
+|---|---|---|---|
+| Claude Code (`.mcp.json`) | Não documentado | `CLAUDE_PROJECT_DIR` existe no ambiente do servidor, mas não pode ser usado em `args` (a expansão acontece antes e exige um padrão, ex.: `${CLAUDE_PROJECT_DIR:-.}`) | Abrir na raiz |
+| Codex (`.codex/config.toml`) | Não documentado. O Codex carrega todo `.codex/config.toml` entre a raiz do Git e a pasta atual, então a config **é** lida numa subpasta | Campo `cwd`, mas sem regra documentada para caminho relativo | Abrir na raiz |
+| Kimi Code (`.kimi-code/mcp.json`) | Não documentado | Campo `cwd`, sem regra documentada para caminho relativo | O `.kimi-code/mcp.json` só é lido na pasta atual: numa subpasta, os servidores nem aparecem. Abrir na raiz |
+| Antigravity (`.agents/mcp_config.json`) | Não documentado | Campo `cwd`, sem variável para a pasta do workspace | Abrir na raiz (workspace = raiz do projeto) |
+
+Nenhuma ferramenta documenta um jeito portátil (sem caminho absoluto da máquina) de apontar para a raiz. Por isso as configurações continuam com caminho relativo, e a regra é **abrir a ferramenta na raiz do projeto**. Testes em cada ferramenta com sessão aberta numa subpasta (ex.: a de um app Fiori) ainda não foram feitos. Ao fazê-los, registre o resultado nesta tabela.
 
 ---
 
@@ -187,5 +203,8 @@ Todas as mensagens do launcher começam com `mcp-launch:`. Para vê-las, rode o 
 | `o ARC-1 exige Node.js >= 22.19` | Atualize o Node (passo 1). |
 | `arc-1` dá timeout na 1ª vez | A rede está bloqueando o npm. Instale o ARC-1 antes e use `ARC1_BIN`. |
 | Servidor falho no `/mcp`, mas o diagnóstico passa | A ferramenta foi aberta fora da raiz do projeto, ou não foi reiniciada após mudar o `.env`. |
+| `"...\arc-1.cmd" não pôde ser executado (EINVAL)` | O caminho não aponta para um arquivo executável (pasta ou atalho). Confira `ARC1_BIN`/`VSP_BIN`. |
+| `... é um script .cmd/.bat e precisa do cmd.exe, mas ... contém caractere` | O caminho ou um valor de `VSP_*` tem `%`, `!`, `^` ou aspas, que o `cmd.exe` interpretaria. Use o `.exe` ou remova o caractere. |
+| `aviso: ... o ARC-1 inicia somente leitura; ... defina ARC1_ALLOW_DEV_WRITES=true` | O `arc-1` aponta para um DEV. Só defina a flag se o cliente não autorizou o `vsp` (política 4.2). |
 
 > Antes de usar `arc-1` ou `vsp` em ambiente de cliente, obtenha o aceite formal do cliente. A política de APIs da SAP classifica as APIs ADT como internas (ver seção 7 da [política](../standards/politica-mcp-abap.md)).

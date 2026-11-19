@@ -21,6 +21,32 @@ export const BASIS_MINIMO = 750; // política, regra absoluta 5
 export const BASIS_MCP_OFICIAL = 816; // S/4HANA 2025+: abap-adt
 export const ARC1_PACKAGE = "arc-1@1.10.1"; // versão fixada (mesmo critério do fiori-mcp, ADR-0007)
 
+// Ações do ARC-1 negadas por SAP_DENY_ACTIONS (nomes conferidos em arc-1@1.10.1,
+// dist/authz/policy.js). Ao atualizar a versão do ARC-1, confira os nomes de novo: um nome
+// desconhecido faz o ARC-1 recusar iniciar.
+export const ARC1_NEGADAS_SEMPRE = ["SAPWrite.delete"];
+// Política 4.2: ABAP Unit nunca em PRD. As ações são do tipo Test, que o modo somente leitura
+// não bloqueia; por isso a negação explícita.
+export const ARC1_NEGADAS_PRD = ["SAPDiagnose.unittest", "SAPDiagnose.unittest_ci"];
+
+// ---------------------------------------------------------------- comando (2.4)
+// No Windows, .cmd/.bat só rodam via cmd.exe (spawn sem shell falha com EINVAL no Node >=
+// 18.20.2/20.12.2). Com shell, o cmd.exe interpreta a linha: o caminho e cada argumento vão
+// entre aspas, e qualquer caractere que o cmd.exe ainda interpretaria dentro de aspas (%, !, ^,
+// aspas) ou que quebraria a linha é recusado.
+const SEGURO_NO_CMD = /^[^"%!^\r\n]*$/;
+export function precisaShell(command, platform) {
+  return platform === "win32" && /\.(cmd|bat)$/i.test(command);
+}
+export function comandoParaSpawn(command, args, platform) {
+  if (!precisaShell(command, platform)) return { command, args, shell: false };
+  for (const x of [command, ...args])
+    if (!SEGURO_NO_CMD.test(x))
+      recusar(`${command} é um script .cmd/.bat e precisa do cmd.exe, mas ${JSON.stringify(x)} contém caractere que o cmd.exe interpretaria (% ! ^ ou aspas). Use o executável (.exe) ou remova o caractere.`);
+  const q = (x) => `"${x}"`;
+  return { command: q(command), args: args.map(q), shell: true };
+}
+
 // ---------------------------------------------------------------- TLS (1.3)
 // NODE_TLS_REJECT_UNAUTHORIZED=0 desliga a verificação de certificado do probe e do ARC-1.
 export function verificarTls(env) {
@@ -133,7 +159,7 @@ export function resolverSid({ sid, sidOrigem }, sidDeclarado, prefix) {
 //   v(nome)     valor da variável <prefix>_<nome> (undefined se ausente ou placeholder)
 //   env         ambiente do processo (base do ambiente do filho; ARC1_BIN/VSP_BIN)
 //   platform    process.platform
-// Saída: { command, args, shell, modo, childEnv, avisos } ou Recusa.
+// Saída: { command, args, shell, modo, acoesNegadas, childEnv, avisos } ou Recusa.
 export function decidir({ tool, prefix, sistema, conn, v, env, platform }) {
   const { sid, sidPendente, mandante, ambiente, motivo, sapBasis, produto } = sistema;
   const req = (nome) => v(nome) ?? recusar(`variável ${prefix}_${nome} não definida (ambiente ou .env)`);
@@ -148,14 +174,21 @@ export function decidir({ tool, prefix, sistema, conn, v, env, platform }) {
   const childEnv = filtrarEnvFilho(env);
   Object.assign(childEnv, { SAP_URL: conn.url, SAP_CLIENT: conn.client, SAP_USER: conn.user, SAP_PASSWORD: conn.password });
 
-  let command, args, shell = false, modo;
+  let command, args, modo, acoesNegadas;
 
   if (tool === "arc-1") {
+    // Exceção controlada da política 4.2: escrita em DEV só com opt-in explícito (2.1).
     const podeEscrever = isDev && sapBasis < BASIS_MCP_OFICIAL;
-    const writes = podeEscrever && !sidPendente;
-    if (podeEscrever && sidPendente)
+    const pediuEscrita = flag("ALLOW_DEV_WRITES");
+    const writes = podeEscrever && pediuEscrita && !sidPendente;
+    if (podeEscrever && pediuEscrita && sidPendente)
       avisos.push(`ARC-1 em somente leitura até o SID ser confirmado (defina ${prefix}_SAP_SID)`);
+    if (podeEscrever && !pediuEscrita)
+      avisos.push(`${sid} é ${ambiente}, mas o ARC-1 inicia somente leitura; para a exceção controlada (política 4.2), defina ${prefix}_ALLOW_DEV_WRITES=true e ${prefix}_ALLOWED_PACKAGES`);
+    if (!isDev && pediuEscrita)
+      avisos.push(`${prefix}_ALLOW_DEV_WRITES ignorada: ${sid} é ${ambiente}`);
     modo = writes ? "escrita restrita a pacotes" : "somente leitura";
+    acoesNegadas = [...ARC1_NEGADAS_SEMPRE, ...(ambiente === "PRD" ? ARC1_NEGADAS_PRD : [])];
     Object.assign(childEnv, {
       SAP_TRANSPORT: "stdio",
       SAP_INSECURE: "false",
@@ -165,7 +198,7 @@ export function decidir({ tool, prefix, sistema, conn, v, env, platform }) {
       SAP_ALLOW_DATA_PREVIEW: "false",
       SAP_ALLOW_FREE_SQL: "false",
       SAP_ALLOW_PLUGIN_EXECUTE: "false",
-      SAP_DENY_ACTIONS: "SAPWrite.delete",
+      SAP_DENY_ACTIONS: acoesNegadas.join(","),
     });
     if (writes) childEnv.SAP_ALLOWED_PACKAGES = req("ALLOWED_PACKAGES");
     if (v("BLOCKED_DATA_SOURCES")) childEnv.SAP_BLOCKED_DATA_SOURCES = v("BLOCKED_DATA_SOURCES");
@@ -175,7 +208,6 @@ export function decidir({ tool, prefix, sistema, conn, v, env, platform }) {
     } else {
       command = platform === "win32" ? "npx.cmd" : "npx";
       args = ["--yes", ARC1_PACKAGE];
-      shell = platform === "win32"; // .cmd exige shell no Node >= 20; argumentos fixos
     }
   } else if (tool === "vsp") {
     if (!isDev) recusar(`vsp recusado: ${sid}/${mandante} é ${ambiente} — ${motivo}. Política MCP: vsp só em DEV/SANDBOX.`);
@@ -193,5 +225,5 @@ export function decidir({ tool, prefix, sistema, conn, v, env, platform }) {
     recusar(`ferramenta desconhecida: ${tool}`);
   }
 
-  return { command, args, shell, modo, childEnv, avisos };
+  return { ...comandoParaSpawn(command, args, platform), modo, acoesNegadas, childEnv, avisos };
 }

@@ -1,6 +1,6 @@
 # Plano de correções — launcher MCP ABAP e documentação
 
-> **Status:** Bloco 1 implementado (branch `fix/launcher-travas-seguranca`); Blocos 2 e 3 pendentes
+> **Status:** Bloco 1 implementado (PR #6, em `develop`); Bloco 2 implementado (branch `fix/launcher-operacao`); Bloco 3 pendente
 > **Origem:** análise do repositório em 2026-11-18 (branch `feature/politica-mcp-abap`, commit `7651085`)
 > **Escopo:** `scripts/mcp-launch.mjs`, `scripts/sap-probe.mjs`, `scripts/sync-agents.mjs`, `.agents/mcp.servers.json`, `standards/politica-mcp-abap.md`, ADR-0009 e documentação relacionada.
 
@@ -188,4 +188,21 @@ O Bloco 1 foi implementado com os testes do item 1.7 (`scripts/mcp-politica.mjs`
 - **1.2:** um `LOGSYS` divergente do `<P>_SAP_SID` recusa os dois servidores. Um `LOGSYS` fora do padrão não gera SID, e vale o comportamento de SID não detectado (usa o declarado, com aviso).
 - **1.6:** valor fora da enumeração vira `PRD`.
 
-Os Blocos 2 e 3 continuam pendentes. Seguir a ordem dos blocos.
+O Bloco 2 foi implementado no branch `fix/launcher-operacao`. Decisões e evidências:
+
+- **2.1:** nova variável `<P>_ALLOW_DEV_WRITES`. A flag é ignorada, com aviso, fora de DEV/SANDBOX, em SAP_BASIS ≥ 816 e com SID não confirmado.
+- **2.2:** nomes conferidos no pacote `arc-1@1.10.1` (`dist/authz/policy.js`): `SAPDiagnose.unittest` e `SAPDiagnose.unittest_ci`, do tipo `Test`. O modo somente leitura do ARC-1 não bloqueia esse tipo (`dist/adt/safety.js`, `MUTATING_OPS = 'CDUAWX'`), então a negação explícita em PRD é necessária. No levantamento das demais regras da política 4.2, não sobrou nenhuma que dependa só do prompt:
+  - aplicar quickfix, iniciar trace e alterar o estado do SQL trace são do tipo escrita e já ficam bloqueados em somente leitura;
+  - `odata_perf` e `authorization_trace` são do tipo consulta e já ficam bloqueados pela prévia de dados desligada.
+
+  O estado de runtime e o `--diagnostico` passam a mostrar `acoesNegadas`. Ao atualizar o ARC-1, confira os nomes de novo: um nome desconhecido em `SAP_DENY_ACTIONS` faz o ARC-1 recusar iniciar.
+- **2.3:** `timeoutSec: 120` no vsp. A pesquisa achou um defeito no gerador: a chave documentada do Antigravity é `timeoutSeconds`, e o gerador escrevia `timeout`. Isso foi corrigido no `sync-agents.mjs`. Timeouts de partida padrão: 10 s no Codex e 30 s no Kimi. No Claude Code, o `MCP_TIMEOUT` global já gerado vale 600 s.
+- **2.4:** `.cmd`/`.bat` rodam via `cmd.exe`, com o caminho e cada argumento entre aspas. Um valor com `%`, `!`, `^` ou aspas recusa iniciar, porque o `cmd.exe` interpretaria esses caracteres. `EINVAL` ganhou mensagem própria. Testado nesta máquina com um `.cmd` numa pasta com espaço: antes falhava com `EINVAL` e a sugestão de "Desbloquear"; agora executa.
+- **2.5:** só levantamento em documentação, registrado em `docs/setup-mcp-abap.md` (seção "Diretório de trabalho por ferramenta"). Nenhuma das quatro ferramentas documenta um jeito portátil de fixar a raiz, então as configs não mudaram e vale "abrir na raiz". **Pendente:** teste real em cada ferramenta com a sessão aberta numa subpasta.
+- **2.6:**
+  - cada sessão grava o próprio arquivo, `.agents/runtime/<servidor>.<pid>.json`, e ao encerrar remove só o seu;
+  - na partida, o launcher descarta os arquivos de processos mortos do mesmo servidor;
+  - o orquestrador usa `node scripts/mcp-runtime.mjs` (`AGENTS.md`, regra 3; política, seções 2 e 3), que lista só os servidores com processo vivo;
+  - limite conhecido: reaproveitamento de PID pelo sistema operacional, raro, não é detectado.
+
+O Bloco 3 continua pendente.

@@ -21,7 +21,8 @@
         "node",
         "scripts/mcp-launch.mjs",
         "vsp"
-      ]
+      ],
+      "startupTimeoutMs": 120000
     },
     "fiori-mcp": {
       "command": "cmd",

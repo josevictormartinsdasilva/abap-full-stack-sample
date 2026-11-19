@@ -14,7 +14,8 @@
 //   <P>_SAP_URL, <P>_SAP_CLIENT, <P>_SAP_USER, <P>_SAP_PASSWORD   obrigatórias
 //   <P>_SAP_SID   opcional: se informado, precisa bater com o SID detectado; obrigatório quando
 //                 o SID só puder ser inferido do T000-LOGSYS (senão vsp recusa e ARC-1 só lê)
-//   ARC-1: <P>_ALLOWED_PACKAGES (só se o sistema for DEV/SANDBOX), <P>_BLOCKED_DATA_SOURCES, ARC1_BIN
+//   ARC-1: <P>_ALLOW_DEV_WRITES=true + <P>_ALLOWED_PACKAGES (escrita, só em DEV/SANDBOX ≤ 2023),
+//          <P>_BLOCKED_DATA_SOURCES, ARC1_BIN
 //   vsp:   <P>_ALLOWED_PACKAGES (obrigatória), <P>_ALLOWED_TRANSPORTS, <P>_ENABLE_TRANSPORTS,
 //          <P>_READ_ONLY, VSP_BIN
 //
@@ -27,14 +28,17 @@
 //   - URL só https:// (http:// apenas para localhost); NODE_TLS_REJECT_UNAUTHORIZED=0 recusa.
 //   - vsp: só em DEV/SANDBOX detectado e SAP_BASIS 750–815; sempre com --expect (SID detectado),
 //     --allowed-packages e --block-free-sql; nunca --insecure.
-//   - ARC-1: fora de DEV/SANDBOX, com SAP_BASIS >= 816 ou com SID não confirmado, somente
-//     leitura; prévia de dados, SQL livre, escrita em transporte/Git e plugins sempre desligados.
+//   - ARC-1: somente leitura, exceto em DEV/SANDBOX ≤ 2023 com SID confirmado e opt-in
+//     <P>_ALLOW_DEV_WRITES=true; prévia de dados, SQL livre, escrita em transporte/Git e plugins
+//     sempre desligados; SAPWrite.delete sempre negado e ABAP Unit negado em PRD.
 //   - O que não puder ser detectado é tratado como o caso mais restritivo.
 //   - Nenhuma variável SAP_*, NODE_OPTIONS ou NODE_TLS_REJECT_UNAUTHORIZED do ambiente do
 //     usuário é herdada; o processo filho roda num diretório neutro para não carregar o .env.
 //
-// Para o orquestrador rotear, o resultado da detecção é gravado em .agents/runtime/<servidor>.json
-// (não versionado), apagado no início de cada execução e ao encerrar o servidor.
+// Para o orquestrador rotear, o resultado da detecção é gravado em
+// .agents/runtime/<servidor>.<pid>.json (não versionado) e apagado ao encerrar. O orquestrador
+// lista os servidores vivos com `node scripts/mcp-runtime.mjs`, que descarta arquivos de
+// processos já terminados.
 //
 // IMPORTANTE: stdout é o canal MCP. Este script só escreve em stderr.
 // Sem dependências: só Node.js >= 18.
@@ -45,7 +49,8 @@ import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { detectar, validarUrlSap } from "./sap-probe.mjs";
-import { PLACEHOLDER, Recusa, aplicarRegistro, decidir, lerRegistro, resolverSid, verificarTls } from "./mcp-politica.mjs";
+import { PLACEHOLDER, Recusa, aplicarRegistro, comandoParaSpawn, decidir, lerRegistro, resolverSid, verificarTls } from "./mcp-politica.mjs";
+import { RUNTIME_DIR, gravarEstado, listarAtivos, removerEstado } from "./mcp-runtime.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const REGISTRO = "standards/sistemas-sap.json";
@@ -74,10 +79,10 @@ if (!tool) fail(`servidor "${server}" não é arc-1* nem vsp*`);
 const prefix = (tool === "arc-1" ? "ARC1" : "VSP") + server.slice(tool.length).toUpperCase().replace(/[^A-Z0-9]+/g, "_");
 
 // ---------------------------------------------------------------- estado para o orquestrador
-const runtimeDir = path.join(ROOT, ".agents/runtime");
-const runtimeFile = path.join(runtimeDir, `${server}.json`);
-const limparRuntime = () => { try { fs.rmSync(runtimeFile, { force: true }); } catch { /* sem efeito */ } };
-if (!DIAGNOSTICO) limparRuntime(); // nunca deixar a detecção de uma sessão anterior valendo
+// Descarta os arquivos de sessões anteriores deste servidor cujo processo já terminou. Os de
+// sessões vivas (outra ferramenta no mesmo servidor) ficam.
+if (!DIAGNOSTICO) listarAtivos(RUNTIME_DIR, { servidor: server });
+const limparRuntime = () => removerEstado(RUNTIME_DIR, server, process.pid);
 
 // ---------------------------------------------------------------- TLS (antes de qualquer conexão)
 politica(() => verificarTls(process.env));
@@ -117,9 +122,12 @@ try {
 // ---------------------------------------------------------------- executáveis (antes de tocar no SAP)
 const GUIA = "docs/setup-mcp-abap.md";
 function verificarBinario(cmd, variavel, passo) {
-  const r = spawnSync(cmd, ["--version"], { encoding: "utf8", timeout: 15000, windowsHide: true });
+  const c = politica(() => comandoParaSpawn(cmd, ["--version"], process.platform));
+  const r = spawnSync(c.command, c.args, { encoding: "utf8", timeout: 15000, windowsHide: true, shell: c.shell });
   if (r.error?.code === "ENOENT")
     fail(`"${cmd}" não encontrado. Instale-o ou defina ${variavel} com o caminho completo (${GUIA}, ${passo}).`);
+  if (r.error?.code === "EINVAL")
+    fail(`"${cmd}" não pôde ser executado (EINVAL). Confira se ${variavel} aponta para o executável e não para uma pasta ou atalho (${GUIA}, ${passo}).`);
   if (r.error) fail(`"${cmd}" não pôde ser executado (${r.error.code || r.error.message}). Se foi baixado agora, o sistema pode tê-lo bloqueado — no Windows, "Desbloquear" nas propriedades do arquivo; no macOS, xattr -d com.apple.quarantine (${GUIA}, ${passo}).`);
   if (r.status !== 0) fail(`"${cmd} --version" terminou com código ${r.status}; confira se é o binário correto (${GUIA}, ${passo}).`);
   return (r.stdout || r.stderr || "").trim().split(/\r?\n/)[0];
@@ -162,13 +170,14 @@ if (fs.existsSync(arquivoRegistro)) {
 
 // ---------------------------------------------------------------- decisão por ferramenta
 const sistema = { sid, sidPendente: sidInfo.sidPendente, mandante, ambiente, motivo, sapBasis: det.sapBasis, produto: det.produto };
-const { command, args, shell, modo, childEnv, avisos } = politica(() =>
+const { command, args, shell, modo, acoesNegadas, childEnv, avisos } = politica(() =>
   decidir({ tool, prefix, sistema, conn, v, env: process.env, platform: process.platform }));
 avisos.forEach((a) => log(`aviso: ${a}`));
 
 const estado = {
   servidor: server, ferramenta: tool, sid, mandante, usuario: conn.user,
   sapBasis: det.sapBasis, produto: det.produto, ambiente, motivo, modo,
+  ...(acoesNegadas ? { acoesNegadas } : {}),
   sidConfirmado: sidInfo.sidConfirmado, sidOrigem: sidInfo.sidOrigem,
   detectadoEm: new Date().toISOString(), pid: process.pid,
 };
@@ -180,8 +189,7 @@ if (DIAGNOSTICO) {
 }
 
 // ---------------------------------------------------------------- execução
-fs.mkdirSync(runtimeDir, { recursive: true });
-fs.writeFileSync(runtimeFile, JSON.stringify(estado, null, 2) + "\n");
+gravarEstado(RUNTIME_DIR, estado);
 const child = spawn(command, args, { env: childEnv, cwd: os.tmpdir(), stdio: "inherit", shell });
 child.on("error", (e) => { limparRuntime(); fail(`não foi possível iniciar "${command}": ${e.message}`); });
 for (const sig of ["SIGINT", "SIGTERM"]) process.on(sig, () => child.kill(sig));

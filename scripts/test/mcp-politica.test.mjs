@@ -2,7 +2,8 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import {
-  Recusa, verificarTls, filtrarEnvFilho, lerRegistro, aplicarRegistro, resolverSid, decidir, ARC1_PACKAGE,
+  Recusa, verificarTls, filtrarEnvFilho, lerRegistro, aplicarRegistro, resolverSid, decidir, comandoParaSpawn,
+  ARC1_PACKAGE, ARC1_NEGADAS_PRD,
 } from "../mcp-politica.mjs";
 
 const REG = "standards/sistemas-sap.json";
@@ -171,28 +172,65 @@ describe("decidir — ARC-1", () => {
     assert.equal(d.childEnv.SAP_ALLOWED_PACKAGES, undefined);
   });
   test("travas fixas sempre presentes", () => {
-    const { childEnv } = decidirCom({ tool: "arc-1", sistema: { ambiente: "PRD" } });
-    for (const k of ["SAP_INSECURE", "SAP_ALLOW_TRANSPORT_WRITES", "SAP_ALLOW_GIT_WRITES", "SAP_ALLOW_DATA_PREVIEW", "SAP_ALLOW_FREE_SQL", "SAP_ALLOW_PLUGIN_EXECUTE"])
-      assert.equal(childEnv[k], "false", k);
-    assert.equal(childEnv.SAP_DENY_ACTIONS, "SAPWrite.delete");
+    for (const ambiente of ["DEV", "SANDBOX", "QAS", "PRD"]) {
+      const { childEnv } = decidirCom({ tool: "arc-1", sistema: { ambiente } });
+      for (const k of ["SAP_INSECURE", "SAP_ALLOW_TRANSPORT_WRITES", "SAP_ALLOW_GIT_WRITES", "SAP_ALLOW_DATA_PREVIEW", "SAP_ALLOW_FREE_SQL", "SAP_ALLOW_PLUGIN_EXECUTE"])
+        assert.equal(childEnv[k], "false", `${ambiente} ${k}`);
+      assert.ok(childEnv.SAP_DENY_ACTIONS.split(",").includes("SAPWrite.delete"), ambiente);
+    }
   });
-  test("DEV ≤ 2023: escrita restrita aos pacotes", () => {
-    const d = decidirCom({ tool: "arc-1", vars: { ALLOWED_PACKAGES: "ZMM*" } });
+  test("DEV ≤ 2023 com opt-in: escrita restrita aos pacotes (2.1)", () => {
+    const d = decidirCom({ tool: "arc-1", vars: { ALLOW_DEV_WRITES: "true", ALLOWED_PACKAGES: "ZMM*" } });
     assert.equal(d.modo, "escrita restrita a pacotes");
     assert.equal(d.childEnv.SAP_ALLOW_WRITES, "true");
     assert.equal(d.childEnv.SAP_ALLOWED_PACKAGES, "ZMM*");
   });
-  test("DEV ≤ 2023 sem pacotes recusa", () => {
-    assert.throws(() => decidirCom({ tool: "arc-1" }), recusa(/ARC1_ALLOWED_PACKAGES/));
+  test("DEV ≤ 2023 sem opt-in: somente leitura e não exige pacotes (2.1)", () => {
+    for (const ambiente of ["DEV", "SANDBOX"]) {
+      const d = decidirCom({ tool: "arc-1", sistema: { ambiente } });
+      assert.equal(d.modo, "somente leitura", ambiente);
+      assert.equal(d.childEnv.SAP_ALLOW_WRITES, "false", ambiente);
+      assert.equal(d.childEnv.SAP_ALLOWED_PACKAGES, undefined, ambiente);
+      assert.match(d.avisos[0], /ARC1_ALLOW_DEV_WRITES=true/, ambiente);
+    }
   });
-  test("DEV 2025+: somente leitura", () => {
-    assert.equal(decidirCom({ tool: "arc-1", sistema: { sapBasis: 816 } }).modo, "somente leitura");
+  test("opt-in com valor diferente de true/1/yes não liga a escrita (2.1)", () => {
+    for (const val of ["false", "0", "sim", ""])
+      assert.equal(decidirCom({ tool: "arc-1", vars: { ALLOW_DEV_WRITES: val, ALLOWED_PACKAGES: "Z*" } }).modo, "somente leitura", val);
   });
-  test("SID só do LOGSYS (pendente): somente leitura, sem exigir pacotes (1.2)", () => {
-    const d = decidirCom({ tool: "arc-1", sistema: { sidPendente: true } });
+  test("DEV ≤ 2023 com opt-in e sem pacotes recusa (2.1)", () => {
+    assert.throws(() => decidirCom({ tool: "arc-1", vars: { ALLOW_DEV_WRITES: "true" } }), recusa(/ARC1_ALLOWED_PACKAGES/));
+  });
+  test("opt-in não libera escrita fora de DEV/SANDBOX nem em 2025+ (2.1)", () => {
+    const vars = { ALLOW_DEV_WRITES: "true", ALLOWED_PACKAGES: "Z*" };
+    for (const ambiente of ["QAS", "PRD"]) {
+      const d = decidirCom({ tool: "arc-1", sistema: { ambiente }, vars });
+      assert.equal(d.childEnv.SAP_ALLOW_WRITES, "false", ambiente);
+      assert.match(d.avisos[0], /ALLOW_DEV_WRITES ignorada/, ambiente);
+    }
+    assert.equal(decidirCom({ tool: "arc-1", sistema: { sapBasis: 816 }, vars }).modo, "somente leitura");
+  });
+  test("SID só do LOGSYS (pendente): somente leitura mesmo com opt-in (1.2)", () => {
+    const d = decidirCom({ tool: "arc-1", sistema: { sidPendente: true }, vars: { ALLOW_DEV_WRITES: "true" } });
     assert.equal(d.modo, "somente leitura");
     assert.equal(d.childEnv.SAP_ALLOW_WRITES, "false");
     assert.match(d.avisos[0], /ARC1_SAP_SID/);
+  });
+  test("PRD: ABAP Unit negado (2.2)", () => {
+    const d = decidirCom({ tool: "arc-1", sistema: { ambiente: "PRD" } });
+    assert.deepEqual(d.acoesNegadas, ["SAPWrite.delete", ...ARC1_NEGADAS_PRD]);
+    assert.equal(d.childEnv.SAP_DENY_ACTIONS, "SAPWrite.delete,SAPDiagnose.unittest,SAPDiagnose.unittest_ci");
+  });
+  test("QAS/DEV: ABAP Unit permitido (2.2)", () => {
+    for (const ambiente of ["QAS", "DEV", "SANDBOX"])
+      assert.equal(decidirCom({ tool: "arc-1", sistema: { ambiente } }).childEnv.SAP_DENY_ACTIONS, "SAPWrite.delete", ambiente);
+  });
+  test("PRD declarado no registro também nega ABAP Unit (2.2)", () => {
+    // o ambiente que chega a decidir() já é o efetivo (detectado + registro)
+    const r = aplicarRegistro({ sid: "QS4", mandante: "400", ambiente: "QAS", motivo: "x" },
+      lerRegistro(registro([{ sid: "QS4", ambiente: "PRD" }]), REG).restricoes, REG);
+    const d = decidirCom({ tool: "arc-1", sistema: { ambiente: r.ambiente } });
+    assert.ok(d.acoesNegadas.includes("SAPDiagnose.unittest"));
   });
   test("ambiente do filho: credenciais da conexão, sem NODE_OPTIONS nem TLS herdados (1.3)", () => {
     const d = decidirCom({ tool: "arc-1", sistema: { ambiente: "QAS" },
@@ -206,9 +244,13 @@ describe("decidir — ARC-1", () => {
     const linux = decidirCom({ tool: "arc-1", sistema: { ambiente: "QAS" } });
     assert.deepEqual([linux.command, linux.args, linux.shell], ["npx", ["--yes", ARC1_PACKAGE], false]);
     const win = decidirCom({ tool: "arc-1", sistema: { ambiente: "QAS" }, platform: "win32" });
-    assert.deepEqual([win.command, win.shell], ["npx.cmd", true]);
+    assert.deepEqual([win.command, win.args, win.shell], ['"npx.cmd"', ['"--yes"', `"${ARC1_PACKAGE}"`], true]);
     const bin = decidirCom({ tool: "arc-1", sistema: { ambiente: "QAS" }, env: { ARC1_BIN: "/opt/arc1" } });
     assert.deepEqual([bin.command, bin.args], ["/opt/arc1", []]);
+  });
+  test("ARC1_BIN .cmd no Windows: shell com caminho entre aspas (2.4)", () => {
+    const d = decidirCom({ tool: "arc-1", sistema: { ambiente: "QAS" }, platform: "win32", env: { ARC1_BIN: "C:\\Program Files\\arc1\\arc-1.cmd" } });
+    assert.deepEqual([d.command, d.args, d.shell], ['"C:\\Program Files\\arc1\\arc-1.cmd"', [], true]);
   });
 });
 
@@ -242,6 +284,34 @@ describe("decidir — vsp", () => {
     assert.deepEqual(d.args.slice(7), ["--allow-transportable-edits", "--allowed-transports", "DS4K*", "--enable-transports", "--read-only"]);
   });
   test("VSP_BIN substitui o comando", () => {
-    assert.equal(decidirCom({ tool: "vsp", vars, env: { VSP_BIN: "C:/tools/vsp.exe" } }).command, "C:/tools/vsp.exe");
+    const d = decidirCom({ tool: "vsp", vars, env: { VSP_BIN: "C:/tools/vsp.exe" }, platform: "win32" });
+    assert.deepEqual([d.command, d.shell], ["C:/tools/vsp.exe", false]);
+  });
+  test("VSP_BIN .bat no Windows: shell, caminho e argumentos entre aspas (2.4)", () => {
+    const d = decidirCom({ tool: "vsp", vars: { ALLOWED_PACKAGES: "$TMP,Z*" }, env: { VSP_BIN: "C:\\tools\\vsp.bat" }, platform: "win32" });
+    assert.equal(d.shell, true);
+    assert.equal(d.command, '"C:\\tools\\vsp.bat"');
+    assert.ok(d.args.every((a) => a.startsWith('"') && a.endsWith('"')));
+    assert.ok(d.args.includes('"$TMP,Z*"'));
+  });
+  test("VSP_BIN .cmd com argumento perigoso para o cmd.exe recusa (2.4)", () => {
+    for (const pacotes of ["Z*%PATH%", 'Z*" & calc', "Z*^", "Z*!x!"])
+      assert.throws(() => decidirCom({ tool: "vsp", vars: { ALLOWED_PACKAGES: pacotes }, env: { VSP_BIN: "C:\\tools\\vsp.cmd" }, platform: "win32" }),
+        recusa(/cmd\.exe interpretaria/), pacotes);
+  });
+  test("vsp não informa ações negadas (são do ARC-1)", () => {
+    assert.equal(decidirCom({ tool: "vsp", vars }).acoesNegadas, undefined);
+  });
+});
+
+describe("comandoParaSpawn (2.4)", () => {
+  test(".cmd/.bat só exigem shell no Windows", () => {
+    assert.deepEqual(comandoParaSpawn("vsp.cmd", ["-v"], "linux"), { command: "vsp.cmd", args: ["-v"], shell: false });
+    assert.deepEqual(comandoParaSpawn("C:\\x\\vsp.exe", ["-v"], "win32"), { command: "C:\\x\\vsp.exe", args: ["-v"], shell: false });
+    assert.deepEqual(comandoParaSpawn("C:\\x\\VSP.CMD", ["--version"], "win32"), { command: '"C:\\x\\VSP.CMD"', args: ['"--version"'], shell: true });
+    assert.deepEqual(comandoParaSpawn("C:\\x y\\vsp.bat", [], "win32"), { command: '"C:\\x y\\vsp.bat"', args: [], shell: true });
+  });
+  test("caminho com caractere perigoso recusa", () => {
+    assert.throws(() => comandoParaSpawn("C:\\%TEMP%\\vsp.cmd", [], "win32"), Recusa);
   });
 });
