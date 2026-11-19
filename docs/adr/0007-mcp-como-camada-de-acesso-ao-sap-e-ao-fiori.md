@@ -1,6 +1,6 @@
 # ADR-0007: MCP como camada de acesso ao SAP e ao Fiori
 
-- **Status:** Aceito
+- **Status:** Aceito (complementado pelo [ADR-0009](0009-selecao-de-mcp-abap-por-versao-e-ambiente.md), que acrescenta `arc-1` e `vsp` para S/4HANA ≤ 2023)
 - **Data:** 2026-11-05
 
 ## Contexto

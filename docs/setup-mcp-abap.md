@@ -115,7 +115,7 @@ Confira se SID, produto e ambiente estão corretos. Se aparecer uma recusa, veja
 **8. Abrir a ferramenta e conferir as conexões.**
 
 1. Abra a ferramenta de IA **na raiz do projeto**. O launcher é chamado por caminho relativo (`scripts/mcp-launch.mjs`) e não é encontrado se o servidor for iniciado em outra pasta (ver [Diretório de trabalho por ferramenta](#diretório-de-trabalho-por-ferramenta)).
-2. Rode `/mcp` (Claude Code). Os servidores `abap-adt`, `arc-1`, `vsp` e `fiori-mcp` devem aparecer conectados.
+2. Rode `/mcp` (Claude Code). Devem aparecer conectados o `fiori-mcp` e os servidores que você configurou (`vsp` e/ou `arc-1`; `abap-adt` só se houver S/4HANA 2025+). Um servidor não configurado aparece como falho, o que é esperado.
 
 Se você alterar o `.env`, reinicie a ferramenta: os servidores só são iniciados na abertura da sessão.
 
@@ -155,9 +155,14 @@ Nenhuma ferramenta documenta um jeito portátil (sem caminho absoluto da máquin
 
 ## Validações pendentes
 
-O launcher é coberto por testes automatizados (`node --test scripts/test/*.test.mjs`), mas ainda não foi exercitado contra um SAP real. Antes de levar a `develop` para a `main`:
+O launcher é coberto por testes automatizados (`node --test scripts/test/*.test.mjs`). Contra ambientes reais, já foi validado:
 
-1. **DEV ≤ 2023:** `node scripts/mcp-launch.mjs vsp --diagnostico` e `node scripts/mcp-launch.mjs arc-1 --diagnostico` (com o ARC-1 apontando para o DEV). Conferir SID, `sidOrigem`, produto, ambiente `DEV`, modo, e `acoesNegadas` só com `SAPWrite.delete`.
+- **2026-11-19, `vsp` num DEV S/4HANA 2023 (SAP_BASIS 758):** ambiente `DEV`, modo desenvolvimento, SID lido do `systeminformation`. O teste revelou e corrigiu o erro `406` na leitura da T000 em releases ≤ 2023.
+- **2026-11-19, download e cache (Windows):** `vsp` v2.62.1 baixado do GitHub, com `VSP_VERSION=2.61.0` testado; ARC-1 v1.10.1 instalado pelo npm.
+
+Falta, antes de levar a `develop` para a `main`:
+
+1. **ARC-1 no DEV ≤ 2023:** `node scripts/mcp-launch.mjs arc-1 --diagnostico` com o ARC-1 apontando para o DEV. Conferir SID, `sidOrigem`, produto, ambiente `DEV`, modo, e `acoesNegadas` só com `SAPWrite.delete`.
 2. **QAS ≤ 2023:** `node scripts/mcp-launch.mjs arc-1 --diagnostico`. Conferir ambiente `QAS`, modo somente leitura e `acoesNegadas` com `SAPDiagnose.unittest` e `SAPDiagnose.unittest_ci`.
 3. **Subpasta:** em cada ferramenta, abrir a sessão numa subpasta e registrar o resultado na tabela da seção anterior.
 

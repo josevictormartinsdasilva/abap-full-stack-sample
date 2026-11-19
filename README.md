@@ -141,8 +141,8 @@ Quando uma nova funcionalidade completa precisa ser entregue, o **Orquestrador C
   (Plano aprovado)     (CDS/DDLX ativos)     (Page Map / Rotas)       (ATC 100% limpo)
 ```
 
-1. **Orquestrador**: Avalia o requisito, consulta [naming-conventions.json](standards/naming-conventions.json) e submete um plano de ação para sua confirmação.
-2. **`abap-rap-dev`**: Implementa os objetos no backend, valida sintaxe (`abap_object_check`) e ativa no sistema SAP BTP.
+1. **Orquestrador**: Avalia o requisito, consulta [naming-conventions.json](standards/naming-conventions.json), identifica o sistema-alvo e o servidor MCP pela [política](standards/politica-mcp-abap.md) e submete um plano com os nomes dos objetos para sua aprovação.
+2. **`abap-rap-dev`** (ou **`abap-classic-dev`**): Implementa os objetos no backend, valida sintaxe (`abap_object_check` ou o equivalente do servidor) e ativa, somente no sistema de desenvolvimento confirmado.
 3. **`fiori-elements-dev`**: Atualiza o descritor `manifest.json`, sincroniza navegações e valida o linter.
 4. **`abap-qa-auditor`**: Dispara o ATC no backend, executa testes unitários e confirma que não existem desvios nem erros residuais.
 
@@ -154,7 +154,8 @@ Quando uma nova funcionalidade completa precisa ser entregue, o **Orquestrador C
 - **[standards/naming-conventions.json](standards/naming-conventions.json)**: Mapeamento técnico estruturado com todos os prefixos e padrões de nomenclatura, mais o bloco `cliente` com os parâmetros do projeto.
 - **[standards/politica-mcp-abap.md](standards/politica-mcp-abap.md)**: Qual servidor MCP acessa cada sistema SAP (por versão e ambiente) e o que cada um pode fazer.
 - **[docs/primeiros-passos.md](docs/primeiros-passos.md)**: Guia de início para o desenvolvedor: liberações a pedir, instalação, conexão ao SAP e primeiro teste de ponta a ponta.
-- **[docs/setup-mcp-abap.md](docs/setup-mcp-abap.md)**: Passo a passo para configurar o `vsp` e o `arc-1` na máquina do desenvolvedor.
+- **[docs/setup-mcp-abap.md](docs/setup-mcp-abap.md)**: Passo a passo para configurar o `vsp` e o `arc-1` na máquina do desenvolvedor, com a tabela de problemas comuns.
+- **[docs/adr/](docs/adr/README.md)**: Registros de decisão de arquitetura (ADR-0001 a ADR-0009).
 - **[standards/sistemas-sap.json](standards/sistemas-sap.json)**: Opcional. Restrições adicionais por sistema; o ambiente é detectado no próprio SAP e esta lista só pode torná-lo mais restritivo.
 - **[AGENTS.md](AGENTS.md)**: Regras do orquestrador e papéis dos subagentes — fonte única para todas as ferramentas.
 - **[CLAUDE.md](CLAUDE.md)**: Importa o `AGENTS.md` e adiciona só o que é específico do Claude Code.
@@ -211,11 +212,11 @@ Definidos pela [política de MCP ABAP](standards/politica-mcp-abap.md) ([ADR-000
 - impõe as travas técnicas: `vsp` só em DEV/Sandbox, com `--expect`, `--allowed-packages` e `--block-free-sql`; `arc-1` somente leitura em QAS/PRD, sem prévia de dados nem SQL; SAP_BASIS < 750 recusado; conexão só por `https://` e sem TLS desligado;
 - isola as credenciais de cada servidor.
 
-As decisões ficam em `scripts/mcp-politica.mjs` e são cobertas por testes (`node --test scripts/test/*.test.mjs`), que a CI executa.
+As decisões ficam em `scripts/mcp-politica.mjs` e são cobertas por testes (`node --test scripts/test/*.test.mjs`), que a CI executa. O launcher já foi validado com o `vsp` num DEV S/4HANA 2023 real; o que falta validar está em [Validações pendentes](docs/setup-mcp-abap.md#validações-pendentes).
 
 **Configuração na máquina:** siga o passo a passo em [docs/setup-mcp-abap.md](docs/setup-mcp-abap.md). Ele cobre:
 
-- os requisitos (Node.js ≥ 22.19 e o binário do `vsp`);
+- os requisitos: só Node.js ≥ 22.19. O binário do `vsp` e o pacote do ARC-1 não exigem instalação manual: o launcher baixa a última versão estável de cada um para um cache do usuário, confere a integridade (SHA-256 no `vsp`, hash do registry npm no ARC-1) e recusa iniciar se uma versão nova perder alguma flag ou variável de segurança (`VSP_VERSION`/`ARC1_VERSION` fixam uma versão);
 - o `.env` (as variáveis `VSP_*` e `ARC1_*`);
 - o teste com `node scripts/mcp-launch.mjs <servidor> --diagnostico`;
 - vários sistemas do mesmo tipo;
@@ -258,14 +259,21 @@ scripts/mcp-launch.mjs          ← launcher de arc-1/vsp com as travas da polí
 scripts/sap-probe.mjs           ← detecção de SID, release e ambiente no próprio SAP
 scripts/mcp-politica.mjs        ← decisões do launcher (funções puras, testáveis)
 scripts/mcp-runtime.mjs         ← lista os servidores arc-1/vsp vivos (usado pelo orquestrador)
+scripts/vsp-binario.mjs         ← download e conferência (SHA-256, flags) do binário do vsp
+scripts/arc1-pacote.mjs         ← instalação e conferência (variáveis, Node) do ARC-1 via npm
 scripts/test/                   ← testes das travas (node --test)
+docs/                           ← primeiros passos, setup do MCP ABAP e ADRs (docs/adr/)
+imagens/                        ← figuras do padrao-desenvolvimento.md
+.github/workflows/              ← CI: --check do gerador + testes
+.env.example                    ← modelo do .env local (o .env não é versionado)
+.agents/runtime/                ← estado dos servidores arc-1/vsp em execução (não versionado)
 .claude/                        ← gerado (Claude Code: agents, skills, settings.json)
 .mcp.json                       ← gerado (Claude Code: servidores MCP, na raiz)
 .codex/                         ← gerado (Codex)
 .kimi-code/                     ← gerado (Kimi Code)
 ```
 
-Os arquivos gerados são versionados (quem clona usa direto) e trazem o aviso `GERADO por scripts/sync-agents.mjs`. Em `.claude/settings.json` o script só gerencia `enabledMcpjsonServers` e `env.MCP_TIMEOUT`; as demais chaves (permissões etc.) podem ser editadas à mão.
+Os scripts não têm dependências além do Node.js (≥ 18 para o gerador e os testes; ≥ 22.19 para o ARC-1). Os arquivos gerados são versionados (quem clona usa direto) e trazem o aviso `GERADO por scripts/sync-agents.mjs`. Em `.claude/settings.json` o script só gerencia `enabledMcpjsonServers` e `env.MCP_TIMEOUT`; as demais chaves (permissões etc.) podem ser editadas à mão.
 
 ### Servidores MCP: qual arquivo editar?
 
@@ -333,4 +341,7 @@ O marcador `{{skill}}` vira a instrução de carregar a skill na sintaxe de cada
 
 ## 🤝 Contribuidores
 
-Quem contribuir deve registrar a atividade em [CONTRIBUTORS.md](CONTRIBUTORS.md) (uma linha por contribuição).
+- **José Victor Martins da Silva** ([@josevictormartinsdasilva](https://github.com/josevictormartinsdasilva))
+- **Luciano Filho** ([@lucianocasado88](https://github.com/lucianocasado88))
+
+Quem contribuir deve registrar a atividade em [CONTRIBUTORS.md](CONTRIBUTORS.md) (uma linha por contribuição). Antes do PR, rode `node scripts/sync-agents.mjs --check` e `node --test scripts/test/*.test.mjs`, os mesmos passos da CI.
