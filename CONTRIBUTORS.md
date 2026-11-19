@@ -23,6 +23,7 @@ Em todo Pull Request (ou commit direto), adicione **uma linha** na tabela de [Hi
 
 | Data | Contribuidor | Área | Atividade |
 |---|---|---|---|
+| 2026-11-19 | José Victor Martins da Silva | Documentação | Guia `docs/primeiros-passos.md` para o desenvolvedor que adota o projeto (liberações, instalação, conexão, teste de ponta a ponta) |
 | 2026-11-09 | Luciano Filho | Orquestrador | Fonte única em `.agents/` + gerador `scripts/sync-agents.mjs` e checagem na CI; regras do orquestrador só no `AGENTS.md`; padrões movidos para `standards/` com bloco `cliente` e sem valores do cenário de demonstração |
 | 2026-11-09 | José Victor Martins da Silva | Ferramenta (Codex) | Preparação dos subagentes, MCPs e regras de orquestração para o Codex (`.codex/`) |
 | 2026-11-06 | José Victor Martins da Silva | Documentação | Atualização do README sobre o orquestrador |
