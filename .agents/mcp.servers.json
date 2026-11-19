@@ -1,5 +1,5 @@
 {
-  "_comentario": "FONTE ÚNICA dos servidores MCP. Edite aqui e rode `node scripts/sync-agents.mjs`. O token nunca é versionado: vem da variável de ambiente indicada em tokenEnvVar. arc-1 e vsp são iniciados por scripts/mcp-launch.mjs, que aplica as travas de standards/politica-mcp-abap.md (ADR-0009); para mais sistemas, copie a entrada com sufixo (ex.: arc-1-qas-ne) com variáveis de prefixo próprio (ARC1_QAS_NE_*).",
+  "_comentario": "FONTE ÚNICA dos servidores MCP. Edite aqui e rode `node scripts/sync-agents.mjs`. O token nunca é versionado: vem da variável de ambiente indicada em tokenEnvVar. arc-1 e vsp são iniciados por scripts/mcp-launch.mjs, que aplica as travas de standards/politica-mcp-abap.md (ADR-0009); para mais sistemas, copie a entrada com sufixo (ex.: arc-1-qas-xxx) com variáveis de prefixo próprio (ARC1_QAS_XXX_*).",
   "servers": {
     "abap-adt": {
       "transport": "http",

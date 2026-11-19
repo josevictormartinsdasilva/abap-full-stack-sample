@@ -22,7 +22,7 @@ Formato: MADR simplificado, em português. Um arquivo por decisão: `NNNN-titulo
 | [0006](0006-atc-tolerancia-zero-como-criterio-de-entrega.md) | ATC com tolerância zero como critério de entrega | Aceito |
 | [0007](0007-mcp-como-camada-de-acesso-ao-sap-e-ao-fiori.md) | MCP como camada de acesso ao SAP e ao Fiori | Aceito |
 | [0008](0008-parametros-do-cliente-centralizados-sem-suposicao.md) | Parâmetros do cliente centralizados, sem suposição | Aceito |
-| [0009](0009-selecao-de-mcp-abap-por-versao-e-ambiente.md) | Seleção de MCP ABAP por versão e ambiente | Proposto |
+| [0009](0009-selecao-de-mcp-abap-por-versao-e-ambiente.md) | Seleção de MCP ABAP por versão e ambiente | Aceito |
 
 ## Modelo
 

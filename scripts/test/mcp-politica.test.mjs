@@ -2,13 +2,36 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import {
-  Recusa, verificarTls, filtrarEnvFilho, lerRegistro, aplicarRegistro, resolverSid, decidir, comandoParaSpawn,
+  Recusa, valorDeVariavel, verificarTls, filtrarEnvFilho, lerRegistro, aplicarRegistro, resolverSid, decidir, comandoParaSpawn,
   ARC1_PACKAGE, ARC1_NEGADAS_FORA_DEV,
 } from "../mcp-politica.mjs";
 
 const REG = "standards/sistemas-sap.json";
 const recusa = (re) => (e) => e instanceof Recusa && re.test(e.message);
 const registro = (restricoes) => JSON.stringify({ _instrucao: "x", restricoes });
+
+// ---------------------------------------------------------------- 3.5
+describe("valorDeVariavel (3.5)", () => {
+  test("ausente ou vazia", () => {
+    for (const bruto of [undefined, null, ""])
+      assert.deepEqual(valorDeVariavel("VSP_SAP_URL", bruto), { valor: undefined, placeholder: false });
+  });
+  test("placeholder <...> em qualquer variável que não seja senha", () => {
+    assert.deepEqual(valorDeVariavel("VSP_SAP_URL", "<https://host:porta>"), { valor: undefined, placeholder: true });
+    assert.equal(valorDeVariavel("ARC1_QAS_XXX_SAP_USER", "dev<1>").placeholder, true);
+  });
+  test("senha: só o valor inteiro <...> é placeholder", () => {
+    assert.deepEqual(valorDeVariavel("VSP_SAP_PASSWORD", "<SENHA>"), { valor: undefined, placeholder: true });
+    assert.deepEqual(valorDeVariavel("ARC1_QAS_XXX_SAP_PASSWORD", " <SENHA> "), { valor: undefined, placeholder: true });
+  });
+  test("senha real com < e > é aceita", () => {
+    for (const s of ["Ab<12>cd", "x<y>", "<a>b", "a<b>", "<<x>>", "p#ss<w>"])
+      assert.deepEqual(valorDeVariavel("VSP_SAP_PASSWORD", s), { valor: s, placeholder: false }, s);
+  });
+  test("valor comum", () => {
+    assert.deepEqual(valorDeVariavel("VSP_ALLOWED_PACKAGES", "$TMP,Z*"), { valor: "$TMP,Z*", placeholder: false });
+  });
+});
 
 // ---------------------------------------------------------------- 1.1
 describe("lerRegistro (1.1)", () => {

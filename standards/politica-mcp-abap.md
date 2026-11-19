@@ -66,6 +66,13 @@ O operador só informa **como conectar**: URL, mandante, usuário e senha (`ARC1
 
 - A classificação depende de a SCC4 estar correta. A opção de modificação global do sistema (SE06) não é lida, mas, se estiver bloqueada, o próprio SAP recusa as escritas.
 - A leitura da T000 usa o data preview do ADT. Um usuário sem essa autorização faz o sistema ser tratado como PRD.
+
+**Exceção à regra "SQL livre sempre desligado":** o launcher lê a T000 pelo endpoint de SQL livre do ADT (`/sap/bc/adt/datapreview/freestyle`), porque é o único caminho comum a todos os releases a partir do NW 7.50. A exceção é restrita:
+
+- **consulta fixa**, no código do launcher (`SELECT MANDT, LOGSYS, CCCATEGORY, CCCORACTIV, CCNOCLIIND FROM T000 WHERE MANDT = '<mandante>'`). O mandante é reduzido a dígitos antes de entrar na consulta, e nenhum outro valor vem de configuração ou de agente;
+- **só a T000**, uma linha de configuração do mandante, sem dado de negócio;
+- **só leitura** (`SELECT`), uma vez por início de servidor;
+- **feita pelo launcher, antes de o servidor MCP subir.** O agente nunca tem acesso a esse endpoint: no `arc-1` e no `vsp`, SQL livre e prévia de dados continuam desligados (`SAP_ALLOW_FREE_SQL=false`, `SAP_ALLOW_DATA_PREVIEW=false`, `--block-free-sql`).
 - O `abap-adt` (MCP oficial) não passa pelo launcher. Para ele, o agente confirma SID e release pelas ferramentas de informação de sistema do próprio servidor.
 
 **Resultado para o orquestrador:** a cada início, o launcher grava em `.agents/runtime/<servidor>.<pid>.json` (não versionado) o SID, o mandante, o produto, o SAP_BASIS, o ambiente, o motivo da classificação, o modo (desenvolvimento ou somente leitura), as ações negadas e o `pid`. Cada sessão tem o seu arquivo, então duas ferramentas no mesmo servidor não apagam o estado uma da outra. O arquivo é apagado quando o servidor encerra normalmente. Se o processo for morto à força, o arquivo fica, por isso o orquestrador não lê os arquivos diretamente: usa `node scripts/mcp-runtime.mjs`, que lista em JSON só os servidores cujo processo está vivo e descarta os demais.
@@ -79,7 +86,7 @@ O operador só informa **como conectar**: URL, mandante, usuário e senha (`ARC1
 | 757 / 756 / 755 / 754 | S/4HANA 2022 / 2021 / 2020 / 1909 | ≤ 2023 |
 | 750–753 | S/4HANA 1511–1809, ECC EhP8 (NW 7.50) | ≤ 2023 |
 
-**Mais de um sistema da mesma faixa:** cada sistema tem a sua entrada em `.agents/mcp.servers.json`, com sufixo no nome (ex.: `arc-1-qas-ne`, `arc-1-qas-se`), e variáveis próprias (`ARC1_QAS_NE_*`, `ARC1_QAS_SE_*`). Depois de alterar, rode `node scripts/sync-agents.mjs`.
+**Mais de um sistema da mesma faixa:** cada sistema tem a sua entrada em `.agents/mcp.servers.json`, com sufixo no nome (ex.: `arc-1-qas-xxx`, `arc-1-qas-yyy`), e variáveis próprias (`ARC1_QAS_XXX_*`, `ARC1_QAS_YYY_*`). Depois de alterar, rode `node scripts/sync-agents.mjs`.
 
 ---
 

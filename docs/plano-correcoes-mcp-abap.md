@@ -1,6 +1,6 @@
 # Plano de correções — launcher MCP ABAP e documentação
 
-> **Status:** Bloco 1 implementado (PR #6, em `develop`); Bloco 2 implementado (branch `fix/launcher-operacao`); Bloco 3 pendente
+> **Status:** os três blocos foram implementados: Bloco 1 (PR #6) e Bloco 2 (PR #7) na `develop`; Bloco 3 no branch `fix/consistencia-docs`. Pendências que dependem de teste manual: 2.5 em cada ferramenta e validação contra SAP real.
 > **Origem:** análise do repositório em 2026-11-18 (branch `feature/politica-mcp-abap`, commit `7651085`)
 > **Escopo:** `scripts/mcp-launch.mjs`, `scripts/sap-probe.mjs`, `scripts/sync-agents.mjs`, `.agents/mcp.servers.json`, `standards/politica-mcp-abap.md`, ADR-0009 e documentação relacionada.
 
@@ -205,4 +205,22 @@ O Bloco 2 foi implementado no branch `fix/launcher-operacao`. Decisões e evidê
   - o orquestrador usa `node scripts/mcp-runtime.mjs` (`AGENTS.md`, regra 3; política, seções 2 e 3), que lista só os servidores com processo vivo;
   - limite conhecido: reaproveitamento de PID pelo sistema operacional, raro, não é detectado.
 
-O Bloco 3 continua pendente.
+O Bloco 3 foi implementado no branch `fix/consistencia-docs`:
+
+- **3.1:** `qas-ne`/`qas-se` trocados por `qas-xxx`/`qas-yyy` nos quatro arquivos. O grep do critério de aceite não encontra mais nenhuma ocorrência fora deste plano.
+- **3.2:** exceção registrada na política (seção 2) e no ADR-0009 (consequências). Condições:
+  - consulta fixa no código;
+  - só na T000;
+  - só leitura;
+  - feita pelo launcher antes de o servidor subir, sem acesso do agente.
+- **3.3:** ADR-0009 passou para "Aceito", porque o PR #5 foi aprovado e mergeado na `develop`. O índice `docs/adr/README.md` foi atualizado.
+- **3.4:** o README diz que os comandos stdio (`npx` e `node`) ganham o `cmd /c`. A seção de macOS/Linux também foi corrigida.
+- **3.5:** `valorDeVariavel` em `scripts/mcp-politica.mjs`:
+  - na senha, só o valor inteiro `<...>` conta como placeholder; uma senha real com `<` e `>` é aceita, e o placeholder nunca é enviado ao SAP;
+  - nas demais variáveis, a mensagem passou de "não definida" para "ainda tem o placeholder";
+  - `.env.example` e o comentário do launcher documentam que não existe comentário no fim da linha.
+- **3.6:** no `sync-agents.mjs`:
+  - a `description` de uma linha sai entre aspas duplas;
+  - arquivos de skill binários (com byte 0 ou que não são UTF-8 válido) são copiados byte a byte;
+  - o `.gitattributes` marca mais extensões binárias;
+  - verificado com um agente e uma imagem temporários: o SHA-1 da cópia é idêntico ao do original.

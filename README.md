@@ -223,7 +223,7 @@ As decisões ficam em `scripts/mcp-politica.mjs` e são cobertas por testes (`no
 
 ### ⚠️ Usando no macOS / Linux
 
-Os arquivos versionados usam o wrapper `cmd /c` para o `fiori-mcp`, que só existe no Windows. Na sua cópia local, gere a variante Unix (requer Node.js):
+Os arquivos versionados usam o wrapper `cmd /c` nos servidores stdio (`fiori-mcp`, `arc-1` e `vsp`), que só existe no Windows. Na sua cópia local, gere a variante Unix (requer Node.js):
 
 ```bash
 node scripts/sync-agents.mjs --platform=unix
@@ -276,7 +276,7 @@ Edite **somente** `.agents/mcp.servers.json`. Os demais arquivos de MCP são ger
 | `.kimi-code/mcp.json` | Kimi Code | gerado |
 | `.agents/mcp_config.json` | Antigravity | gerado |
 
-Os gerados podem parecer cópias da fonte, mas o formato muda por ferramenta. No `.mcp.json`, por exemplo: `transport` vira `type`; `tokenEnvVar` vira o header `Authorization: Bearer ${ABAP_ADT_TOKEN}`; o `npx` ganha o prefixo `cmd /c` no Windows; e `timeoutSec` vai para `env.MCP_TIMEOUT` em `.claude/settings.json`.
+Os gerados podem parecer cópias da fonte, mas o formato muda por ferramenta. No `.mcp.json`, por exemplo: `transport` vira `type`; `tokenEnvVar` vira o header `Authorization: Bearer ${ABAP_ADT_TOKEN}`; os comandos stdio (`npx` e `node`) ganham o prefixo `cmd /c` no Windows; e `timeoutSec` vai para `env.MCP_TIMEOUT` em `.claude/settings.json`.
 
 > Os `.json` gerados **não** trazem o aviso `GERADO`, porque JSON não aceita comentários. Na dúvida, consulte esta tabela. Uma edição manual num gerado é reprovada pelo `--check` da CI e sobrescrita na próxima execução do script.
 

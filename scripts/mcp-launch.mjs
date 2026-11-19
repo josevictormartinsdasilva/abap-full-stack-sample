@@ -7,8 +7,8 @@
 //
 // <servidor> é a chave do servidor em .agents/mcp.servers.json e define a ferramenta e o
 // prefixo das variáveis de ambiente:
-//   arc-1          -> ARC1_*          vsp          -> VSP_*
-//   arc-1-qas-ne   -> ARC1_QAS_NE_*   vsp-sandbox  -> VSP_SANDBOX_*
+//   arc-1          -> ARC1_*            vsp          -> VSP_*
+//   arc-1-qas-xxx  -> ARC1_QAS_XXX_*    vsp-sandbox  -> VSP_SANDBOX_*
 //
 // Variáveis (do ambiente do sistema ou, como fallback, do .env da raiz do projeto):
 //   <P>_SAP_URL, <P>_SAP_CLIENT, <P>_SAP_USER, <P>_SAP_PASSWORD   obrigatórias
@@ -49,7 +49,7 @@ import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { detectar, validarUrlSap } from "./sap-probe.mjs";
-import { PLACEHOLDER, Recusa, aplicarRegistro, comandoParaSpawn, decidir, lerRegistro, resolverSid, verificarTls } from "./mcp-politica.mjs";
+import { Recusa, valorDeVariavel, aplicarRegistro, comandoParaSpawn, decidir, lerRegistro, resolverSid, verificarTls } from "./mcp-politica.mjs";
 import { RUNTIME_DIR, gravarEstado, listarAtivos, removerEstado } from "./mcp-runtime.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -88,6 +88,9 @@ const limparRuntime = () => removerEstado(RUNTIME_DIR, server, process.pid);
 politica(() => verificarTls(process.env));
 
 // ---------------------------------------------------------------- variáveis
+// .env: uma variável por linha (NOME=valor), linhas iniciadas por # são comentário. Não há
+// comentário no fim da linha: o # faz parte do valor (senhas podem conter #). Aspas simples ou
+// duplas envolvendo o valor inteiro são removidas.
 function readDotEnv(file) {
   if (!fs.existsSync(file)) return {};
   const out = {};
@@ -99,11 +102,13 @@ function readDotEnv(file) {
   return out;
 }
 const dotenv = readDotEnv(path.join(ROOT, ".env"));
-const v = (name) => {
-  const val = process.env[`${prefix}_${name}`] ?? dotenv[`${prefix}_${name}`];
-  return val === undefined || val === "" || PLACEHOLDER.test(val) ? undefined : val;
+const lerVar = (name) => valorDeVariavel(`${prefix}_${name}`, process.env[`${prefix}_${name}`] ?? dotenv[`${prefix}_${name}`]);
+const v = (name) => lerVar(name).valor;
+const req = (name) => {
+  const { valor, placeholder } = lerVar(name);
+  if (placeholder) fail(`variável ${prefix}_${name} ainda tem o placeholder do .env.example (<...>); preencha o valor real`);
+  return valor ?? fail(`variável ${prefix}_${name} não definida (ambiente ou .env)`);
 };
-const req = (name) => v(name) ?? fail(`variável ${prefix}_${name} não definida (ambiente ou .env)`);
 
 const conn = {
   url: req("SAP_URL"),
