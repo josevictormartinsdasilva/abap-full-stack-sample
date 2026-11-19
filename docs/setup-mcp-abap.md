@@ -128,7 +128,7 @@ Se você alterar o `.env`, reinicie a ferramenta: os servidores só são iniciad
 
 ## Diretório de trabalho por ferramenta
 
-As configurações geradas chamam `node scripts/mcp-launch.mjs <servidor>` com caminho **relativo**. Ele só funciona se a ferramenta iniciar o servidor com a raiz do projeto como diretório de trabalho. Levantamento feito em 2026-11-19 na documentação de cada ferramenta (item 2.5 do [plano de correções](plano-correcoes-mcp-abap.md)):
+As configurações geradas chamam `node scripts/mcp-launch.mjs <servidor>` com caminho **relativo**. Ele só funciona se a ferramenta iniciar o servidor com a raiz do projeto como diretório de trabalho. Levantamento feito em 2026-11-19 na documentação de cada ferramenta:
 
 | Ferramenta | Diretório do servidor stdio | Recurso para fixar a raiz | Situação |
 |---|---|---|---|
@@ -138,6 +138,18 @@ As configurações geradas chamam `node scripts/mcp-launch.mjs <servidor>` com c
 | Antigravity (`.agents/mcp_config.json`) | Não documentado | Campo `cwd`, sem variável para a pasta do workspace | Abrir na raiz (workspace = raiz do projeto) |
 
 Nenhuma ferramenta documenta um jeito portátil (sem caminho absoluto da máquina) de apontar para a raiz. Por isso as configurações continuam com caminho relativo, e a regra é **abrir a ferramenta na raiz do projeto**. Testes em cada ferramenta com sessão aberta numa subpasta (ex.: a de um app Fiori) ainda não foram feitos. Ao fazê-los, registre o resultado nesta tabela.
+
+---
+
+## Validações pendentes
+
+O launcher é coberto por testes automatizados (`node --test scripts/test/*.test.mjs`), mas ainda não foi exercitado contra um SAP real. Antes de levar a `develop` para a `main`:
+
+1. **DEV ≤ 2023:** `node scripts/mcp-launch.mjs vsp --diagnostico` e `node scripts/mcp-launch.mjs arc-1 --diagnostico` (com o ARC-1 apontando para o DEV). Conferir SID, `sidOrigem`, produto, ambiente `DEV`, modo, e `acoesNegadas` só com `SAPWrite.delete`.
+2. **QAS ≤ 2023:** `node scripts/mcp-launch.mjs arc-1 --diagnostico`. Conferir ambiente `QAS`, modo somente leitura e `acoesNegadas` com `SAPDiagnose.unittest` e `SAPDiagnose.unittest_ci`.
+3. **Subpasta:** em cada ferramenta, abrir a sessão numa subpasta e registrar o resultado na tabela da seção anterior.
+
+**Ao atualizar a versão do ARC-1** (`ARC1_PACKAGE` em `scripts/mcp-politica.mjs`), confira os nomes das ações negadas (`ARC1_NEGADAS_*`) em `dist/authz/policy.js` do pacote novo. Um nome desconhecido em `SAP_DENY_ACTIONS` faz o ARC-1 recusar iniciar.
 
 ---
 

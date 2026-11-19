@@ -37,6 +37,16 @@ describe("mcp-launch — recusas antes de conectar", () => {
     assert.equal(r.status, 2);
     assert.match(r.stderr, /ARC1_TESTE_SAP_URL: a URL do SAP precisa ser https:\/\//);
   });
+  test("placeholder do .env.example tem mensagem própria (3.5)", () => {
+    const r = executar({ ARC1_TESTE_SAP_PASSWORD: "<SENHA>" });
+    assert.equal(r.status, 2);
+    assert.match(r.stderr, /ARC1_TESTE_SAP_PASSWORD ainda tem o placeholder/);
+    assert.doesNotMatch(r.stderr, /SENHA>/, "o valor não é ecoado");
+  });
+  test("senha real com <...> no meio passa da leitura das variáveis (3.5)", () => {
+    const r = executar({ ARC1_TESTE_SAP_URL: "http://127.0.0.1:1", ARC1_TESTE_SAP_PASSWORD: "Ab<12>cd" });
+    assert.match(r.stderr, /não foi possível identificar o sistema/);
+  });
   test("URL http://localhost passa da validação e chega à conexão (1.4)", () => {
     const r = executar({ ARC1_TESTE_SAP_URL: "http://127.0.0.1:1" });
     assert.equal(r.status, 2);

@@ -16,6 +16,16 @@ export class Recusa extends Error {
 const recusar = (msg) => { throw new Recusa(msg); };
 
 export const PLACEHOLDER = /<[^>]*>/;
+
+// Valor de uma variável do ambiente/.env (3.5). Em geral, qualquer <...> indica placeholder do
+// .env.example. Na senha, <...> pode ser parte do valor real: só conta como placeholder se o
+// valor inteiro for <...> (ex.: <SENHA>), e esse nunca é enviado ao SAP (cada logon errado
+// conta para o bloqueio do usuário).
+export function valorDeVariavel(nome, bruto) {
+  if (bruto === undefined || bruto === null || bruto === "") return { valor: undefined, placeholder: false };
+  const placeholder = /(^|_)SAP_PASSWORD$/.test(nome) ? /^<[^<>]*>$/.test(bruto.trim()) : PLACEHOLDER.test(bruto);
+  return placeholder ? { valor: undefined, placeholder: true } : { valor: bruto, placeholder: false };
+}
 const AMBIENTES = Object.keys(RESTRICAO).join(", ");
 export const BASIS_MINIMO = 750; // política, regra absoluta 5
 export const BASIS_MCP_OFICIAL = 816; // S/4HANA 2025+: abap-adt
@@ -163,7 +173,7 @@ export function resolverSid({ sid, sidOrigem }, sidDeclarado, prefix) {
 // Saída: { command, args, shell, modo, acoesNegadas, childEnv, avisos } ou Recusa.
 export function decidir({ tool, prefix, sistema, conn, v, env, platform }) {
   const { sid, sidPendente, mandante, ambiente, motivo, sapBasis, produto } = sistema;
-  const req = (nome) => v(nome) ?? recusar(`variável ${prefix}_${nome} não definida (ambiente ou .env)`);
+  const req = (nome) => v(nome) ?? recusar(`variável ${prefix}_${nome} não definida ou ainda com placeholder <...> (ambiente ou .env)`);
   const flag = (nome) => /^(true|1|yes)$/i.test(v(nome) ?? "");
   const avisos = [];
 

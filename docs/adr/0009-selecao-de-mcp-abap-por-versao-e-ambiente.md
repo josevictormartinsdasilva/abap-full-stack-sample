@@ -1,6 +1,6 @@
 # ADR-0009: Seleção de MCP ABAP por versão e ambiente
 
-- **Status:** Proposto
+- **Status:** Aceito (2026-11-19, PR #5 na `develop`)
 - **Data:** 2026-11-17
 
 ## Contexto
@@ -51,6 +51,7 @@ Foi feito um estudo de caso, com análise do código-fonte, de dois servidores M
 - (+) Cada faixa de release usa o servidor com melhor cobertura funcional, e os ambientes de cliente ficam somente leitura por trava técnica, não só por instrução.
 - (+) A classificação não depende do operador: um engano na configuração (URL de QAS no lugar do DEV, ambiente declarado errado) é barrado pela detecção. O orquestrador roteia sem suposição ([ADR-0008](0008-parametros-do-cliente-centralizados-sem-suposicao.md)).
 - (−) A detecção depende de a SCC4 estar correta e de o usuário ter autorização de data preview na T000; sem ela, o sistema é tratado como PRD. A opção de modificação global (SE06) não é lida.
+- (−) **Exceção ao "SQL livre desligado":** a leitura da T000 usa o endpoint de SQL livre do ADT (`/sap/bc/adt/datapreview/freestyle`). A consulta é fixa no código, só na T000, só leitura e feita pelo launcher antes de o servidor subir. Os agentes continuam sem SQL livre nem prévia de dados. Detalhes na seção 2 da política.
 - (+) A trava do sistema de desenvolvimento ([ADR-0004](0004-trava-do-sistema-de-desenvolvimento.md)) continua válida e passa a valer para o servidor selecionado.
 - (−) **Dependências novas:** ARC-1 e vsp são comunitários, sem suporte SAP. As versões precisam de acompanhamento e atualização por PR.
 - (−) **Política de APIs da SAP:** a FAQ Q33 classifica as APIs ADT como internas e as limita a canais endossados. Usar ARC-1/vsp em clientes exige aceite formal do cliente.
