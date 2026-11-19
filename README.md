@@ -4,6 +4,8 @@ Bem-vindo ao ambiente de desenvolvimento integrado para o ecossistema SAP. Este 
 
 Todos os agentes seguem rigorosamente os padrões corporativos de desenvolvimento documentados em [padrao-desenvolvimento.md](standards/padrao-desenvolvimento.md) e mapeados em [naming-conventions.json](standards/naming-conventions.json).
 
+> **Primeira vez aqui?** Comece por [docs/primeiros-passos.md](docs/primeiros-passos.md): do zero ao primeiro objeto criado pelos agentes.
+
 ---
 
 ## 🧭 Visão Geral dos Agentes
@@ -151,6 +153,7 @@ Quando uma nova funcionalidade completa precisa ser entregue, o **Orquestrador C
 - **[standards/padrao-desenvolvimento.md](standards/padrao-desenvolvimento.md)**: Manual normativo corporativo de desenvolvimento SAP (Módulos, Pacotes, Requests, Dicionário SE11, ABAP OO, CDS, Fiori e Regras de ATC).
 - **[standards/naming-conventions.json](standards/naming-conventions.json)**: Mapeamento técnico estruturado com todos os prefixos e padrões de nomenclatura, mais o bloco `cliente` com os parâmetros do projeto.
 - **[standards/politica-mcp-abap.md](standards/politica-mcp-abap.md)**: Qual servidor MCP acessa cada sistema SAP (por versão e ambiente) e o que cada um pode fazer.
+- **[docs/primeiros-passos.md](docs/primeiros-passos.md)**: Guia de início para o desenvolvedor: liberações a pedir, instalação, conexão ao SAP e primeiro teste de ponta a ponta.
 - **[docs/setup-mcp-abap.md](docs/setup-mcp-abap.md)**: Passo a passo para configurar o `vsp` e o `arc-1` na máquina do desenvolvedor.
 - **[standards/sistemas-sap.json](standards/sistemas-sap.json)**: Opcional. Restrições adicionais por sistema; o ambiente é detectado no próprio SAP e esta lista só pode torná-lo mais restritivo.
 - **[AGENTS.md](AGENTS.md)**: Regras do orquestrador e papéis dos subagentes — fonte única para todas as ferramentas.
