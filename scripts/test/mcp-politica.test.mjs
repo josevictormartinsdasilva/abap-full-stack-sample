@@ -3,7 +3,7 @@ import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import {
   Recusa, valorDeVariavel, verificarTls, filtrarEnvFilho, lerRegistro, aplicarRegistro, resolverSid, decidir, comandoParaSpawn,
-  ARC1_PACKAGE, ARC1_NEGADAS_FORA_DEV,
+  ARC1_NEGADAS_FORA_DEV,
 } from "../mcp-politica.mjs";
 
 const REG = "standards/sistemas-sap.json";
@@ -170,8 +170,9 @@ describe("TLS (1.3)", () => {
 const CONN = { url: "https://sap.exemplo.com", client: "100", user: "DEV", password: "segredo" };
 const variaveis = (mapa) => (nome) => mapa[nome];
 const base = { sid: "DS4", sidPendente: false, mandante: "100", ambiente: "DEV", motivo: "teste", sapBasis: 758, produto: "S/4HANA 2023" };
-const decidirCom = ({ tool, sistema = {}, vars = {}, env = { PATH: "/bin" }, platform = "linux" }) =>
-  decidir({ tool, prefix: tool === "vsp" ? "VSP" : "ARC1", sistema: { ...base, ...sistema }, conn: CONN, v: variaveis(vars), env, platform });
+const ARC1 = { command: "/usr/bin/node", args: ["/cache/arc-1/1.10.1/node_modules/arc-1/bin/arc1.js"] };
+const decidirCom = ({ tool, sistema = {}, vars = {}, env = { PATH: "/bin" }, platform = "linux", arc1 = ARC1 }) =>
+  decidir({ tool, prefix: tool === "vsp" ? "VSP" : "ARC1", sistema: { ...base, ...sistema }, conn: CONN, v: variaveis(vars), env, platform, arc1 });
 
 describe("decidir — SAP_BASIS mínimo (1.5)", () => {
   for (const tool of ["arc-1", "vsp"])
@@ -267,11 +268,12 @@ describe("decidir — ARC-1", () => {
     assert.equal(d.childEnv.SAP_ALLOW_WRITES, "false");
     assert.equal(d.childEnv.SAP_URL, CONN.url);
   });
-  test("comando: npx com versão fixada; shell só no Windows; ARC1_BIN substitui", () => {
+  test("comando: Node + bin do ARC-1 gerenciado, sem shell (nem no Windows); ARC1_BIN substitui", () => {
     const linux = decidirCom({ tool: "arc-1", sistema: { ambiente: "QAS" } });
-    assert.deepEqual([linux.command, linux.args, linux.shell], ["npx", ["--yes", ARC1_PACKAGE], false]);
-    const win = decidirCom({ tool: "arc-1", sistema: { ambiente: "QAS" }, platform: "win32" });
-    assert.deepEqual([win.command, win.args, win.shell], ['"npx.cmd"', ['"--yes"', `"${ARC1_PACKAGE}"`], true]);
+    assert.deepEqual([linux.command, linux.args, linux.shell], [ARC1.command, ARC1.args, false]);
+    const win = decidirCom({ tool: "arc-1", sistema: { ambiente: "QAS" }, platform: "win32", arc1: { command: "C:\\Program Files\\nodejs\\node.exe", args: ["C:\\x\\arc1.js"] } });
+    assert.deepEqual([win.command, win.shell], ["C:\\Program Files\\nodejs\\node.exe", false]);
+    assert.throws(() => decidirCom({ tool: "arc-1", sistema: { ambiente: "QAS" }, arc1: null }), recusa(/ARC-1 não instalado/));
     const bin = decidirCom({ tool: "arc-1", sistema: { ambiente: "QAS" }, env: { ARC1_BIN: "/opt/arc1" } });
     assert.deepEqual([bin.command, bin.args], ["/opt/arc1", []]);
   });

@@ -16,7 +16,7 @@ Você **não edita** nenhum arquivo de MCP (`.mcp.json`, `.codex/config.toml` et
 
 ### Uma vez por máquina
 
-**1. Node.js 22.19 ou superior.** O ARC-1 exige essa versão.
+**1. Node.js 22.19 ou superior.** É o mínimo do ARC-1 hoje. Uma versão nova do ARC-1 pode exigir mais; nesse caso o launcher avisa.
 
 ```powershell
 node -v
@@ -49,7 +49,14 @@ Rode o diagnóstico (passo 7) antes de abrir a ferramenta de IA. Assim o primeir
 [Environment]::SetEnvironmentVariable('NODE_EXTRA_CA_CERTS', 'C:\certs\ca-cliente.pem', 'User')
 ```
 
-O ARC-1 não tem passo de instalação: o launcher o baixa sozinho na primeira execução (`npx arc-1@1.10.1`).
+**ARC-1 — automático.** Também não tem passo de instalação. O launcher instala a **última versão estável** do npm (`arc-1@latest`) num cache do usuário (`%LOCALAPPDATA%\abap-full-stack\arc-1\<versão>\`, ou `~/.cache`/`~/Library/Caches` no Linux/macOS) e a executa com o Node da máquina. A cada início ele consulta a versão (cerca de 3 s); quando sai uma nova, instala uma vez e apaga a anterior.
+
+- **Integridade:** o `npm install` confere cada pacote pelo hash do registry e usa o registry e o proxy configurados no npm da máquina.
+- **Trava:** antes de iniciar, o launcher confere se a versão instalada ainda reconhece as variáveis de segurança que ele define (`SAP_ALLOW_WRITES`, `SAP_DENY_ACTIONS`, `SAP_ALLOW_FREE_SQL` etc.) e se o Node atende ao `engines` dela. Se não, recusa iniciar.
+- **Sem acesso ao npm:** usa a versão mais nova que já está no cache, com um aviso.
+- **Voltar atrás:** fixe uma versão no `.env` com `ARC1_VERSION=1.10.1`.
+
+A primeira instalação leva cerca de 30 s. Rode o diagnóstico (passo 7) antes de abrir a ferramenta de IA.
 
 ### Uma vez por projeto / cliente
 
@@ -99,7 +106,7 @@ mcp-launch: vsp -> DS4/110 · S/4HANA 2023 · DEV (mandante de customizing ...) 
 mcp-launch: arc-1 -> QS4/400 · S/4HANA 2023 · QAS (mandante de teste ...) · somente leitura
 ```
 
-Antes de conectar ao SAP, o diagnóstico confere os executáveis: o binário do `vsp` (baixado e conferido pelo SHA-256, ou o `VSP_BIN`) e as flags de segurança dele e a versão do Node exigida pelo ARC-1. Se faltar algo, ele para com a indicação do passo deste guia que resolve.
+Antes de conectar ao SAP, o diagnóstico confere os executáveis: o binário do `vsp` (baixado e conferido pelo SHA-256, ou o `VSP_BIN`) e as flags de segurança dele, e o ARC-1 (instalado pelo npm, ou o `ARC1_BIN`) com as variáveis de segurança e o Node exigido. Se faltar algo, ele para com a indicação do passo deste guia que resolve.
 
 Confira se SID, produto e ambiente estão corretos. Se aparecer uma recusa, veja a seção [Problemas comuns](#problemas-comuns).
 
@@ -124,7 +131,8 @@ Se você alterar o `.env`, reinicie a ferramenta: os servidores só são iniciad
 | `VSP_READ_ONLY=true` | Usa o `vsp` no DEV apenas para análise. |
 | `VSP_BIN` | Caminho de um `vsp` baixado manualmente, para redes que bloqueiam o GitHub. Com ela, o launcher não baixa o binário e não confere o hash, mas confere as flags de segurança. |
 | `VSP_VERSION` | Fixa uma versão do `vsp` (ex.: `2.62.1`) em vez da última estável. Use para voltar atrás quando uma release nova quebrar algo. Um `.cmd`/`.bat` também é aceito, desde que o caminho e os valores das variáveis `VSP_*` não tenham `%`, `!`, `^` ou aspas. |
-| `ARC1_BIN` | Caminho de um ARC-1 já instalado, para redes que bloqueiam o `npx`. Instale com `npm install -g arc-1@1.10.1`. No Windows, o `npm` instala um `arc-1.cmd`, que pode ser usado aqui. |
+| `ARC1_BIN` | Caminho de um ARC-1 já instalado, para redes que bloqueiam o npm. Instale com `npm install -g arc-1`. No Windows, o `npm` instala um `arc-1.cmd`, que pode ser usado aqui. Com ela, o launcher não instala nem confere o pacote. |
+| `ARC1_VERSION` | Fixa uma versão do ARC-1 (ex.: `1.10.1`) em vez da última estável. Use para voltar atrás quando uma versão nova quebrar algo. |
 | `ARC1_ALLOW_DEV_WRITES=true` + `ARC1_ALLOWED_PACKAGES=Z*` | Exceção controlada da política (4.2): habilita a escrita do `arc-1` quando ele aponta para um DEV/SANDBOX ≤ 2023, restrita aos pacotes informados. Sem a flag, o `arc-1` no DEV fica somente leitura e não pede pacotes. |
 | `ARC1_BLOCKED_DATA_SOURCES` | Tabelas a bloquear na leitura (experimental). Ex.: `USR02,PA0002`. |
 
@@ -153,7 +161,7 @@ O launcher é coberto por testes automatizados (`node --test scripts/test/*.test
 2. **QAS ≤ 2023:** `node scripts/mcp-launch.mjs arc-1 --diagnostico`. Conferir ambiente `QAS`, modo somente leitura e `acoesNegadas` com `SAPDiagnose.unittest` e `SAPDiagnose.unittest_ci`.
 3. **Subpasta:** em cada ferramenta, abrir a sessão numa subpasta e registrar o resultado na tabela da seção anterior.
 
-**Ao atualizar a versão do ARC-1** (`ARC1_PACKAGE` em `scripts/mcp-politica.mjs`), confira os nomes das ações negadas (`ARC1_NEGADAS_*`) em `dist/authz/policy.js` do pacote novo. Um nome desconhecido em `SAP_DENY_ACTIONS` faz o ARC-1 recusar iniciar.
+**Versões novas do ARC-1 e do vsp** entram sozinhas (última estável). Se uma delas renomear uma ação negada (`ARC1_NEGADAS_*` em `scripts/mcp-politica.mjs`, conferidas em `dist/authz/policy.js`), o próprio ARC-1 recusa iniciar com o nome desconhecido. Se renomear uma variável ou flag de segurança, o launcher recusa. Nos dois casos, fixe a versão anterior (`ARC1_VERSION`/`VSP_VERSION`) e ajuste o launcher por PR.
 
 ---
 
@@ -221,8 +229,13 @@ Todas as mensagens do launcher começam com `mcp-launch:`. Para vê-las, rode o 
 | `o vsp em uso (...) não tem as flags ...` | A versão nova renomeou ou removeu uma flag que o launcher usa para aplicar a política. Fixe a versão anterior com `VSP_VERSION` e avise quem mantém o projeto, para ajustar `scripts/mcp-politica.mjs`. |
 | `"...\vsp.exe" não encontrado` | O caminho em `VSP_BIN` está errado. Corrija-o ou remova a variável para usar o download automático. |
 | `"vsp" não pôde ser executado (EACCES/EPERM)` | O arquivo está bloqueado. No Windows, abra as propriedades do arquivo e marque "Desbloquear". No macOS, rode `xattr -d com.apple.quarantine`. No Linux, rode `chmod +x`. |
-| `"vsp --version" terminou com código ...` | O arquivo em `VSP_BIN` não é o `vsp` correto, ou é de outra plataforma. Baixe novamente o asset da sua plataforma ou remova `VSP_BIN`. || `o ARC-1 exige Node.js >= 22.19` | Atualize o Node (passo 1). |
-| `arc-1` dá timeout na 1ª vez | A rede está bloqueando o npm. Instale o ARC-1 antes e use `ARC1_BIN`. |
+| `"vsp --version" terminou com código ...` | O arquivo em `VSP_BIN` não é o `vsp` correto, ou é de outra plataforma. Baixe novamente o asset da sua plataforma ou remova `VSP_BIN`. |
+| `o ARC-1 vX exige Node.js >=...` | A versão nova do ARC-1 pede um Node mais recente. Atualize o Node (passo 1) ou fixe a versão anterior com `ARC1_VERSION`. |
+| `não foi possível consultar a última versão do ARC-1 no npm ... e não há versão no cache` | Primeiro uso sem acesso ao npm. Confira o registry e o proxy do npm (`npm config get registry`) ou instale o ARC-1 manualmente e use `ARC1_BIN`. |
+| `aviso: não foi possível consultar a última versão do ARC-1 ...; usando a vX do cache` | Sem acesso ao npm no momento. O launcher seguiu com a versão já instalada. |
+| `não foi possível instalar o ARC-1 vX` | O `npm install` falhou. A mensagem traz o fim do erro do npm (rede, proxy, registry ou compilação do `better-sqlite3`). Para contornar, use `ARC1_BIN`. |
+| `o ARC-1 vX não reconhece SAP_...` | A versão nova renomeou ou removeu uma variável que o launcher usa para aplicar a política. Fixe a versão anterior com `ARC1_VERSION` e avise quem mantém o projeto, para ajustar `scripts/mcp-politica.mjs`. |
+| `arc-1` dá timeout na 1ª vez | A primeira instalação (ou a de uma versão nova) passou do tempo limite da ferramenta de IA. Rode `node scripts/mcp-launch.mjs arc-1 --diagnostico` uma vez no terminal e reabra a ferramenta. |
 | Servidor falho no `/mcp`, mas o diagnóstico passa | A ferramenta foi aberta fora da raiz do projeto, ou não foi reiniciada após mudar o `.env`. |
 | `"...\arc-1.cmd" não pôde ser executado (EINVAL)` | O caminho não aponta para um arquivo executável (pasta ou atalho). Confira `ARC1_BIN`/`VSP_BIN`. |
 | `... é um script .cmd/.bat e precisa do cmd.exe, mas ... contém caractere` | O caminho ou um valor de `VSP_*` tem `%`, `!`, `^` ou aspas, que o `cmd.exe` interpretaria. Use o `.exe` ou remova o caractere. |

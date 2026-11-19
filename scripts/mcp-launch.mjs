@@ -15,7 +15,8 @@
 //   <P>_SAP_SID   opcional: se informado, precisa bater com o SID detectado; obrigatório quando
 //                 o SID só puder ser inferido do T000-LOGSYS (senão vsp recusa e ARC-1 só lê)
 //   ARC-1: <P>_ALLOW_DEV_WRITES=true + <P>_ALLOWED_PACKAGES (escrita, só em DEV/SANDBOX ≤ 2023),
-//          <P>_BLOCKED_DATA_SOURCES, ARC1_BIN
+//          <P>_BLOCKED_DATA_SOURCES, ARC1_BIN (sem ele, o launcher instala a última versão estável
+//          do npm; ver scripts/arc1-pacote.mjs), ARC1_VERSION (fixa uma versão)
 //   vsp:   <P>_ALLOWED_PACKAGES (obrigatória), <P>_ALLOWED_TRANSPORTS, <P>_ENABLE_TRANSPORTS,
 //          <P>_READ_ONLY, VSP_BIN (sem ele, o launcher baixa a última release estável do vsp e
 //          confere o SHA-256; ver scripts/vsp-binario.mjs), VSP_VERSION (fixa uma versão)
@@ -52,6 +53,7 @@ import { fileURLToPath } from "node:url";
 import { detectar, validarUrlSap } from "./sap-probe.mjs";
 import { Recusa, valorDeVariavel, aplicarRegistro, comandoParaSpawn, decidir, lerRegistro, resolverSid, verificarTls } from "./mcp-politica.mjs";
 import { FalhaVsp, flagsAusentes, garantirVsp } from "./vsp-binario.mjs";
+import { FalhaArc1, garantirArc1 } from "./arc1-pacote.mjs";
 import { RUNTIME_DIR, gravarEstado, listarAtivos, removerEstado } from "./mcp-runtime.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -104,8 +106,8 @@ function readDotEnv(file) {
   return out;
 }
 const dotenv = readDotEnv(path.join(ROOT, ".env"));
-// VSP_BIN/VSP_VERSION/ARC1_BIN: ambiente do sistema ou, como fallback, o .env (docs/setup-mcp-abap.md, passo 4).
-for (const k of ["VSP_BIN", "VSP_VERSION", "ARC1_BIN"]) if (!process.env[k] && dotenv[k]) process.env[k] = dotenv[k];
+// VSP_BIN/VSP_VERSION/ARC1_BIN/ARC1_VERSION: ambiente do sistema ou, como fallback, o .env (docs/setup-mcp-abap.md, passo 4).
+for (const k of ["VSP_BIN", "VSP_VERSION", "ARC1_BIN", "ARC1_VERSION"]) if (!process.env[k] && dotenv[k]) process.env[k] = dotenv[k];
 const lerVar = (name) => valorDeVariavel(`${prefix}_${name}`, process.env[`${prefix}_${name}`] ?? dotenv[`${prefix}_${name}`]);
 const v = (name) => lerVar(name).valor;
 const req = (name) => {
@@ -141,6 +143,7 @@ function verificarBinario(cmd, variavel, passo) {
   if (r.status !== 0) fail(`"${cmd} --version" terminou com código ${r.status}; confira se é o binário correto (${GUIA}, ${passo}).`);
   return (r.stdout || r.stderr || "").trim().split(/\r?\n/)[0];
 }
+let arc1;
 if (tool === "vsp") {
   // VSP_BIN explícito tem precedência; sem ele, binário gerenciado (última estável + SHA-256).
   if (!process.env.VSP_BIN) {
@@ -163,9 +166,14 @@ if (tool === "vsp") {
 } else if (process.env.ARC1_BIN) {
   verificarBinario(process.env.ARC1_BIN, "ARC1_BIN", "variáveis opcionais");
 } else {
-  const [maj, min] = process.versions.node.split(".").map(Number);
-  if (maj < 22 || (maj === 22 && min < 19))
-    fail(`o ARC-1 exige Node.js >= 22.19; esta máquina tem ${process.versions.node} (${GUIA}, passo 1).`);
+  // ARC-1 gerenciado: última estável do npm, com Node (engines) e variáveis de segurança conferidos.
+  try {
+    arc1 = garantirArc1({ log });
+    log(`ARC-1 em uso: v${arc1.versao}`);
+  } catch (e) {
+    if (e instanceof FalhaArc1) fail(`${e.message} (${GUIA}, passo 1)`);
+    throw e;
+  }
 }
 
 // ---------------------------------------------------------------- detecção no próprio SAP
@@ -196,7 +204,7 @@ if (fs.existsSync(arquivoRegistro)) {
 // ---------------------------------------------------------------- decisão por ferramenta
 const sistema = { sid, sidPendente: sidInfo.sidPendente, mandante, ambiente, motivo, sapBasis: det.sapBasis, produto: det.produto };
 const { command, args, shell, modo, acoesNegadas, childEnv, avisos } = politica(() =>
-  decidir({ tool, prefix, sistema, conn, v, env: process.env, platform: process.platform }));
+  decidir({ tool, prefix, sistema, conn, v, env: process.env, platform: process.platform, arc1 }));
 avisos.forEach((a) => log(`aviso: ${a}`));
 
 const estado = {
