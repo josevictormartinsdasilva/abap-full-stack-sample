@@ -252,6 +252,7 @@ standards/
 .agents/
   agents/<nome>.md              ← subagentes (fonte)
   skills/<nome>/SKILL.md        ← skills (fonte)
+  skills/<nome>/references/     ← material técnico de apoio das skills (fonte; ver THIRD_PARTY_NOTICES.md)
   mcp.servers.json              ← servidores MCP (fonte)
   mcp_config.json               ← gerado (Antigravity)
 scripts/sync-agents.mjs         ← gerador
@@ -336,6 +337,7 @@ O marcador `{{skill}}` vira a instrução de carregar a skill na sintaxe de cada
 - **Removeu um agente?** Apague a fonte e rode o script: os arquivos gerados órfãos são removidos.
 - **Não use valores de cliente nas skills.** Pacotes, variantes e pastas vêm do bloco `cliente` de `standards/naming-conventions.json`.
 - **Padrões corporativos** (`standards/`) são a fonte única de verdade — não duplique regras dentro das skills.
+- **Material de terceiros** em `.agents/skills/*/references/` leva no cabeçalho a origem, o commit e a licença, e é registrado em `THIRD_PARTY_NOTICES.md` ([ADR-0010](docs/adr/0010-material-de-referencia-de-terceiros-nas-skills.md)).
 
 ---
 

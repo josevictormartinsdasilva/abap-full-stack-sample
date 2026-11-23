@@ -23,6 +23,7 @@ Formato: MADR simplificado, em português. Um arquivo por decisão: `NNNN-titulo
 | [0007](0007-mcp-como-camada-de-acesso-ao-sap-e-ao-fiori.md) | MCP como camada de acesso ao SAP e ao Fiori | Aceito |
 | [0008](0008-parametros-do-cliente-centralizados-sem-suposicao.md) | Parâmetros do cliente centralizados, sem suposição | Aceito |
 | [0009](0009-selecao-de-mcp-abap-por-versao-e-ambiente.md) | Seleção de MCP ABAP por versão e ambiente | Aceito |
+| [0010](0010-material-de-referencia-de-terceiros-nas-skills.md) | Material de referência de terceiros nas skills | Proposto |
 
 ## Modelo
 

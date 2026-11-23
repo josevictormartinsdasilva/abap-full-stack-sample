@@ -43,3 +43,15 @@ Esta skill orienta o desenvolvimento, ajuste e ativação de objetos do modelo A
 5. **Classes e Behavior Pool**:
    - Classe de Comportamento: `ZCL<MD>_BP_<ENTIDADE>` ou `ZBP_C_<ENTIDADE>`
    - Métodos e Variáveis: Seguir rigorosamente as convenções de prefixos (`IV/IS/IT/IO/IR_*`, `EV/ES/ET/EO/ER_*`, `CV/CS/CT/CO/CR_*`, `RV/RS/RT/RO/RR_*`, `LT_*`, `LS_*`, `LV_*`, `<FS_*`).
+
+## Referências (leia sob demanda)
+
+Material técnico de apoio em `references/`. Leia o arquivo indicado **antes** de começar a tarefa correspondente. Nomes, prefixos e regras deste documento e de `padrao-desenvolvimento.md` prevalecem sobre os exemplos das referências.
+
+| Tarefa | Arquivo |
+|---|---|
+| Escrever ou alterar BDEF, behavior pool (`ZCL<MD>_BP_*`) ou código EML | [references/rap-bdl-eml.md](references/rap-bdl-eml.md) |
+| Criar ou alterar CDS view entity, projeção, metadata extension, DCL ou value help | [references/cds-view-entities.md](references/cds-view-entities.md) |
+| Escolher classe liberada (UUID, data/usuário, e-mail, HTTP, JSON, log, bgPF, bloqueio, numeração) | [references/classes-liberadas.md](references/classes-liberadas.md) |
+| *(Opcional)* SQL avançado (window functions, CTE, conjuntos) ou AMDP / table function | [references/abap-sql-amdp.md](references/abap-sql-amdp.md) |
+| Saber se uma API ou técnica mantém o nível A | [../abap-qa-auditor/references/clean-core-niveis.md](../abap-qa-auditor/references/clean-core-niveis.md) |
