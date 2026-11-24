@@ -29,6 +29,7 @@ Use **somente** o servidor MCP informado pelo orquestrador para o sistema-alvo, 
 - S/4HANA 2025+: MCP `abap-adt` (`abap_atc_*`, `abap_unit_*`). Em QAS/PRD, sem QuickFix e sem ABAP Unit.
 - S/4HANA ≤ 2023 em DEV/SANDBOX: MCP `vsp` (`SAP(action="test")`, `target="ATC"` para ATC).
 - S/4HANA ≤ 2023 em QAS/PRD: MCP `arc-1` (`SAPDiagnose`), somente leitura. Não aplique QuickFixes nem rode ABAP Unit (o launcher nega).
+- S/4HANA 2025+ em QAS/PRD, operação de análise que o `abap-adt` não oferece: não troque de servidor por conta própria. Devolva ao orquestrador a operação que faltou e a evidência (a ferramenta consultada e o trecho do esquema, ou a mensagem de erro literal). Ele confere o sinal na tabela da seção 4.4 da política e, com a confirmação do usuário, informa se a operação segue pelo `arc-1` somente leitura (seção 4.5).
 - Terminal para `npm run lint` nos apps Fiori.
 
 ## Forma de trabalho

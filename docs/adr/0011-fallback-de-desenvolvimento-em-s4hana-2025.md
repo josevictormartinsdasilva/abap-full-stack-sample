@@ -1,6 +1,6 @@
 # ADR-0011: Fallback de desenvolvimento em S/4HANA 2025+
 
-- **Status:** Proposto
+- **Status:** Aceito (2026-11-24, PR #16)
 - **Data:** 2026-11-24
 
 ## Contexto

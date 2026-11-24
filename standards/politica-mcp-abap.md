@@ -17,14 +17,14 @@ Esta política define **qual servidor MCP** acessa cada sistema SAP, conforme a 
 | S/4HANA 2023 ou inferior (SAP_BASIS 750–815) | QAS / PRD | Somente análise | `arc-1` | Somente leitura (forçado pelo launcher) |
 | S/4HANA 2023 ou inferior (SAP_BASIS 750–815) | DEV / SANDBOX | Desenvolvimento e análise | `vsp` (vibing-steampunk) | Endurecido (forçado pelo launcher) |
 
-Em S/4HANA 2025+ DEV/SANDBOX, uma operação de desenvolvimento que o `abap-adt` não ofereça segue a cadeia de fallback da seção 4.4.
+Em S/4HANA 2025+ DEV/SANDBOX, uma operação de desenvolvimento que o `abap-adt` não ofereça segue a cadeia de fallback da seção 4.4. Em S/4HANA 2025+ QAS/PRD, uma operação de análise que o `abap-adt` não ofereça segue o fallback somente leitura da seção 4.5.
 
 **Regras absolutas:**
 
 1. **`vsp` nunca acessa QAS ou PRD.** O launcher recusa iniciar.
 2. **Nenhuma escrita em QAS ou PRD**, por nenhum servidor: criar, alterar, ativar, excluir, liberar transporte ou aplicar quickfix.
 3. **O ambiente e o release vêm do próprio sistema**, não de declaração do operador (seção 2). O que não puder ser detectado é tratado como o caso mais restritivo.
-4. **Cada sistema é acessado só pelo servidor que a matriz indica para ele.** Não use outro servidor só porque ele "também funcionaria". A única exceção é o fallback de desenvolvimento em S/4HANA 2025+ (seção 4.4).
+4. **Cada sistema é acessado só pelo servidor que a matriz indica para ele.** Não use outro servidor só porque ele "também funcionaria". As únicas exceções são os fallbacks de S/4HANA 2025+: desenvolvimento em DEV/SANDBOX (seção 4.4) e análise em QAS/PRD (seção 4.5).
 5. **SAP_BASIS < 750** está fora do escopo. Informe o usuário e não prossiga.
 
 ---
@@ -116,7 +116,7 @@ O operador só informa **como conectar**: URL, mandante, usuário e senha (`ARC1
 - **Restrições de acesso:** a configuração do ADT deve manter `adt.mcpServer.accessRestrictionsEnabled = true`, com destinos e pacotes listados. Essa configuração fica no IDE de cada desenvolvedor, fora deste repositório.
 - **Recursos Joule** (explicação de objeto, AI-fix do ATC, documentação): podem ter custo adicional. Use somente com autorização do usuário.
 
-### 4.2 `arc-1` — ARC-1 (S/4HANA ≤ 2023, QAS/PRD)
+### 4.2 `arc-1` — ARC-1 (S/4HANA ≤ 2023, QAS/PRD; em 2025+, só contingência e fallback)
 
 **Travas técnicas** aplicadas por `scripts/mcp-launch.mjs`, que o agente não consegue desligar:
 
@@ -181,7 +181,7 @@ O `abap-adt` é o servidor de um sistema 2025+. Se ele **não oferecer** uma ope
 **Quando o fallback vale:**
 
 - Só quando a operação **não existe** no servidor, conforme os sinais da tabela abaixo, e com a evidência mostrada ao usuário.
-- Só para **desenvolvimento** em DEV/SANDBOX. Em QAS/PRD 2025+ não há fallback: a análise é feita pelo `abap-adt` e, se ele estiver fora do ar, pelo `arc-1` somente leitura (seção 6).
+- Só para **desenvolvimento** em DEV/SANDBOX. Em QAS/PRD 2025+ não há fallback de desenvolvimento: a análise é feita pelo `abap-adt`; se ele não oferecer a operação, pelo `arc-1` somente leitura (seção 4.5); se estiver fora do ar, também pelo `arc-1` somente leitura (seção 6).
 - Só para a **operação** que faltou. As demais etapas da mesma entrega continuam no `abap-adt`, inclusive o ATC e o ABAP Unit do `abap-qa-auditor`.
 - A trava do sistema de desenvolvimento ([ADR-0004](../docs/adr/0004-trava-do-sistema-de-desenvolvimento.md)) vale em cada servidor: o SID do `vsp` ou do `arc-1` (em `node scripts/mcp-runtime.mjs`) precisa ser o `sistemaDesenvolvimento`, o mesmo do `abap-adt`.
 - As confirmações exigidas a cada uso no `vsp` (seção 4.3) continuam valendo.
@@ -225,13 +225,39 @@ Os opt-ins ficam desligados por padrão. O desenvolvedor os liga quando o fallba
 
 **Relatório:** o orquestrador informa ao usuário a operação que o `abap-adt` não ofereceu, o servidor que a executou (ou que ela foi entregue para execução manual) e os objetos afetados. Na execução manual, depois que o desenvolvedor criar o objeto, o orquestrador confere pelo `abap-adt` que ele existe e está ativo, e o `abap-qa-auditor` roda o ATC normalmente.
 
+### 4.5 Fallback de análise em QAS/PRD S/4HANA 2025+
+
+Decisão: [ADR-0012](../docs/adr/0012-fallback-de-analise-em-qas-prd-s4hana-2025.md).
+
+O `abap-adt` é o servidor de análise de um QAS/PRD 2025+. Se ele estiver no ar, mas **não oferecer** uma operação de análise pedida (por exemplo: dumps, traces, onde-usado ou a leitura de um tipo de objeto que a SAP ainda não entregou no MCP oficial), o orquestrador segue esta cadeia, **sempre no mesmo sistema**:
+
+1. **`abap-adt`**: tentar primeiro, sempre.
+2. **`arc-1` somente leitura**: pela entrada apontada para esse sistema (`arc-1-qas` ou `arc-1-prd`), com as ferramentas permitidas da seção 4.2.
+3. **Parar e informar**: se o `arc-1` também não atender, informar ao usuário qual operação faltou em cada servidor. O agente não tem outro caminho; a análise fica com o usuário (ADT ou SAP GUI).
+
+O `vsp` nunca entra nesta cadeia (regra absoluta 1).
+
+**Quando o fallback vale:**
+
+- Só para **análise** (leitura, busca, onde-usado, syntax check, ATC sem quickfix, dumps, traces e consultas de transporte). Pedido de escrita em QAS/PRD continua recusado (seção 3, passo 4).
+- Só quando a operação **não existe** no `abap-adt`, conforme a tabela de sinais da seção 4.4, com a mesma evidência e a confirmação do usuário antes de trocar de servidor. As linhas de request, pacote e ativação não se aplicam. Indisponibilidade não é lacuna: segue a seção 6.
+- Só para a **operação** que faltou. O restante da análise continua no `abap-adt`.
+- O SID e o mandante do `arc-1` (em `node scripts/mcp-runtime.mjs`) precisam ser os do sistema consultado pelo `abap-adt`. Se divergirem, pare e informe.
+- Os subagentes não trocam de servidor por conta própria: devolvem ao orquestrador a operação e a evidência.
+
+**Travas técnicas:** nenhuma flag nova. Em QAS/PRD, o launcher sempre inicia o `arc-1` somente leitura, em qualquer release, com ABAP Unit e `SAPWrite.delete` negados e prévia de dados e SQL livre desligados (seção 4.2). `<P>_FALLBACK_2025` e `<P>_ALLOW_DEV_WRITES` são ignoradas fora de DEV/SANDBOX. A decisão de usar o `arc-1` com o `abap-adt` no ar é procedural.
+
+**Dados:** dumps e traces podem conter dados de negócio. Antes de lê-los num QAS/PRD de cliente, considere as obrigações de LGPD (seção 7).
+
+**Relatório:** o orquestrador informa ao usuário a operação que o `abap-adt` não ofereceu, a evidência, o servidor que a executou e o sistema consultado.
+
 ---
 
 ## 5. Equivalência de operações entre servidores
 
 Os subagentes descrevem o trabalho em termos do `abap-adt`. Quando o servidor do sistema for outro, use o equivalente abaixo. No `vsp`, confirme a sintaxe exata com `SAP(action="help", target="<ação>")`.
 
-| Operação | `abap-adt` | `vsp` (DEV/SANDBOX ≤ 2023) | `arc-1` (QAS/PRD ≤ 2023) |
+| Operação | `abap-adt` | `vsp` (DEV/SANDBOX ≤ 2023) | `arc-1` (QAS/PRD ≤ 2023; fallback de análise em 2025+) |
 |---|---|---|---|
 | Buscar objeto | `abap_repository_*` | `SAP(action="search")` / `grep` | `SAPSearch` |
 | Ler código | `abap_object_*` (leitura) | `SAP(action="read")` | `SAPRead` |
@@ -256,6 +282,7 @@ Prefixos por ferramenta de IA: no Claude Code, por exemplo, os servidores aparec
 | BTP ABAP Environment / S/4HANA Cloud Public | `abap-adt`. |
 | `abap-adt` indisponível (fora do ar) num sistema 2025+ | `arc-1`, apenas para análise (sem o opt-in da seção 4.4, o launcher força somente leitura em SAP_BASIS ≥ 816). Desenvolvimento aguarda o `abap-adt`. |
 | `abap-adt` no ar, mas sem a operação de desenvolvimento pedida (2025+) | Cadeia de fallback da seção 4.4: `vsp` → `arc-1` → execução manual autorizada pelo usuário. |
+| `abap-adt` no ar, mas sem a operação de análise pedida (QAS/PRD 2025+) | Fallback da seção 4.5: `arc-1` somente leitura no mesmo sistema → parar e informar. |
 | Tarefa envolvendo vários sistemas | Aplicar a matriz **por sistema**. A autorização de um sistema não vale para outro. |
 | Servidor do sistema indisponível (erro ao iniciar) | Repassar ao usuário a mensagem do `mcp-launch`. Não trocar de servidor por conta própria. |
 
