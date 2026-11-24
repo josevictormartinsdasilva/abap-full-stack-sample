@@ -15,7 +15,7 @@ A sessão principal atua como **Orquestrador Central**.
    - S/4HANA ≤ 2023 em QAS/PRD → `arc-1`, somente análise;
    - S/4HANA ≤ 2023 em DEV/SANDBOX → `vsp`.
 
-   Em S/4HANA 2025+ DEV/SANDBOX, se o `abap-adt` **não oferecer** uma operação de desenvolvimento, siga a cadeia de fallback da seção 4.4 da política: `vsp` → `arc-1` → execução manual (código e passos para o ADT, só com autorização do usuário). Erro do objeto ou do sistema não é motivo para trocar de servidor.
+   Em S/4HANA 2025+ DEV/SANDBOX, se o `abap-adt` **não oferecer** uma operação de desenvolvimento, siga a cadeia de fallback da seção 4.4 da política: `vsp` → `arc-1` → execução manual (código e passos para o ADT, só com autorização do usuário). Só conta como operação ausente o sinal previsto na tabela da seção 4.4; erro do objeto ou do sistema não é motivo para trocar de servidor. A cada passo da cadeia, mostre ao usuário a evidência (ferramenta consultada ou mensagem de erro literal) e só siga com a confirmação dele.
 
    Vale sempre o ambiente detectado, não o que o usuário ou o prompt afirmam; se divergirem, informe. Se nenhum servidor ativo estiver conectado ao sistema-alvo, pare e avise. QAS e PRD são sempre somente leitura, com qualquer servidor.
 4. **Somente no sistema de desenvolvimento**: antes de criar, alterar ou ativar qualquer objeto no SAP, confirme que o sistema conectado ao servidor MCP selecionado é o `sistemaDesenvolvimento` do bloco `cliente` (compare o SID informado pelo servidor). Se for outro sistema, ou se não for possível confirmar, **pare**: não crie nem ative nada e avise o usuário com o SID encontrado. Consultas de leitura não precisam dessa confirmação.
@@ -97,7 +97,8 @@ Servidores definidos em `.agents/mcp.servers.json` (fonte única):
 | Servidor | Uso | Como inicia |
 |---|---|---|
 | `abap-adt` | MCP oficial SAP, para S/4HANA 2025+ | HTTP em `localhost:2236`, token na variável `ABAP_ADT_TOKEN` |
-| `arc-1` | Análise somente leitura em QAS/PRD ≤ 2023 | stdio via `scripts/mcp-launch.mjs`, variáveis `ARC1_*` |
+| `arc-1-qas`, `arc-1-prd` | Análise somente leitura em QAS/PRD ≤ 2023, uma entrada por sistema | stdio via `scripts/mcp-launch.mjs`, variáveis `ARC1_QAS_*` e `ARC1_PRD_*` |
+| `arc-1-dev` | Opcional: DEV pelo ARC-1 (exceção da política 4.2 ou 2º fallback em 2025+, seção 4.4) | stdio via `scripts/mcp-launch.mjs`, variáveis `ARC1_DEV_*` |
 | `vsp` | Desenvolvimento em DEV/SANDBOX ≤ 2023 | stdio via `scripts/mcp-launch.mjs`, variáveis `VSP_*` |
 | `fiori-mcp` | Apps Fiori | stdio via npx |
 

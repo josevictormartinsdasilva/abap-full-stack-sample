@@ -10,9 +10,19 @@ max_depth = 1
 url = "http://localhost:2236/mcp"
 bearer_token_env_var = "ABAP_ADT_TOKEN"
 
-[mcp_servers.arc-1]
+[mcp_servers.arc-1-qas]
 command = "cmd"
-args = ["/c", "node", "scripts/mcp-launch.mjs", "arc-1"]
+args = ["/c", "node", "scripts/mcp-launch.mjs", "arc-1-qas"]
+startup_timeout_sec = 300
+
+[mcp_servers.arc-1-prd]
+command = "cmd"
+args = ["/c", "node", "scripts/mcp-launch.mjs", "arc-1-prd"]
+startup_timeout_sec = 300
+
+[mcp_servers.arc-1-dev]
+command = "cmd"
+args = ["/c", "node", "scripts/mcp-launch.mjs", "arc-1-dev"]
 startup_timeout_sec = 300
 
 [mcp_servers.vsp]

@@ -88,7 +88,7 @@ O operador só informa **como conectar**: URL, mandante, usuário e senha (`ARC1
 | 757 / 756 / 755 / 754 | S/4HANA 2022 / 2021 / 2020 / 1909 | ≤ 2023 |
 | 750–753 | S/4HANA 1511–1809, ECC EhP8 (NW 7.50) | ≤ 2023 |
 
-**Mais de um sistema da mesma faixa:** cada sistema tem a sua entrada em `.agents/mcp.servers.json`, com sufixo no nome (ex.: `arc-1-qas-xxx`, `arc-1-qas-yyy`), e variáveis próprias (`ARC1_QAS_XXX_*`, `ARC1_QAS_YYY_*`). Depois de alterar, rode `node scripts/sync-agents.mjs`.
+**Uma entrada por sistema:** cada sistema do cliente tem a sua entrada em `.agents/mcp.servers.json`, e o sufixo do nome define o prefixo das variáveis. O template traz `vsp` (DEV, `VSP_*`), `arc-1-qas` (`ARC1_QAS_*`), `arc-1-prd` (`ARC1_PRD_*`) e `arc-1-dev` (DEV pelo ARC-1, `ARC1_DEV_*`, opcional). Uma conexão a mais segue o mesmo padrão (ex.: `vsp-sandbox`, `VSP_SANDBOX_*`). Depois de alterar, rode `node scripts/sync-agents.mjs`.
 
 ---
 
@@ -135,7 +135,7 @@ Outras regras desta seção já são garantidas pelo modo somente leitura e pela
 - `SAPDiagnose`: syntax check, ATC sem aplicar quickfix, dumps e traces. ABAP Unit não (só em DEV/SANDBOX).
 - `SAPTransport` em leitura: list, get, diff e history.
 
-**Exceção controlada:** se um cliente não autorizar o `vsp` no DEV, o `arc-1` pode ser apontado para o DEV com escrita. A escrita exige opt-in explícito: `ARC1_ALLOW_DEV_WRITES=true` e `ARC1_ALLOWED_PACKAGES`. Sem a flag, o `arc-1` no DEV inicia somente leitura (uso só para análise) e não pede pacotes. A flag é ignorada fora de DEV/SANDBOX, com SID não confirmado e em SAP_BASIS ≥ 816 sem `ARC1_FALLBACK_2025=true` (seção 4.4).
+**Exceção controlada:** se um cliente não autorizar o `vsp` no DEV, o `arc-1` pode ser apontado para o DEV com escrita. A escrita usa a entrada `arc-1-dev` (variáveis `ARC1_DEV_*`) e exige opt-in explícito: `<P>_ALLOW_DEV_WRITES=true` e `<P>_ALLOWED_PACKAGES` (ex.: `ARC1_DEV_ALLOW_DEV_WRITES`). Sem a flag, o `arc-1` no DEV inicia somente leitura (uso só para análise) e não pede pacotes. A flag é ignorada fora de DEV/SANDBOX, com SID não confirmado e em SAP_BASIS ≥ 816 sem `<P>_FALLBACK_2025=true` (seção 4.4).
 
 ### 4.3 `vsp` — vibing-steampunk (S/4HANA ≤ 2023, DEV/SANDBOX)
 
@@ -180,17 +180,44 @@ O `abap-adt` é o servidor de um sistema 2025+. Se ele **não oferecer** uma ope
 
 **Quando o fallback vale:**
 
-- Só quando a operação **não existe** no servidor: ferramenta ausente, ou tipo de objeto ou ação não suportado. Um erro do próprio objeto ou do sistema **não** autoriza trocar de servidor: erro de sintaxe, objeto bloqueado, falta de autorização, request inválida ou pacote fora da lista permitida. Nesses casos, corrija ou informe o usuário.
+- Só quando a operação **não existe** no servidor, conforme os sinais da tabela abaixo, e com a evidência mostrada ao usuário.
 - Só para **desenvolvimento** em DEV/SANDBOX. Em QAS/PRD 2025+ não há fallback: a análise é feita pelo `abap-adt` e, se ele estiver fora do ar, pelo `arc-1` somente leitura (seção 6).
 - Só para a **operação** que faltou. As demais etapas da mesma entrega continuam no `abap-adt`, inclusive o ATC e o ABAP Unit do `abap-qa-auditor`.
 - A trava do sistema de desenvolvimento ([ADR-0004](../docs/adr/0004-trava-do-sistema-de-desenvolvimento.md)) vale em cada servidor: o SID do `vsp` ou do `arc-1` (em `node scripts/mcp-runtime.mjs`) precisa ser o `sistemaDesenvolvimento`, o mesmo do `abap-adt`.
 - As confirmações exigidas a cada uso no `vsp` (seção 4.3) continuam valendo.
 
+**Como identificar que a operação não existe:**
+
+| Sinal | Conta como operação ausente? |
+|---|---|
+| Nenhuma ferramenta do servidor cobre a operação (conferido na lista de ferramentas que o servidor publica) | Sim |
+| O tipo de objeto ou a ação pedida não está entre os valores aceitos pelo esquema da ferramenta (ex.: enum de tipos de objeto) | Sim |
+| A ferramenta responde que a operação ou o tipo "não é suportado" ou "não está implementado" | Sim |
+| O ADT responde HTTP 404 ou 501 **no endpoint do tipo de objeto ou da ação** (o recurso não existe no sistema) | Sim |
+| HTTP 404 porque **o objeto** consultado não existe | Não: o objeto não existe, a operação sim |
+| HTTP 401/403, falta de autorização | Não |
+| Objeto bloqueado (lock) ou em edição por outro usuário | Não |
+| Erro de sintaxe ou de ativação | Não |
+| Request inválida ou ausente, pacote fora da lista permitida | Não |
+| Timeout, erro de conexão ou servidor fora do ar | Não: é indisponibilidade (seção 6), não lacuna |
+| Parâmetro errado na chamada | Não: corrija a chamada |
+| Sinal ambíguo, que não se encaixa claramente em nenhuma linha acima | Não: informe o usuário e pergunte |
+
+**Evidência antes de trocar de servidor:** a cada passo da cadeia (`abap-adt` → `vsp`, `vsp` → `arc-1`, `arc-1` → execução manual), o orquestrador para e mostra ao usuário:
+
+1. a operação pedida (ex.: "criar objeto do tipo X no pacote Y");
+2. o servidor que não a atendeu e a versão dele, se o servidor informar;
+3. a evidência: a ferramenta consultada e o trecho do esquema que não cobre a operação, ou a mensagem de erro **literal** devolvida pelo servidor;
+4. a linha da tabela acima em que o sinal se encaixa;
+5. o próximo servidor da cadeia.
+
+Só depois da confirmação do usuário o orquestrador segue para o próximo servidor. Sem evidência, ou com sinal ambíguo, não há fallback. Os subagentes não trocam de servidor por conta própria: devolvem ao orquestrador a operação e a evidência.
+
 **Travas técnicas** aplicadas pelo launcher em SAP_BASIS ≥ 816:
 
 - Sem opt-in, nada muda: o `vsp` recusa iniciar e o `arc-1` inicia somente leitura.
 - `vsp`: inicia só com `VSP_FALLBACK_2025=true`, em DEV/SANDBOX detectado e com SID confirmado, com os mesmos argumentos endurecidos da seção 4.3.
-- `arc-1`: escreve só com `ARC1_FALLBACK_2025=true`, `ARC1_ALLOW_DEV_WRITES=true` e `ARC1_ALLOWED_PACKAGES`, em DEV/SANDBOX com SID confirmado. As travas fixas da seção 4.2 continuam.
+- `arc-1`: escreve só pela entrada `arc-1-dev`, apontada para o DEV, com `ARC1_DEV_FALLBACK_2025=true`, `ARC1_DEV_ALLOW_DEV_WRITES=true` e `ARC1_DEV_ALLOWED_PACKAGES`, em DEV/SANDBOX com SID confirmado. As travas fixas da seção 4.2 continuam.
 - Fora de DEV/SANDBOX, a flag é ignorada, com aviso.
 - O modo gravado no runtime indica `(fallback do abap-adt)`.
 
@@ -217,7 +244,7 @@ Os subagentes descrevem o trabalho em termos do `abap-adt`. Quando o servidor do
 | Dumps | feeds | `SAP(action="analyze")`, `type=list_dumps` | `SAPDiagnose` |
 | Transportes | `abap_transport_*` | `SAP(action="system")` | `SAPTransport` (leitura) |
 
-Prefixos por ferramenta de IA: no Claude Code, por exemplo, os servidores aparecem como `mcp__abap-adt__*`, `mcp__arc-1__*` e `mcp__vsp__SAP`.
+Prefixos por ferramenta de IA: no Claude Code, por exemplo, os servidores aparecem como `mcp__abap-adt__*`, `mcp__arc-1-qas__*`, `mcp__arc-1-prd__*` e `mcp__vsp__SAP`.
 
 ---
 
