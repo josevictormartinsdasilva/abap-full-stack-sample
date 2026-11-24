@@ -31,8 +31,8 @@ import { detectar, validarUrlSap } from "./sap-probe.mjs";
 import { BASIS_MCP_OFICIAL, BASIS_MINIMO, valorDeVariavel } from "./mcp-politica.mjs";
 import { nodeAtende } from "./arc1-pacote.mjs";
 import {
-  atualizarCliente, atualizarDotEnv, camposPendentes, ehPlaceholder, lerDotEnv,
-  placeholdersPadrao, preencherPadrao, prefixoDoServidor, situacaoConexao,
+  atualizarCliente, atualizarDotEnv, atualizarProjetoCTS, camposPendentes, ehPlaceholder, lerDotEnv,
+  placeholdersPadrao, preencherPadrao, prefixoDoServidor, situacaoConexao, situacaoProjetoCTS,
 } from "./config-local.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -307,9 +307,6 @@ const CAMPOS_CLIENTE = [
     validar: (v) => (/^[A-Z0-9]{1,4}$/i.test(v) ? null : "use de 1 a 4 letras ou dígitos") },
   { campo: "pacotePadraoATC", texto: "Pacote padrão (ATC)", ajustar: (v) => v.toUpperCase() },
   { campo: "varianteATC", texto: "Variante ATC", ajustar: (v) => v.toUpperCase() },
-  { campo: "projetoCTS", texto: "Projeto CTS", opcional: true },
-  { campo: "idProjetoCTS", texto: "Identificação do projeto CTS", opcional: true },
-  { campo: "descricaoProjetoCTS", texto: "Descrição breve do projeto CTS", opcional: true },
   { campo: "namespaceFiori", texto: "Namespace Fiori", validar: (v) => (/^[a-z][a-z0-9]*(\.[a-z][a-z0-9]*)+$/.test(v) ? null : "use minúsculas separadas por ponto, ex.: br.com.cliente") },
   { campo: "pastaAppsFiori", texto: "Pasta dos apps Fiori (caminho local)" },
 ];
@@ -350,18 +347,47 @@ async function configurarCliente(resultados) {
     novos.sistemaDesenvolvimento = novos.sistemaDesenvolvimento.toUpperCase();
   }
 
-  if (!Object.keys(novos).length) return preencherDocumentoPadrao(cliente);
-  if (!(await confirmar("Gravar os parâmetros do cliente?", true))) return;
-  fs.writeFileSync(ARQ.nomenclatura, atualizarCliente(texto, novos));
-  ok("standards/naming-conventions.json atualizado");
-  return preencherDocumentoPadrao({ ...cliente, ...novos });
+  // Projeto CTS: vai na request (requests.projetoCTS), não no pacote, e nem todo cliente usa.
+  const requests = JSON.parse(texto).requests;
+  const cts = situacaoProjetoCTS(requests);
+  let novoCTS; // undefined = sem mudança; null = não se aplica; objeto = definido
+  if (cts === "pendente" || revisar) {
+    console.log("");
+    info("Projeto CTS: atribuído a cada request na criação (SE09/SE10), não ao pacote. Nem todo cliente usa.");
+    const usa = await confirmar("Este cliente atribui projeto CTS às requests?", cts === "definido");
+    if (!usa) novoCTS = null;
+    else {
+      const p = cts === "definido" ? requests.projetoCTS : {};
+      novoCTS = {
+        projeto: (await perguntar("Projeto CTS", { atual: p.projeto })).toUpperCase(),
+        identificador: await perguntar("Identificação do projeto", { atual: p.identificador }),
+        descricao: await perguntar("Descrição breve do projeto", { atual: p.descricao }),
+      };
+    }
+    if (novoCTS === null && cts === "nao-se-aplica") novoCTS = undefined;
+  }
+
+  const semMudanca = !Object.keys(novos).length && novoCTS === undefined;
+  if (!semMudanca) {
+    if (!(await confirmar("Gravar os parâmetros do cliente?", true))) return;
+    let novoTexto = Object.keys(novos).length ? atualizarCliente(texto, novos) : texto;
+    if (novoCTS !== undefined) novoTexto = atualizarProjetoCTS(novoTexto, novoCTS);
+    fs.writeFileSync(ARQ.nomenclatura, novoTexto);
+    ok("standards/naming-conventions.json atualizado");
+  }
+  const ctsFinal = novoCTS !== undefined ? novoCTS : cts === "nao-se-aplica" ? null : cts === "definido" ? requests.projetoCTS : undefined;
+  return preencherDocumentoPadrao({
+    ...cliente, ...novos,
+    ...(ctsFinal === null ? { semProjetoCTS: true } : {}),
+    ...(ctsFinal ? { projetoCTS: ctsFinal.projeto, idProjetoCTS: ctsFinal.identificador, descricaoProjetoCTS: ctsFinal.descricao } : {}),
+  });
 }
 
-function preencherDocumentoPadrao(cliente) {
+function preencherDocumentoPadrao(valores) {
   const texto = ler(ARQ.padrao);
   const antes = placeholdersPadrao(texto);
   if (!antes.length) return;
-  const novo = preencherPadrao(texto, cliente);
+  const novo = preencherPadrao(texto, valores);
   if (novo !== texto) {
     fs.writeFileSync(ARQ.padrao, novo);
     ok(`standards/padrao-desenvolvimento.md: ${antes.filter((p) => !novo.includes(p)).join(", ")} preenchidos`);

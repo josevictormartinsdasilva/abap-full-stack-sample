@@ -20,7 +20,7 @@ import { BASIS_MCP_OFICIAL, valorDeVariavel } from "./mcp-politica.mjs";
 import { nodeAtende } from "./arc1-pacote.mjs";
 import {
   camposPendentes, ehPlaceholder, lerDiagnostico, lerDotEnv, placeholdersPadrao,
-  prefixoDoServidor, recusaEsperada2025, situacaoConexao,
+  prefixoDoServidor, recusaEsperada2025, situacaoConexao, situacaoProjetoCTS,
 } from "./config-local.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -48,7 +48,8 @@ const servidores = JSON.parse(fs.readFileSync(rel(".agents/mcp.servers.json"), "
 const temEnv = fs.existsSync(rel(".env"));
 const dotenv = temEnv ? lerDotEnv(fs.readFileSync(rel(".env"), "utf8")) : {};
 const lerVar = (n) => process.env[n] ?? dotenv[n];
-const cliente = JSON.parse(fs.readFileSync(rel("standards/naming-conventions.json"), "utf8")).cliente || {};
+const nomenclatura = JSON.parse(fs.readFileSync(rel("standards/naming-conventions.json"), "utf8"));
+const cliente = nomenclatura.cliente || {};
 const sidDev = ehPlaceholder(cliente.sistemaDesenvolvimento) ? null : cliente.sistemaDesenvolvimento.trim().toUpperCase();
 const abapServidores = Object.keys(servidores).filter((s) => prefixoDoServidor(s));
 
@@ -81,6 +82,10 @@ else item("ok", `sistemaDesenvolvimento = ${sidDev}`);
 const outros = pendentes.filter((c) => c !== "sistemaDesenvolvimento");
 if (outros.length) item("aviso", `sem valor em naming-conventions.json: ${outros.join(", ")} (os agentes vão perguntar)`, "rode node scripts/setup.mjs --apenas=cliente");
 else item("ok", "naming-conventions.json preenchido");
+const cts = situacaoProjetoCTS(nomenclatura.requests);
+if (cts === "pendente") item("aviso", "projeto CTS das requests não definido (os agentes vão perguntar)",
+  "rode node scripts/setup.mjs --apenas=cliente e responda se o cliente usa projeto CTS (se não usar, fica \"não se aplica\")");
+else item("ok", cts === "definido" ? `projeto CTS das requests = ${nomenclatura.requests.projetoCTS.projeto}` : "projeto CTS: não se aplica a este cliente");
 const restam = placeholdersPadrao(fs.readFileSync(rel("standards/padrao-desenvolvimento.md"), "utf8"));
 if (restam.length) item("aviso", `placeholders em padrao-desenvolvimento.md: ${restam.join(", ")}`, "rode node scripts/setup.mjs --apenas=cliente");
 else item("ok", "padrao-desenvolvimento.md preenchido");

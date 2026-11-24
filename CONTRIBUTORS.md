@@ -23,7 +23,7 @@ Em todo Pull Request (ou commit direto), adicione **uma linha** na tabela de [Hi
 
 | Data | Contribuidor | Área | Atividade |
 |---|---|---|---|
-| 2026-11-24 | José Victor Martins da Silva | Ferramenta | Assistente de configuração (`scripts/setup.mjs`) e verificação única (`scripts/doctor.mjs`): conexão com detecção no SAP, parâmetros do cliente (incl. projeto CTS) e token do abap-adt |
+| 2026-11-24 | José Victor Martins da Silva | Ferramenta | Assistente de configuração (`scripts/setup.mjs`) e verificação única (`scripts/doctor.mjs`): conexão com detecção no SAP, parâmetros do cliente, projeto CTS opcional das requests e token do abap-adt |
 | 2026-11-19 | José Victor Martins da Silva | Documentação | Revisão geral da documentação (README, guias, ADRs e CONTRIBUTORS) para refletir o estado atual do código |
 | 2026-11-19 | José Victor Martins da Silva | MCP | ARC-1 sempre na última versão estável do npm, instalado num cache do usuário, com conferência das variáveis de segurança e do Node (`scripts/arc1-pacote.mjs`, PR #12) |
 | 2026-11-19 | José Victor Martins da Silva | MCP | Download automático do `vsp` na última release estável, com SHA-256 e conferência das flags de segurança (`scripts/vsp-binario.mjs`, PR #11) |
