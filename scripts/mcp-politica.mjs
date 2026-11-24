@@ -170,8 +170,14 @@ export function resolverSid({ sid, sidOrigem }, sidDeclarado, prefix) {
 //   env         ambiente do processo (base do ambiente do filho; ARC1_BIN/VSP_BIN)
 //   arc1        { command, args } do ARC-1 gerenciado (scripts/arc1-pacote.mjs); ignorado com ARC1_BIN
 //   platform    process.platform
-// Saída: { command, args, shell, modo, acoesNegadas, childEnv, avisos } ou Recusa.
-export function decidir({ tool, prefix, sistema, conn, v, env, platform, arc1 }) {
+//   caCert      caminho absoluto do .pem fixado para a conexão (<P>_SAP_CA_CERT), se houver
+// Saída: { command, args, shell, modo, tls, acoesNegadas, childEnv, avisos } ou Recusa.
+//
+// TLS (política seção 2, ADR-0013): o probe sempre verifica o certificado, com a cadeia do
+// sistema ou com o .pem fixado. O ARC-1 (Node) recebe o .pem por NODE_EXTRA_CA_CERTS. O vsp (Go)
+// não aceita CA própria nem certificado sem SAN; para ele, e só para ele, <P>_SAP_INSECURE=true
+// passa --insecure. A identidade do servidor já foi conferida pelo probe ao iniciar.
+export function decidir({ tool, prefix, sistema, conn, v, env, platform, arc1, caCert }) {
   const { sid, sidPendente, mandante, ambiente, motivo, sapBasis, produto } = sistema;
   const req = (nome) => v(nome) ?? recusar(`variável ${prefix}_${nome} não definida ou ainda com placeholder <...> (ambiente ou .env)`);
   const flag = (nome) => /^(true|1|yes)$/i.test(v(nome) ?? "");
@@ -186,6 +192,8 @@ export function decidir({ tool, prefix, sistema, conn, v, env, platform, arc1 })
   Object.assign(childEnv, { SAP_URL: conn.url, SAP_CLIENT: conn.client, SAP_USER: conn.user, SAP_PASSWORD: conn.password });
 
   let command, args, modo, acoesNegadas;
+  let tls = caCert ? `certificado fixado (${prefix}_SAP_CA_CERT)` : "cadeia confiável do sistema";
+  const pediuInseguro = flag("SAP_INSECURE");
 
   // Fallback de desenvolvimento em 2025+ (política 4.4): o abap-adt é o servidor do sistema, e o
   // vsp e o ARC-1 só escrevem nele com opt-in explícito <P>_FALLBACK_2025=true, e só em DEV/SANDBOX.
@@ -223,6 +231,9 @@ export function decidir({ tool, prefix, sistema, conn, v, env, platform, arc1 })
       SAP_ALLOW_PLUGIN_EXECUTE: "false",
       SAP_DENY_ACTIONS: acoesNegadas.join(","),
     });
+    if (caCert) childEnv.NODE_EXTRA_CA_CERTS = caCert;
+    if (pediuInseguro)
+      avisos.push(`${prefix}_SAP_INSECURE ignorada: o ARC-1 sempre verifica o TLS; para certificado autoassinado ou de CA interna, use ${prefix}_SAP_CA_CERT (node scripts/setup.mjs)`);
     if (writes) childEnv.SAP_ALLOWED_PACKAGES = req("ALLOWED_PACKAGES");
     if (v("BLOCKED_DATA_SOURCES")) childEnv.SAP_BLOCKED_DATA_SOURCES = v("BLOCKED_DATA_SOURCES");
     if (env.ARC1_BIN) {
@@ -246,9 +257,14 @@ export function decidir({ tool, prefix, sistema, conn, v, env, platform, arc1 })
     if (v("ALLOWED_TRANSPORTS")) args.push("--allow-transportable-edits", "--allowed-transports", v("ALLOWED_TRANSPORTS"));
     if (flag("ENABLE_TRANSPORTS")) args.push("--enable-transports");
     if (flag("READ_ONLY")) args.push("--read-only");
+    if (pediuInseguro && new URL(conn.url).protocol === "https:") {
+      args.push("--insecure");
+      tls = `vsp sem verificação TLS (${prefix}_SAP_INSECURE); identidade conferida pelo launcher ao iniciar com ${tls}`;
+      avisos.push(`${prefix}_SAP_INSECURE=true: o vsp não verifica o certificado do SAP. O launcher conferiu o certificado ao iniciar, mas uma interceptação posterior não seria detectada. Peça ao Basis um certificado com SAN e importe a CA no repositório do sistema para desligar esta opção (ADR-0013).`);
+    }
   } else {
     recusar(`ferramenta desconhecida: ${tool}`);
   }
 
-  return { ...comandoParaSpawn(command, args, platform), modo, acoesNegadas, childEnv, avisos };
+  return { ...comandoParaSpawn(command, args, platform), modo, tls, acoesNegadas, childEnv, avisos };
 }

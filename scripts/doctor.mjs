@@ -125,7 +125,7 @@ for (const s of configurados) {
   if (d.estado) {
     const e = d.estado;
     if (e.sapBasis >= BASIS_MCP_OFICIAL) algum2025 = true;
-    item("ok", `${s}: ${e.sid}/${e.mandante} · ${e.produto} · ${e.ambiente} · ${e.modo}`);
+    item("ok", `${s}: ${e.sid}/${e.mandante} · ${e.produto} · ${e.ambiente} · ${e.modo}${e.tls ? ` · TLS: ${e.tls}` : ""}`);
     d.avisos.forEach((a) => item("aviso", `${s}: ${a}`));
     const esperado = papelEsperado(s);
     if (esperado === "DEV" && !["DEV", "SANDBOX"].includes(e.ambiente)) item("erro", `${s}: configurado como DEV, mas o sistema é ${e.ambiente}`, "confira a URL e o mandante");

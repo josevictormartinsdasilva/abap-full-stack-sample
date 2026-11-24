@@ -171,8 +171,8 @@ const CONN = { url: "https://sap.exemplo.com", client: "100", user: "DEV", passw
 const variaveis = (mapa) => (nome) => mapa[nome];
 const base = { sid: "DS4", sidPendente: false, mandante: "100", ambiente: "DEV", motivo: "teste", sapBasis: 758, produto: "S/4HANA 2023" };
 const ARC1 = { command: "/usr/bin/node", args: ["/cache/arc-1/1.10.1/node_modules/arc-1/bin/arc1.js"] };
-const decidirCom = ({ tool, sistema = {}, vars = {}, env = { PATH: "/bin" }, platform = "linux", arc1 = ARC1 }) =>
-  decidir({ tool, prefix: tool === "vsp" ? "VSP" : "ARC1", sistema: { ...base, ...sistema }, conn: CONN, v: variaveis(vars), env, platform, arc1 });
+const decidirCom = ({ tool, sistema = {}, vars = {}, env = { PATH: "/bin" }, platform = "linux", arc1 = ARC1, caCert, conn = CONN }) =>
+  decidir({ tool, prefix: tool === "vsp" ? "VSP" : "ARC1", sistema: { ...base, ...sistema }, conn, v: variaveis(vars), env, platform, arc1, caCert });
 
 describe("decidir — SAP_BASIS mínimo (1.5)", () => {
   for (const tool of ["arc-1", "vsp"])
@@ -389,5 +389,54 @@ describe("comandoParaSpawn (2.4)", () => {
   });
   test("caminho com caractere perigoso recusa", () => {
     assert.throws(() => comandoParaSpawn("C:\\%TEMP%\\vsp.cmd", [], "win32"), Recusa);
+  });
+});
+
+describe("decidir — TLS: certificado fixado e opt-in insecure do vsp (ADR-0013)", () => {
+  const vsp = { ALLOWED_PACKAGES: "Z*" };
+  const CA = "/proj/.agents/certs/arc-1-qas.pem";
+  test("sem certificado fixado: cadeia do sistema e sem --insecure", () => {
+    const a = decidirCom({ tool: "arc-1" });
+    assert.equal(a.childEnv.NODE_EXTRA_CA_CERTS, undefined);
+    assert.equal(a.childEnv.SAP_INSECURE, "false");
+    assert.match(a.tls, /cadeia confiável/);
+    assert.ok(!decidirCom({ tool: "vsp", vars: vsp }).args.includes("--insecure"));
+  });
+  test("ARC-1 com certificado fixado recebe o .pem por NODE_EXTRA_CA_CERTS e continua verificando", () => {
+    for (const ambiente of ["DEV", "QAS", "PRD"]) {
+      const d = decidirCom({ tool: "arc-1", sistema: { ambiente }, caCert: CA });
+      assert.equal(d.childEnv.NODE_EXTRA_CA_CERTS, CA, ambiente);
+      assert.equal(d.childEnv.SAP_INSECURE, "false", ambiente);
+      assert.match(d.tls, /certificado fixado \(ARC1_SAP_CA_CERT\)/);
+    }
+  });
+  test("certificado fixado substitui um NODE_EXTRA_CA_CERTS global no filho", () => {
+    const d = decidirCom({ tool: "arc-1", env: { PATH: "/bin", NODE_EXTRA_CA_CERTS: "/global.pem" }, caCert: CA });
+    assert.equal(d.childEnv.NODE_EXTRA_CA_CERTS, CA);
+  });
+  test("ARC-1 ignora SAP_INSECURE, com aviso", () => {
+    for (const ambiente of ["DEV", "QAS", "PRD"]) {
+      const d = decidirCom({ tool: "arc-1", sistema: { ambiente }, vars: { SAP_INSECURE: "true" } });
+      assert.equal(d.childEnv.SAP_INSECURE, "false", ambiente);
+      assert.ok(d.avisos.some((a) => /ARC1_SAP_INSECURE ignorada/.test(a)), ambiente);
+    }
+  });
+  test("vsp com opt-in recebe --insecure, mantém as travas e descreve o TLS", () => {
+    const d = decidirCom({ tool: "vsp", vars: { ...vsp, SAP_INSECURE: "true" }, caCert: "/proj/.agents/certs/vsp.pem" });
+    assert.ok(d.args.includes("--insecure"));
+    assert.ok(d.args.includes("--expect") && d.args.includes("--block-free-sql"));
+    assert.match(d.tls, /vsp sem verificação TLS.*certificado fixado/);
+    assert.ok(d.avisos.some((a) => /VSP_SAP_INSECURE=true/.test(a)));
+  });
+  test("vsp: opt-in não altera a recusa fora de DEV/SANDBOX", () => {
+    assert.throws(() => decidirCom({ tool: "vsp", sistema: { ambiente: "QAS" }, vars: { ...vsp, SAP_INSECURE: "true" } }), recusa(/vsp só em DEV\/SANDBOX/));
+  });
+  test("vsp: opt-in sem efeito em http://localhost (não há TLS)", () => {
+    const d = decidirCom({ tool: "vsp", vars: { ...vsp, SAP_INSECURE: "true" }, conn: { ...CONN, url: "http://localhost:8000" } });
+    assert.ok(!d.args.includes("--insecure"));
+  });
+  test("valores que não ligam o opt-in", () => {
+    for (const valor of ["false", "0", "", undefined])
+      assert.ok(!decidirCom({ tool: "vsp", vars: { ...vsp, SAP_INSECURE: valor } }).args.includes("--insecure"), String(valor));
   });
 });

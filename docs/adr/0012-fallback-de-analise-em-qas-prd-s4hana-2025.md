@@ -1,6 +1,6 @@
 # ADR-0012: Fallback de análise em QAS/PRD S/4HANA 2025+
 
-- **Status:** Proposto
+- **Status:** Aceito (2026-11-24, PR #19)
 - **Data:** 2026-11-24
 
 ## Contexto
