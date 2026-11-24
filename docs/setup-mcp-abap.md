@@ -5,8 +5,8 @@ Guia para preparar a máquina de cada desenvolvedor para os servidores `vsp` e `
 | Servidor | Sistema | Modo |
 |---|---|---|
 | `vsp` | DEV / Sandbox ≤ 2023 (em 2025+, só como [fallback](#fallback-do-abap-adt-em-s4hana-2025)) | Desenvolvimento |
-| `arc-1-qas` | QAS ≤ 2023 (em 2025+, só contingência de análise) | Somente leitura |
-| `arc-1-prd` | PRD ≤ 2023 (em 2025+, só contingência de análise) | Somente leitura |
+| `arc-1-qas` | QAS ≤ 2023 (em 2025+, só contingência e [fallback de análise](#fallback-de-análise-em-qasprd-2025)) | Somente leitura |
+| `arc-1-prd` | PRD ≤ 2023 (em 2025+, só contingência e [fallback de análise](#fallback-de-análise-em-qasprd-2025)) | Somente leitura |
 | `arc-1-dev` (opcional) | DEV, o mesmo do `vsp`: exceção da política 4.2 em ≤ 2023 ou 2º fallback em 2025+ | Somente leitura, salvo opt-in |
 | `abap-adt` | S/4HANA 2025+ | Ver [Configuração do Token MCP](../README.md#-configuração-do-token-mcp-abap-adt) |
 
@@ -234,8 +234,8 @@ O `vsp` e o `arc-1` ficam **desligados por padrão** num sistema 2025+ (opt-in):
 | Sistema | Servidor no dia a dia | Contingência / fallback | Entrada |
 |---|---|---|---|
 | DEV | `abap-adt` | `vsp` como fallback de desenvolvimento (flag) | `vsp` (padrão) |
-| QAS | `abap-adt` (leitura) | `arc-1` só leitura, se o `abap-adt` cair (opcional) | `arc-1-qas` |
-| PRD | `abap-adt` (leitura) | `arc-1` só leitura, se o `abap-adt` cair (opcional) | `arc-1-prd` |
+| QAS | `abap-adt` (leitura) | `arc-1` só leitura, se o `abap-adt` cair ou não oferecer a análise (opcional) | `arc-1-qas` |
+| PRD | `abap-adt` (leitura) | `arc-1` só leitura, se o `abap-adt` cair ou não oferecer a análise (opcional) | `arc-1-prd` |
 | DEV (raro) | — | `arc-1` como 2º fallback, se o `vsp` não atender | `arc-1-dev` |
 
 - **Use a entrada `vsp`** que já vem no template. Deixe `VSP_*` apontando de vez para o DEV do cliente, com `VSP_FALLBACK_2025=true` comentado. Para usar, descomente essa linha e reinicie a sessão.
@@ -244,6 +244,17 @@ O `vsp` e o `arc-1` ficam **desligados por padrão** num sistema 2025+ (opt-in):
 - **Defina `<P>_SAP_SID`** com o SID do DEV 2025, para o launcher recusar se a URL estiver trocada. Esse SID precisa ser o mesmo de `cliente.sistemaDesenvolvimento` em `standards/naming-conventions.json`.
 
 > Usar `vsp`/`arc-1` num sistema de cliente exige aceite formal do cliente (política, seção 7). Decisão registrada no [ADR-0011](adr/0011-fallback-de-desenvolvimento-em-s4hana-2025.md).
+
+### Fallback de análise em QAS/PRD 2025+
+
+Num QAS/PRD 2025+, a análise é feita pelo `abap-adt`. Se ele estiver no ar, mas **não oferecer** a operação de análise pedida (por exemplo, dumps, traces ou onde-usado), a [política, seção 4.5](../standards/politica-mcp-abap.md) permite usar o `arc-1` **somente leitura** no mesmo sistema. Se o `arc-1` também não atender, o orquestrador para e informa. O `vsp` nunca é usado em QAS/PRD.
+
+- **Não há flag para ligar.** Basta a entrada do sistema estar preenchida: `ARC1_QAS_*` para o QAS e `ARC1_PRD_*` para o PRD. Nesses ambientes, o launcher sempre sobe o `arc-1` somente leitura, com ABAP Unit negado e sem prévia de dados nem SQL livre.
+- **Mesma evidência do fallback de desenvolvimento:** antes de trocar de servidor, o orquestrador mostra a operação, a ferramenta consultada ou o erro literal e o sinal da tabela da seção 4.4, e espera a sua confirmação. Indisponibilidade do `abap-adt` não é lacuna: aí vale a contingência normal.
+- **Mesmo sistema:** confira em `node scripts/mcp-runtime.mjs` se o SID e o mandante do `arc-1` são os do sistema consultado pelo `abap-adt`.
+- **Dados:** dumps e traces podem conter dados de negócio. Considere a LGPD antes de ler esses dados num sistema de cliente (política, seção 7).
+
+> Decisão registrada no [ADR-0012](adr/0012-fallback-de-analise-em-qas-prd-s4hana-2025.md). Usar o `arc-1` num sistema de cliente também exige aceite formal do cliente.
 
 ---
 
