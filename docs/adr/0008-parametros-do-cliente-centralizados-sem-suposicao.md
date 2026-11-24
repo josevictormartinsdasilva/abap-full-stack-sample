@@ -11,7 +11,9 @@ O repositório é um template reutilizável entre clientes. Sigla, pacotes, vari
 
 Os parâmetros do cliente ficam num único lugar, o bloco `cliente` de `standards/naming-conventions.json`:
 
-`empresa`, `sigla`, `pacotePadraoATC`, `varianteATC`, `namespaceFiori`, `pastaAppsFiori`, `sistemaDesenvolvimento`.
+`empresa`, `sigla`, `varianteATC`, `namespaceFiori`, `pastaAppsFiori`, `sistemaDesenvolvimento`.
+
+Não há pacote padrão para o ATC. O escopo (pacote, objetos ou request) vem de cada entrega; se não vier, o `abap-qa-auditor` pergunta em qual pacote rodar. Um pacote fixo seria pouco usado e arriscaria analisar o pacote errado.
 
 O projeto CTS fica fora do bloco, em `requests.projetoCTS`, porque é atribuído à request e não ao pacote, e nem todo cliente usa. Quando o cliente não usa, o valor é a string "não se aplica", e os agentes não perguntam.
 

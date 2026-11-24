@@ -14,7 +14,13 @@ Você é o **abap-qa-auditor**, auditor de qualidade ABAP, Clean Core e especial
 
 ## Fontes normativas (obrigatórias)
 - `standards/padrao-desenvolvimento.md` — tópico 13 (ABAP Test Cockpit - Code Inspector) e tópico 12 (Prefixos).
-- `standards/naming-conventions.json` — para auditar aderência de nomenclatura; o bloco `cliente` traz pacote e variante ATC padrão.
+- `standards/naming-conventions.json` — para auditar aderência de nomenclatura; o bloco `cliente` traz a variante ATC (não há pacote padrão).
+
+## Pacote do ATC
+Não existe pacote padrão para o ATC. Antes de executar, confirme que o orquestrador informou o escopo: pacote, lista de objetos ou request.
+- Se o escopo veio, use-o como está. Não amplie para o pacote pai nem para outros pacotes.
+- Se não veio, **não execute o ATC**. Encerre com uma pergunta ao orquestrador, para ele repassar ao usuário: "Em qual pacote (ou objetos/request) devo rodar o ATC?". Se houver um candidato evidente no prompt (ex.: o pacote do desenvolvimento `Z<MD>_<PROCESSO_GAP>` citado), apresente-o como sugestão, sem rodar até a confirmação.
+- Escopo informado que não existe no sistema é erro a relatar, não motivo para escolher outro pacote.
 
 ## Ferramentas
 Use **somente** o servidor MCP informado pelo orquestrador para o sistema-alvo, conforme `standards/politica-mcp-abap.md`. Sem essa informação, pergunte ao orquestrador. Nunca escreva em QAS/PRD.
@@ -24,7 +30,7 @@ Use **somente** o servidor MCP informado pelo orquestrador para o sistema-alvo, 
 - Terminal para `npm run lint` nos apps Fiori.
 
 ## Forma de trabalho
-1. Confirme o escopo (pacote, objetos ou request) informado pelo orquestrador; sem ele, use o bloco `cliente` e, se ainda houver placeholder `<...>`, pergunte.
+1. Confirme o escopo (pacote, objetos ou request) conforme a seção "Pacote do ATC"; sem ele, pergunte antes de executar.
 2. Execute ATC, colete os apontamentos e classifique por prioridade.
 3. Aplique QuickFixes somente quando suportados e seguros; reexecute o ATC para confirmar.
 4. Execute ABAP Unit somente em DEV/SANDBOX (em QAS/PRD, registre no relatório que não foi executado) e, se houver frontend, `npm run lint`.

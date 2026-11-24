@@ -105,9 +105,10 @@ async function linha(prompt, { oculto = false } = {}) {
 }
 
 // Pergunta com valor atual como padrão (Enter mantém) e validação opcional.
-async function perguntar(texto, { atual, validar, oculto = false, opcional = false } = {}) {
+// Sem valor atual, `exemplo` aparece como dica do formato esperado (não vira valor padrão).
+async function perguntar(texto, { atual, validar, exemplo, oculto = false, opcional = false } = {}) {
   const temAtual = atual !== undefined && atual !== null && atual !== "";
-  const dica = temAtual ? (oculto ? cinza(" [Enter mantém a atual]") : cinza(` [${atual}]`)) : "";
+  const dica = temAtual ? (oculto ? cinza(" [Enter mantém a atual]") : cinza(` [${atual}]`)) : exemplo ? cinza(` (ex.: ${exemplo})`) : "";
   for (;;) {
     const r = await linha(`  ${texto}${dica}: `, { oculto });
     const valor = r === "" && temAtual ? atual : r;
@@ -302,13 +303,14 @@ function conexaoParaEnv(prefix, conn, s, sid) {
 
 // ---------------------------------------------------------------- 3. parâmetros do cliente
 const CAMPOS_CLIENTE = [
-  { campo: "empresa", texto: "Nome da empresa (cliente)" },
-  { campo: "sigla", texto: "Sigla do cliente (prefixo dos objetos)", ajustar: (v) => v.toUpperCase(),
+  { campo: "empresa", texto: "Nome da empresa (cliente)", exemplo: "ACME Indústria" },
+  { campo: "sigla", texto: "Sigla do cliente (prefixo dos objetos)", exemplo: "ACM", ajustar: (v) => v.toUpperCase(),
     validar: (v) => (/^[A-Z0-9]{1,4}$/i.test(v) ? null : "use de 1 a 4 letras ou dígitos") },
-  { campo: "pacotePadraoATC", texto: "Pacote padrão (ATC)", ajustar: (v) => v.toUpperCase() },
-  { campo: "varianteATC", texto: "Variante ATC", ajustar: (v) => v.toUpperCase() },
-  { campo: "namespaceFiori", texto: "Namespace Fiori", validar: (v) => (/^[a-z][a-z0-9]*(\.[a-z][a-z0-9]*)+$/.test(v) ? null : "use minúsculas separadas por ponto, ex.: br.com.cliente") },
-  { campo: "pastaAppsFiori", texto: "Pasta dos apps Fiori (caminho local)" },
+  { campo: "varianteATC", texto: "Variante ATC", exemplo: "Z_ATC_CLIENTE", ajustar: (v) => v.toUpperCase() },
+  { campo: "namespaceFiori", texto: "Namespace Fiori", exemplo: "br.com.cliente", validar: (v) => (/^[a-z][a-z0-9]*(\.[a-z][a-z0-9]*)+$/.test(v) ? null : "use minúsculas separadas por ponto, ex.: br.com.cliente") },
+  { campo: "pastaAppsFiori", texto: "Pasta onde ficam (ou vão ficar) os apps Fiori, relativa à raiz do projeto ou absoluta",
+    exemplo: "apps  ou  C:\\projetos\\cliente\\fiori", ajustar: (v) => v.replace(/[\\/]+$/, ""),
+    validar: (v) => (/[<>"|?*]/.test(v) ? "caminho com caractere inválido" : null) },
 ];
 
 async function configurarCliente(resultados) {
@@ -327,13 +329,18 @@ async function configurarCliente(resultados) {
     let atual = ehPlaceholder(cliente[c.campo]) ? undefined : cliente[c.campo];
     if (c.campo === "namespaceFiori" && !atual && novos.empresa)
       atual = `br.com.${novos.empresa.toLowerCase().normalize("NFD").replace(/[^a-z0-9]/g, "")}`;
-    const v = await perguntar(c.texto, { atual, validar: c.validar, opcional: c.opcional });
+    const v = await perguntar(c.texto, { atual, validar: c.validar, exemplo: c.exemplo, opcional: c.opcional });
     if (v !== "") novos[c.campo] = c.ajustar ? c.ajustar(v) : v;
+    if (c.campo === "pastaAppsFiori" && novos.pastaAppsFiori && !fs.existsSync(path.resolve(ROOT, novos.pastaAppsFiori)))
+      aviso(`a pasta ${novos.pastaAppsFiori} ainda não existe; tudo bem se os apps forem gerados depois`);
   }
 
-  // O sistema de desenvolvimento é o SID detectado no DEV, não digitado.
+  // O sistema de desenvolvimento é o SID detectado no DEV, não digitado. Se a etapa dev não rodou
+  // agora (ex.: --apenas=cliente), vale o SID que ela gravou no .env na detecção anterior.
   const sidAtual = cliente.sistemaDesenvolvimento?.match(/^[A-Z][A-Z0-9]{2}$/)?.[0];
-  const sidDev = resultados.dev?.sid;
+  const sidGravado = lerDotEnv(lerEnvTexto())[`${prefixoDoServidor("vsp").prefix}_SAP_SID`]?.toUpperCase();
+  const sidDev = resultados.dev?.sid ?? (/^[A-Z][A-Z0-9]{2}$/.test(sidGravado ?? "") ? sidGravado : undefined);
+  if (!resultados.dev?.sid && sidDev) info(`SID do DEV: ${sidDev} (detectado na configuração do DEV, gravado no .env)`);
   if (sidDev && sidAtual && sidAtual !== sidDev) {
     aviso(`o sistemaDesenvolvimento atual é ${sidAtual}, mas o DEV conectado agora é ${sidDev}`);
     if (await confirmar(`Trocar para ${sidDev}?`, false)) novos.sistemaDesenvolvimento = sidDev;
@@ -341,7 +348,10 @@ async function configurarCliente(resultados) {
     novos.sistemaDesenvolvimento = sidDev;
     ok(`sistemaDesenvolvimento = ${sidDev} (detectado no DEV)`);
   } else if (!sidAtual) {
+    aviso("o SID do DEV ainda não foi detectado: o DEV não está configurado no .env ou a detecção falhou");
+    info("O ideal é rodar node scripts/setup.mjs --apenas=dev, que detecta o SID no próprio SAP.");
     novos.sistemaDesenvolvimento = await perguntar("SID do sistema de desenvolvimento (só nele os agentes criam objetos)", {
+      exemplo: "DS4",
       validar: (v) => (/^[A-Z][A-Z0-9]{2}$/.test(v.toUpperCase()) ? null : "SID tem 3 caracteres, ex.: DS4"),
     });
     novos.sistemaDesenvolvimento = novos.sistemaDesenvolvimento.toUpperCase();
