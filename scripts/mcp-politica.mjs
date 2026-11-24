@@ -187,18 +187,30 @@ export function decidir({ tool, prefix, sistema, conn, v, env, platform, arc1 })
 
   let command, args, modo, acoesNegadas;
 
+  // Fallback de desenvolvimento em 2025+ (política 4.4): o abap-adt é o servidor do sistema, e o
+  // vsp e o ARC-1 só escrevem nele com opt-in explícito <P>_FALLBACK_2025=true, e só em DEV/SANDBOX.
+  const oficial = sapBasis >= BASIS_MCP_OFICIAL;
+  const fallback = oficial && isDev && flag("FALLBACK_2025");
+  if (oficial && !isDev && flag("FALLBACK_2025"))
+    avisos.push(`${prefix}_FALLBACK_2025 ignorada: ${sid} é ${ambiente}`);
+  if (fallback)
+    avisos.push(`${tool} como fallback do abap-adt em ${sid} (${produto}): use só para operação de desenvolvimento que o abap-adt não oferece (política 4.4)`);
+
   if (tool === "arc-1") {
     // Exceção controlada da política 4.2: escrita em DEV só com opt-in explícito (2.1).
-    const podeEscrever = isDev && sapBasis < BASIS_MCP_OFICIAL;
+    // Em 2025+, só como fallback do abap-adt (4.4).
+    const podeEscrever = isDev && (!oficial || fallback);
     const pediuEscrita = flag("ALLOW_DEV_WRITES");
     const writes = podeEscrever && pediuEscrita && !sidPendente;
     if (podeEscrever && pediuEscrita && sidPendente)
       avisos.push(`ARC-1 em somente leitura até o SID ser confirmado (defina ${prefix}_SAP_SID)`);
     if (podeEscrever && !pediuEscrita)
-      avisos.push(`${sid} é ${ambiente}, mas o ARC-1 inicia somente leitura; para a exceção controlada (política 4.2), defina ${prefix}_ALLOW_DEV_WRITES=true e ${prefix}_ALLOWED_PACKAGES`);
+      avisos.push(`${sid} é ${ambiente}, mas o ARC-1 inicia somente leitura; para escrever (política ${oficial ? "4.4" : "4.2"}), defina ${prefix}_ALLOW_DEV_WRITES=true e ${prefix}_ALLOWED_PACKAGES`);
+    if (isDev && oficial && !fallback && pediuEscrita)
+      avisos.push(`${prefix}_ALLOW_DEV_WRITES ignorada: ${sid} é ${produto}, servido pelo abap-adt; a escrita do ARC-1 só vale como fallback (defina ${prefix}_FALLBACK_2025=true, política 4.4)`);
     if (!isDev && pediuEscrita)
       avisos.push(`${prefix}_ALLOW_DEV_WRITES ignorada: ${sid} é ${ambiente}`);
-    modo = writes ? "escrita restrita a pacotes" : "somente leitura";
+    modo = writes ? `escrita restrita a pacotes${fallback ? " (fallback do abap-adt)" : ""}` : "somente leitura";
     acoesNegadas = [...ARC1_NEGADAS_SEMPRE, ...(isDev ? [] : ARC1_NEGADAS_FORA_DEV)];
     Object.assign(childEnv, {
       SAP_TRANSPORT: "stdio",
@@ -223,10 +235,11 @@ export function decidir({ tool, prefix, sistema, conn, v, env, platform, arc1 })
     }
   } else if (tool === "vsp") {
     if (!isDev) recusar(`vsp recusado: ${sid}/${mandante} é ${ambiente} — ${motivo}. Política MCP: vsp só em DEV/SANDBOX.`);
-    if (sapBasis >= BASIS_MCP_OFICIAL) recusar(`vsp recusado: SAP_BASIS ${sapBasis} (${produto}); permitido só ${BASIS_MINIMO}–${BASIS_MCP_OFICIAL - 1}. Use o abap-adt.`);
+    if (oficial && !fallback)
+      recusar(`vsp recusado: SAP_BASIS ${sapBasis} (${produto}) é servido pelo abap-adt. Só como fallback de desenvolvimento, quando o abap-adt não oferecer a operação, defina ${prefix}_FALLBACK_2025=true (política 4.4).`);
     if (sidPendente)
       recusar(`vsp recusado: o SID ${sid} veio do T000-LOGSYS e não foi confirmado pelo sistema. Se estiver correto, defina ${prefix}_SAP_SID=${sid}.`);
-    modo = flag("READ_ONLY") ? "somente leitura" : "desenvolvimento";
+    modo = flag("READ_ONLY") ? "somente leitura" : `desenvolvimento${fallback ? " (fallback do abap-adt)" : ""}`;
     command = env.VSP_BIN || "vsp";
     args = ["--mode", "hyperfocused", "--expect", `${sid}.${mandante}/${conn.user}`,
       "--allowed-packages", req("ALLOWED_PACKAGES"), "--block-free-sql"];

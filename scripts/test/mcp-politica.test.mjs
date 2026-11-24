@@ -333,6 +333,53 @@ describe("decidir — vsp", () => {
   });
 });
 
+describe("decidir — fallback do abap-adt em 2025+ (política 4.4)", () => {
+  const s2025 = { sapBasis: 816, produto: "S/4HANA 2025" };
+  const vsp = { ALLOWED_PACKAGES: "ZMM*" };
+  const arc1 = { ALLOW_DEV_WRITES: "true", ALLOWED_PACKAGES: "ZMM*" };
+
+  test("vsp sem opt-in continua recusado e indica a variável", () => {
+    assert.throws(() => decidirCom({ tool: "vsp", sistema: s2025, vars: vsp }), recusa(/abap-adt.*VSP_FALLBACK_2025=true/));
+  });
+  test("vsp com opt-in em DEV/SANDBOX: desenvolvimento endurecido, marcado como fallback", () => {
+    for (const ambiente of ["DEV", "SANDBOX"]) {
+      const d = decidirCom({ tool: "vsp", sistema: { ...s2025, ambiente }, vars: { ...vsp, FALLBACK_2025: "true" } });
+      assert.equal(d.modo, "desenvolvimento (fallback do abap-adt)", ambiente);
+      assert.deepEqual(d.args, ["--mode", "hyperfocused", "--expect", "DS4.100/DEV", "--allowed-packages", "ZMM*", "--block-free-sql"], ambiente);
+      assert.ok(d.avisos.some((a) => /fallback do abap-adt/.test(a)), ambiente);
+    }
+  });
+  test("vsp com opt-in continua recusado em QAS/PRD", () => {
+    for (const ambiente of ["QAS", "PRD"])
+      assert.throws(() => decidirCom({ tool: "vsp", sistema: { ...s2025, ambiente }, vars: { ...vsp, FALLBACK_2025: "true" } }), recusa(/vsp só em DEV\/SANDBOX/), ambiente);
+  });
+  test("vsp com opt-in e SID pendente recusa", () => {
+    assert.throws(() => decidirCom({ tool: "vsp", sistema: { ...s2025, sidPendente: true }, vars: { ...vsp, FALLBACK_2025: "true" } }), recusa(/VSP_SAP_SID/));
+  });
+  test("ARC-1 em DEV 2025+: escrita só com os dois opt-ins", () => {
+    const so = decidirCom({ tool: "arc-1", sistema: s2025, vars: arc1 });
+    assert.equal(so.modo, "somente leitura");
+    assert.ok(so.avisos.some((a) => /ARC1_FALLBACK_2025=true/.test(a)));
+    const d = decidirCom({ tool: "arc-1", sistema: s2025, vars: { ...arc1, FALLBACK_2025: "true" } });
+    assert.equal(d.modo, "escrita restrita a pacotes (fallback do abap-adt)");
+    assert.equal(d.childEnv.SAP_ALLOW_WRITES, "true");
+    assert.equal(d.childEnv.SAP_ALLOWED_PACKAGES, "ZMM*");
+    const semEscrita = decidirCom({ tool: "arc-1", sistema: s2025, vars: { FALLBACK_2025: "true" } });
+    assert.equal(semEscrita.modo, "somente leitura");
+  });
+  test("ARC-1 com opt-in em QAS/PRD 2025+ continua somente leitura", () => {
+    for (const ambiente of ["QAS", "PRD"]) {
+      const d = decidirCom({ tool: "arc-1", sistema: { ...s2025, ambiente }, vars: { ...arc1, FALLBACK_2025: "true" } });
+      assert.equal(d.childEnv.SAP_ALLOW_WRITES, "false", ambiente);
+      assert.ok(d.avisos.some((a) => /ARC1_FALLBACK_2025 ignorada/.test(a)), ambiente);
+    }
+  });
+  test("opt-in não muda nada em ≤ 2023", () => {
+    assert.equal(decidirCom({ tool: "vsp", vars: { ...vsp, FALLBACK_2025: "true" } }).modo, "desenvolvimento");
+    assert.equal(decidirCom({ tool: "arc-1", vars: { ...arc1, FALLBACK_2025: "true" } }).modo, "escrita restrita a pacotes");
+  });
+});
+
 describe("comandoParaSpawn (2.4)", () => {
   test(".cmd/.bat só exigem shell no Windows", () => {
     assert.deepEqual(comandoParaSpawn("vsp.cmd", ["-v"], "linux"), { command: "vsp.cmd", args: ["-v"], shell: false });

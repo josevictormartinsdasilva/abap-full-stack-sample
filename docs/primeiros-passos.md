@@ -111,6 +111,8 @@ Com o servidor rodando e o token gerado:
 
 Se o `/mcp` mostrar `ECONNREFUSED` no `abap-adt`, o servidor não está rodando ou não está na porta 2236.
 
+Se o orquestrador informar que o `abap-adt` não oferece uma operação de desenvolvimento pedida, veja [Fallback do `abap-adt` em S/4HANA 2025+](setup-mcp-abap.md#fallback-do-abap-adt-em-s4hana-2025). Nesse caso, o `vsp` (e depois o `arc-1`) é ligado só para essa operação.
+
 ### 5B. S/4HANA 2023 ou inferior — `vsp` e `arc-1`
 
 Siga os passos 1 a 7 de [docs/setup-mcp-abap.md](setup-mcp-abap.md). Em resumo:

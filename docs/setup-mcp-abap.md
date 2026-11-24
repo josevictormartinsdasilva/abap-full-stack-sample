@@ -134,6 +134,7 @@ Se você alterar o `.env`, reinicie a ferramenta: os servidores só são iniciad
 | `ARC1_BIN` | Caminho de um ARC-1 já instalado, para redes que bloqueiam o npm. Instale com `npm install -g arc-1`. No Windows, o `npm` instala um `arc-1.cmd`, que pode ser usado aqui. Com ela, o launcher não instala nem confere o pacote. |
 | `ARC1_VERSION` | Fixa uma versão do ARC-1 (ex.: `1.10.1`) em vez da última estável. Use para voltar atrás quando uma versão nova quebrar algo. |
 | `ARC1_ALLOW_DEV_WRITES=true` + `ARC1_ALLOWED_PACKAGES=Z*` | Exceção controlada da política (4.2): habilita a escrita do `arc-1` quando ele aponta para um DEV/SANDBOX ≤ 2023, restrita aos pacotes informados. Sem a flag, o `arc-1` no DEV fica somente leitura e não pede pacotes. |
+| `VSP_FALLBACK_2025=true` / `ARC1_FALLBACK_2025=true` | Fallback do `abap-adt` num DEV/SANDBOX S/4HANA 2025+ (política 4.4), quando ele não oferecer uma operação de desenvolvimento. No `arc-1`, exige também `ARC1_ALLOW_DEV_WRITES=true` e `ARC1_ALLOWED_PACKAGES`. Ignorada fora de DEV/SANDBOX. Ligue só quando necessário e reinicie a sessão da ferramenta de IA. |
 | `ARC1_BLOCKED_DATA_SOURCES` | Tabelas a bloquear na leitura (experimental). Ex.: `USR02,PA0002`. |
 
 ---
@@ -181,6 +182,44 @@ Falta, antes de levar a `develop` para a `main`:
 
 ---
 
+## Fallback do `abap-adt` em S/4HANA 2025+
+
+Num sistema 2025+, o servidor é o `abap-adt`. Se ele **não oferecer** uma operação de desenvolvimento (por exemplo, um tipo de objeto que a SAP ainda não entregou no MCP oficial), a [política, seção 4.4](../standards/politica-mcp-abap.md) define a cadeia `abap-adt` → `vsp` → `arc-1` → execução manual. Ela vale só em DEV/SANDBOX. Em QAS/PRD não há fallback.
+
+O `vsp` e o `arc-1` ficam **desligados por padrão** num sistema 2025+ (opt-in): o `vsp` recusa iniciar e o `arc-1` sobe somente leitura. Só sobem como fallback quando você liga a variável.
+
+**Quando usar:** só quando o orquestrador informar que o `abap-adt` não oferece a operação. Erro de sintaxe, objeto bloqueado, falta de autorização ou request inválida não são motivo para ligar o fallback.
+
+**Passo a passo:**
+
+1. **Ligue o `vsp`.** No `.env`, aponte as variáveis `VSP_*` para o **mesmo DEV** do `abap-adt` e acrescente:
+
+   ```env
+   VSP_FALLBACK_2025=true
+   ```
+
+2. **Teste** e confira se o SID é o do DEV e se o modo é `desenvolvimento (fallback do abap-adt)`:
+
+   ```powershell
+   node scripts/mcp-launch.mjs vsp --diagnostico
+   ```
+
+3. **Reinicie a sessão** da ferramenta de IA e confira com `/mcp` que o `vsp` conectou. Peça de novo a operação. O orquestrador usa o `vsp` só para ela; o restante, inclusive o ATC, continua no `abap-adt`.
+4. **Se o `vsp` também não atender, ligue o `arc-1`** com as três variáveis abaixo (as `ARC1_*` apontando para o mesmo DEV) e repita os passos 2 e 3 com `arc-1`. O modo esperado é `escrita restrita a pacotes (fallback do abap-adt)`.
+
+   ```env
+   ARC1_FALLBACK_2025=true
+   ARC1_ALLOW_DEV_WRITES=true
+   ARC1_ALLOWED_PACKAGES=Z*
+   ```
+
+5. **Se nenhum atender,** o orquestrador informa o que faltou e, se você autorizar, entrega o código e o passo a passo para criar o objeto no ADT (Eclipse). Depois que você criar e ativar, ele confere o objeto pelo `abap-adt`, e o ATC roda normalmente.
+6. **Ao terminar, desligue** as variáveis (comente as linhas no `.env`) e reinicie a sessão.
+
+> Usar `vsp`/`arc-1` num sistema de cliente exige aceite formal do cliente (política, seção 7). Decisão registrada no [ADR-0011](adr/0011-fallback-de-desenvolvimento-em-s4hana-2025.md).
+
+---
+
 ## Vários sistemas do mesmo tipo
 
 Exemplo: dois QAS, XXX e YYY.
@@ -219,7 +258,7 @@ Todas as mensagens do launcher começam com `mcp-launch:`. Para vê-las, rode o 
 | `T000 ilegível ... tratado como PRD` | O usuário não tem autorização de data preview. Peça-a ao time de segurança SAP. |
 | `vsp recusado: ... é QAS` | A URL do `vsp` aponta para um QAS, ou o mandante do DEV não está como customizing (`C`) na SCC4. |
 | `o sistema conectado é QS4, mas VSP_SAP_SID diz DS4` | A URL está trocada. Corrija `VSP_SAP_URL`. |
-| `vsp recusado: SAP_BASIS 816` | É um S/4HANA 2025. Use o `abap-adt` (MCP oficial). |
+| `vsp recusado: SAP_BASIS 816 ... é servido pelo abap-adt` | É um S/4HANA 2025. Use o `abap-adt` (MCP oficial). Só para uma operação de desenvolvimento que ele não ofereça, defina `VSP_FALLBACK_2025=true` (política 4.4). |
 | `recusado: SAP_BASIS 702 ... fora do escopo` | Release anterior ao NW 7.50. A política não cobre esse sistema (regra absoluta 5). |
 | `vsp recusado: o SID DS4 veio do T000-LOGSYS` | O release não informa o SID pelo ADT. Se o SID estiver certo, defina `VSP_SAP_SID=DS4`. Sem isso, o `arc-1` também só inicia em leitura. |
 | `o T000-LOGSYS indica o SID QS4, mas VSP_SAP_SID diz DS4` | A URL está trocada, ou o LOGSYS ficou errado depois de uma cópia de mandante. Confira a URL; se for o LOGSYS, peça a correção ao Basis. |
