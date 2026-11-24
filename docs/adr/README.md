@@ -24,6 +24,7 @@ Formato: MADR simplificado, em português. Um arquivo por decisão: `NNNN-titulo
 | [0008](0008-parametros-do-cliente-centralizados-sem-suposicao.md) | Parâmetros do cliente centralizados, sem suposição | Aceito |
 | [0009](0009-selecao-de-mcp-abap-por-versao-e-ambiente.md) | Seleção de MCP ABAP por versão e ambiente | Aceito |
 | [0010](0010-material-de-referencia-de-terceiros-nas-skills.md) | Material de referência de terceiros nas skills | Proposto |
+| [0011](0011-fallback-de-desenvolvimento-em-s4hana-2025.md) | Fallback de desenvolvimento em S/4HANA 2025+ | Proposto |
 
 ## Modelo
 

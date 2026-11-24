@@ -17,12 +17,14 @@ Esta política define **qual servidor MCP** acessa cada sistema SAP, conforme a 
 | S/4HANA 2023 ou inferior (SAP_BASIS 750–815) | QAS / PRD | Somente análise | `arc-1` | Somente leitura (forçado pelo launcher) |
 | S/4HANA 2023 ou inferior (SAP_BASIS 750–815) | DEV / SANDBOX | Desenvolvimento e análise | `vsp` (vibing-steampunk) | Endurecido (forçado pelo launcher) |
 
+Em S/4HANA 2025+ DEV/SANDBOX, uma operação de desenvolvimento que o `abap-adt` não ofereça segue a cadeia de fallback da seção 4.4.
+
 **Regras absolutas:**
 
 1. **`vsp` nunca acessa QAS ou PRD.** O launcher recusa iniciar.
 2. **Nenhuma escrita em QAS ou PRD**, por nenhum servidor: criar, alterar, ativar, excluir, liberar transporte ou aplicar quickfix.
 3. **O ambiente e o release vêm do próprio sistema**, não de declaração do operador (seção 2). O que não puder ser detectado é tratado como o caso mais restritivo.
-4. **Cada sistema é acessado só pelo servidor que a matriz indica para ele.** Não use outro servidor só porque ele "também funcionaria".
+4. **Cada sistema é acessado só pelo servidor que a matriz indica para ele.** Não use outro servidor só porque ele "também funcionaria". A única exceção é o fallback de desenvolvimento em S/4HANA 2025+ (seção 4.4).
 5. **SAP_BASIS < 750** está fora do escopo. Informe o usuário e não prossiga.
 
 ---
@@ -118,7 +120,7 @@ O operador só informa **como conectar**: URL, mandante, usuário e senha (`ARC1
 
 **Travas técnicas** aplicadas por `scripts/mcp-launch.mjs`, que o agente não consegue desligar:
 
-- Somente leitura em todo sistema que não seja detectado como DEV/SANDBOX, em qualquer sistema com SAP_BASIS ≥ 816 e quando o SID não for confirmado (seção 2).
+- Somente leitura em todo sistema que não seja detectado como DEV/SANDBOX, em qualquer sistema com SAP_BASIS ≥ 816 (salvo o fallback da seção 4.4) e quando o SID não for confirmado (seção 2).
 - Prévia de dados, SQL livre, escrita em transporte e Git, e execução de plugins sempre desligados.
 - `SAPWrite.delete` sempre negado.
 - Fora de DEV/SANDBOX (QAS e PRD), ABAP Unit negado (`SAPDiagnose.unittest` e `SAPDiagnose.unittest_ci`). As ações de teste não são bloqueadas pelo modo somente leitura do ARC-1, por isso a negação é explícita.
@@ -133,7 +135,7 @@ Outras regras desta seção já são garantidas pelo modo somente leitura e pela
 - `SAPDiagnose`: syntax check, ATC sem aplicar quickfix, dumps e traces. ABAP Unit não (só em DEV/SANDBOX).
 - `SAPTransport` em leitura: list, get, diff e history.
 
-**Exceção controlada:** se um cliente não autorizar o `vsp` no DEV, o `arc-1` pode ser apontado para o DEV com escrita. A escrita exige opt-in explícito: `ARC1_ALLOW_DEV_WRITES=true` e `ARC1_ALLOWED_PACKAGES`. Sem a flag, o `arc-1` no DEV inicia somente leitura (uso só para análise) e não pede pacotes. A flag é ignorada fora de DEV/SANDBOX, em SAP_BASIS ≥ 816 e com SID não confirmado.
+**Exceção controlada:** se um cliente não autorizar o `vsp` no DEV, o `arc-1` pode ser apontado para o DEV com escrita. A escrita exige opt-in explícito: `ARC1_ALLOW_DEV_WRITES=true` e `ARC1_ALLOWED_PACKAGES`. Sem a flag, o `arc-1` no DEV inicia somente leitura (uso só para análise) e não pede pacotes. A flag é ignorada fora de DEV/SANDBOX, com SID não confirmado e em SAP_BASIS ≥ 816 sem `ARC1_FALLBACK_2025=true` (seção 4.4).
 
 ### 4.3 `vsp` — vibing-steampunk (S/4HANA ≤ 2023, DEV/SANDBOX)
 
@@ -141,7 +143,7 @@ Outras regras desta seção já são garantidas pelo modo somente leitura e pela
 
 **Travas técnicas** aplicadas pelo launcher:
 
-- Só inicia para sistemas **detectados** como DEV/SANDBOX, com SAP_BASIS 750–815 e SID confirmado (seção 2).
+- Só inicia para sistemas **detectados** como DEV/SANDBOX, com SAP_BASIS 750–815 e SID confirmado (seção 2). Em SAP_BASIS ≥ 816, só como fallback do `abap-adt`, com `VSP_FALLBACK_2025=true` (seção 4.4).
 - Sempre com `--expect SID.MANDANTE/USUARIO`, `--allowed-packages` e `--block-free-sql`.
 - `--insecure` nunca é usado.
 - Edição de objetos transportáveis só com `VSP_ALLOWED_TRANSPORTS` definido.
@@ -166,6 +168,35 @@ Outras regras desta seção já são garantidas pelo modo somente leitura e pela
 **Proibido:**
 
 - Liberar transportes, salvo pedido explícito do usuário.
+
+### 4.4 Fallback de desenvolvimento em S/4HANA 2025+
+
+O `abap-adt` é o servidor de um sistema 2025+. Se ele **não oferecer** uma operação de desenvolvimento pedida (criar, alterar ou ativar um tipo de objeto que a SAP ainda não entregou no MCP oficial), o orquestrador segue esta cadeia, **sempre no mesmo sistema DEV/SANDBOX**, e para no primeiro servidor que atender:
+
+1. **`abap-adt`**: tentar primeiro, sempre.
+2. **`vsp`**: com as mesmas travas da seção 4.3.
+3. **`arc-1`**: com escrita restrita a pacotes.
+4. **Execução manual**: se nenhum servidor atender, informar ao usuário qual operação faltou em cada servidor e, **só com autorização dele**, entregar o código-fonte e o passo a passo para o desenvolvedor executar no ADT (Eclipse).
+
+**Quando o fallback vale:**
+
+- Só quando a operação **não existe** no servidor: ferramenta ausente, ou tipo de objeto ou ação não suportado. Um erro do próprio objeto ou do sistema **não** autoriza trocar de servidor: erro de sintaxe, objeto bloqueado, falta de autorização, request inválida ou pacote fora da lista permitida. Nesses casos, corrija ou informe o usuário.
+- Só para **desenvolvimento** em DEV/SANDBOX. Em QAS/PRD 2025+ não há fallback: a análise é feita pelo `abap-adt` e, se ele estiver fora do ar, pelo `arc-1` somente leitura (seção 6).
+- Só para a **operação** que faltou. As demais etapas da mesma entrega continuam no `abap-adt`, inclusive o ATC e o ABAP Unit do `abap-qa-auditor`.
+- A trava do sistema de desenvolvimento ([ADR-0004](../docs/adr/0004-trava-do-sistema-de-desenvolvimento.md)) vale em cada servidor: o SID do `vsp` ou do `arc-1` (em `node scripts/mcp-runtime.mjs`) precisa ser o `sistemaDesenvolvimento`, o mesmo do `abap-adt`.
+- As confirmações exigidas a cada uso no `vsp` (seção 4.3) continuam valendo.
+
+**Travas técnicas** aplicadas pelo launcher em SAP_BASIS ≥ 816:
+
+- Sem opt-in, nada muda: o `vsp` recusa iniciar e o `arc-1` inicia somente leitura.
+- `vsp`: inicia só com `VSP_FALLBACK_2025=true`, em DEV/SANDBOX detectado e com SID confirmado, com os mesmos argumentos endurecidos da seção 4.3.
+- `arc-1`: escreve só com `ARC1_FALLBACK_2025=true`, `ARC1_ALLOW_DEV_WRITES=true` e `ARC1_ALLOWED_PACKAGES`, em DEV/SANDBOX com SID confirmado. As travas fixas da seção 4.2 continuam.
+- Fora de DEV/SANDBOX, a flag é ignorada, com aviso.
+- O modo gravado no runtime indica `(fallback do abap-adt)`.
+
+Os opt-ins ficam desligados por padrão. O desenvolvedor os liga quando o fallback for necessário e reinicia a sessão da ferramenta de IA para o servidor subir.
+
+**Relatório:** o orquestrador informa ao usuário a operação que o `abap-adt` não ofereceu, o servidor que a executou (ou que ela foi entregue para execução manual) e os objetos afetados. Na execução manual, depois que o desenvolvedor criar o objeto, o orquestrador confere pelo `abap-adt` que ele existe e está ativo, e o `abap-qa-auditor` roda o ATC normalmente.
 
 ---
 
@@ -196,7 +227,8 @@ Prefixos por ferramenta de IA: no Claude Code, por exemplo, os servidores aparec
 |---|---|
 | SAP_BASIS < 750 | Não prosseguir. Informar o usuário. |
 | BTP ABAP Environment / S/4HANA Cloud Public | `abap-adt`. |
-| `abap-adt` indisponível num sistema 2025+ | `arc-1`, apenas para análise (o launcher força somente leitura em SAP_BASIS ≥ 816). Desenvolvimento aguarda o `abap-adt`. |
+| `abap-adt` indisponível (fora do ar) num sistema 2025+ | `arc-1`, apenas para análise (sem o opt-in da seção 4.4, o launcher força somente leitura em SAP_BASIS ≥ 816). Desenvolvimento aguarda o `abap-adt`. |
+| `abap-adt` no ar, mas sem a operação de desenvolvimento pedida (2025+) | Cadeia de fallback da seção 4.4: `vsp` → `arc-1` → execução manual autorizada pelo usuário. |
 | Tarefa envolvendo vários sistemas | Aplicar a matriz **por sistema**. A autorização de um sistema não vale para outro. |
 | Servidor do sistema indisponível (erro ao iniciar) | Repassar ao usuário a mensagem do `mcp-launch`. Não trocar de servidor por conta própria. |
 

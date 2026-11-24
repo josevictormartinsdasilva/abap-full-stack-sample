@@ -20,6 +20,8 @@
 //   vsp:   <P>_ALLOWED_PACKAGES (obrigatória), <P>_ALLOWED_TRANSPORTS, <P>_ENABLE_TRANSPORTS,
 //          <P>_READ_ONLY, VSP_BIN (sem ele, o launcher baixa a última release estável do vsp e
 //          confere o SHA-256; ver scripts/vsp-binario.mjs), VSP_VERSION (fixa uma versão)
+//   ambos: <P>_FALLBACK_2025=true libera o servidor como fallback de desenvolvimento do abap-adt
+//          em DEV/SANDBOX S/4HANA 2025+ (política 4.4); no ARC-1, junto com <P>_ALLOW_DEV_WRITES
 //
 // O launcher NÃO confia no que foi declarado: lê do próprio SAP (scripts/sap-probe.mjs) o SID,
 // o mandante, o release (SAP_BASIS) e o papel do mandante (T000/SCC4). O registro opcional
@@ -28,10 +30,10 @@
 // Travas aplicadas (não dependem do agente; as decisões ficam em scripts/mcp-politica.mjs):
 //   - SAP_BASIS < 750: recusa, para os dois servidores.
 //   - URL só https:// (http:// apenas para localhost); NODE_TLS_REJECT_UNAUTHORIZED=0 recusa.
-//   - vsp: só em DEV/SANDBOX detectado e SAP_BASIS 750–815; sempre com --expect (SID detectado),
-//     --allowed-packages e --block-free-sql; nunca --insecure.
-//   - ARC-1: somente leitura, exceto em DEV/SANDBOX ≤ 2023 com SID confirmado e opt-in
-//     <P>_ALLOW_DEV_WRITES=true; prévia de dados, SQL livre, escrita em transporte/Git e plugins
+//   - vsp: só em DEV/SANDBOX detectado e SAP_BASIS 750–815 (≥ 816 só com <P>_FALLBACK_2025=true);
+//     sempre com --expect (SID detectado), --allowed-packages e --block-free-sql; nunca --insecure.
+//   - ARC-1: somente leitura, exceto em DEV/SANDBOX com SID confirmado e opt-in
+//     <P>_ALLOW_DEV_WRITES=true (em ≥ 816, também <P>_FALLBACK_2025=true); prévia de dados, SQL livre, escrita em transporte/Git e plugins
 //     sempre desligados; SAPWrite.delete sempre negado e ABAP Unit negado fora de DEV/SANDBOX.
 //   - O que não puder ser detectado é tratado como o caso mais restritivo.
 //   - Nenhuma variável SAP_*, NODE_OPTIONS ou NODE_TLS_REJECT_UNAUTHORIZED do ambiente do

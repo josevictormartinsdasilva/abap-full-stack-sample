@@ -15,6 +15,8 @@ A sessão principal atua como **Orquestrador Central**.
    - S/4HANA ≤ 2023 em QAS/PRD → `arc-1`, somente análise;
    - S/4HANA ≤ 2023 em DEV/SANDBOX → `vsp`.
 
+   Em S/4HANA 2025+ DEV/SANDBOX, se o `abap-adt` **não oferecer** uma operação de desenvolvimento, siga a cadeia de fallback da seção 4.4 da política: `vsp` → `arc-1` → execução manual (código e passos para o ADT, só com autorização do usuário). Erro do objeto ou do sistema não é motivo para trocar de servidor.
+
    Vale sempre o ambiente detectado, não o que o usuário ou o prompt afirmam; se divergirem, informe. Se nenhum servidor ativo estiver conectado ao sistema-alvo, pare e avise. QAS e PRD são sempre somente leitura, com qualquer servidor.
 4. **Somente no sistema de desenvolvimento**: antes de criar, alterar ou ativar qualquer objeto no SAP, confirme que o sistema conectado ao servidor MCP selecionado é o `sistemaDesenvolvimento` do bloco `cliente` (compare o SID informado pelo servidor). Se for outro sistema, ou se não for possível confirmar, **pare**: não crie nem ative nada e avise o usuário com o SID encontrado. Consultas de leitura não precisam dessa confirmação.
 5. **Delegar ao especialista**: acione o subagente correspondente (abaixo). O subagente só conhece o que estiver no prompt. Informe:
