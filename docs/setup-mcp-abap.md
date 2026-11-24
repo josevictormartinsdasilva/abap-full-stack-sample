@@ -4,11 +4,13 @@ Guia para preparar a máquina de cada desenvolvedor para os servidores `vsp` e `
 
 | Servidor | Sistema | Modo |
 |---|---|---|
-| `vsp` | DEV / Sandbox ≤ 2023 | Desenvolvimento |
-| `arc-1` | QAS / PRD ≤ 2023 | Somente leitura |
+| `vsp` | DEV / Sandbox ≤ 2023 (em 2025+, só como [fallback](#fallback-do-abap-adt-em-s4hana-2025)) | Desenvolvimento |
+| `arc-1-qas` | QAS ≤ 2023 (em 2025+, só contingência de análise) | Somente leitura |
+| `arc-1-prd` | PRD ≤ 2023 (em 2025+, só contingência de análise) | Somente leitura |
+| `arc-1-dev` (opcional) | DEV, o mesmo do `vsp`: exceção da política 4.2 em ≤ 2023 ou 2º fallback em 2025+ | Somente leitura, salvo opt-in |
 | `abap-adt` | S/4HANA 2025+ | Ver [Configuração do Token MCP](../README.md#-configuração-do-token-mcp-abap-adt) |
 
-Você **não edita** nenhum arquivo de MCP (`.mcp.json`, `.codex/config.toml` etc.). Eles já vêm gerados com `arc-1` e `vsp` apontando para `scripts/mcp-launch.mjs`. Preparar a máquina é só instalar os executáveis, preencher o `.env` e conferir a detecção.
+Você **não edita** nenhum arquivo de MCP (`.mcp.json`, `.codex/config.toml` etc.). Eles já vêm gerados com uma entrada por sistema do cliente: `vsp` (DEV), `arc-1-qas` (QAS), `arc-1-prd` (PRD) e `arc-1-dev` (DEV pelo ARC-1, opcional), todas apontando para `scripts/mcp-launch.mjs`. O projeto é usado com um clone por cliente, e o nome de cada entrada define o prefixo das variáveis no `.env` (`vsp` → `VSP_*`, `arc-1-qas` → `ARC1_QAS_*`, `arc-1-prd` → `ARC1_PRD_*`, `arc-1-dev` → `ARC1_DEV_*`). Preparar a máquina é só instalar os executáveis, preencher o `.env` e conferir a detecção.
 
 ---
 
@@ -78,22 +80,28 @@ VSP_SAP_PASSWORD=...
 VSP_ALLOWED_PACKAGES=$TMP,Z*
 ```
 
-**6. Preencher a conexão do QAS/PRD (`arc-1`):**
+**6. Preencher as conexões do QAS (`arc-1-qas`) e do PRD (`arc-1-prd`):**
 
 ```ini
-ARC1_SAP_URL=https://qs4.cliente.com.br:44300
-ARC1_SAP_CLIENT=400
-ARC1_SAP_USER=USUARIO_LEITURA
-ARC1_SAP_PASSWORD=...
+ARC1_QAS_SAP_URL=https://qs4.cliente.com.br:44300
+ARC1_QAS_SAP_CLIENT=400
+ARC1_QAS_SAP_USER=USUARIO_LEITURA
+ARC1_QAS_SAP_PASSWORD=...
+
+ARC1_PRD_SAP_URL=https://ps4.cliente.com.br:44300
+ARC1_PRD_SAP_CLIENT=500
+ARC1_PRD_SAP_USER=USUARIO_LEITURA
+ARC1_PRD_SAP_PASSWORD=...
 ```
 
-Informe só a conexão. SID, release e ambiente são **detectados no próprio SAP**. Se o cliente não tiver um dos sistemas, deixe as variáveis dele vazias.
+Informe só a conexão. SID, release e ambiente são **detectados no próprio SAP**: o nome da entrada é só um rótulo, e se a URL de `arc-1-prd` apontar para um QAS, vale o QAS. A conexão `ARC1_DEV_*` (`arc-1-dev`) é opcional e só precisa ser preenchida para a exceção da política 4.2 ou para o 2º fallback em 2025+ (ver [Fallback](#fallback-do-abap-adt-em-s4hana-2025)). Se o cliente não tiver um dos sistemas, ou você não for usar o `arc-1` nele, deixe as variáveis dele com o placeholder: o servidor aparece como falho no `/mcp`, o que é esperado.
 
 **7. Testar a detecção:**
 
 ```powershell
 node scripts/mcp-launch.mjs vsp --diagnostico
-node scripts/mcp-launch.mjs arc-1 --diagnostico
+node scripts/mcp-launch.mjs arc-1-qas --diagnostico
+node scripts/mcp-launch.mjs arc-1-prd --diagnostico
 ```
 
 Resultado esperado:
@@ -103,7 +111,8 @@ mcp-launch: baixando vsp v2.62.1 (vsp-windows-amd64.exe)
 mcp-launch: vsp v2.62.1 salvo em C:\Users\...\AppData\Local\abap-full-stack\vsp\2.62.1\vsp.exe
 mcp-launch: vsp encontrado: vsp version v2.62.1 (...)
 mcp-launch: vsp -> DS4/110 · S/4HANA 2023 · DEV (mandante de customizing ...) · desenvolvimento
-mcp-launch: arc-1 -> QS4/400 · S/4HANA 2023 · QAS (mandante de teste ...) · somente leitura
+mcp-launch: arc-1-qas -> QS4/400 · S/4HANA 2023 · QAS (mandante de teste ...) · somente leitura
+mcp-launch: arc-1-prd -> PS4/500 · S/4HANA 2023 · PRD (mandante de produção ...) · somente leitura
 ```
 
 Antes de conectar ao SAP, o diagnóstico confere os executáveis: o binário do `vsp` (baixado e conferido pelo SHA-256, ou o `VSP_BIN`) e as flags de segurança dele, e o ARC-1 (instalado pelo npm, ou o `ARC1_BIN`) com as variáveis de segurança e o Node exigido. Se faltar algo, ele para com a indicação do passo deste guia que resolve.
@@ -115,13 +124,15 @@ Confira se SID, produto e ambiente estão corretos. Se aparecer uma recusa, veja
 **8. Abrir a ferramenta e conferir as conexões.**
 
 1. Abra a ferramenta de IA **na raiz do projeto**. O launcher é chamado por caminho relativo (`scripts/mcp-launch.mjs`) e não é encontrado se o servidor for iniciado em outra pasta (ver [Diretório de trabalho por ferramenta](#diretório-de-trabalho-por-ferramenta)).
-2. Rode `/mcp` (Claude Code). Devem aparecer conectados o `fiori-mcp` e os servidores que você configurou (`vsp` e/ou `arc-1`; `abap-adt` só se houver S/4HANA 2025+). Um servidor não configurado aparece como falho, o que é esperado.
+2. Rode `/mcp` (Claude Code). Devem aparecer conectados o `fiori-mcp` e os servidores que você configurou (`vsp`, `arc-1-qas` e/ou `arc-1-prd`; `abap-adt` só se houver S/4HANA 2025+). Um servidor não configurado aparece como falho, o que é esperado.
 
 Se você alterar o `.env`, reinicie a ferramenta: os servidores só são iniciados na abertura da sessão.
 
 ---
 
 ## Variáveis opcionais
+
+As variáveis de conexão e de comportamento usam o prefixo da entrada: `VSP`, `ARC1_QAS`, `ARC1_PRD`, `ARC1_DEV`. Na tabela, `ARC1_*` vale para qualquer entrada `arc-1-*` (ex.: `ARC1_QAS_SAP_SID`). `VSP_BIN`, `VSP_VERSION`, `ARC1_BIN` e `ARC1_VERSION` são as únicas sem prefixo por entrada: valem para todas.
 
 | Variável | Para quê |
 |---|---|
@@ -133,8 +144,8 @@ Se você alterar o `.env`, reinicie a ferramenta: os servidores só são iniciad
 | `VSP_VERSION` | Fixa uma versão do `vsp` (ex.: `2.62.1`) em vez da última estável. Use para voltar atrás quando uma release nova quebrar algo. Um `.cmd`/`.bat` também é aceito, desde que o caminho e os valores das variáveis `VSP_*` não tenham `%`, `!`, `^` ou aspas. |
 | `ARC1_BIN` | Caminho de um ARC-1 já instalado, para redes que bloqueiam o npm. Instale com `npm install -g arc-1`. No Windows, o `npm` instala um `arc-1.cmd`, que pode ser usado aqui. Com ela, o launcher não instala nem confere o pacote. |
 | `ARC1_VERSION` | Fixa uma versão do ARC-1 (ex.: `1.10.1`) em vez da última estável. Use para voltar atrás quando uma versão nova quebrar algo. |
-| `ARC1_ALLOW_DEV_WRITES=true` + `ARC1_ALLOWED_PACKAGES=Z*` | Exceção controlada da política (4.2): habilita a escrita do `arc-1` quando ele aponta para um DEV/SANDBOX ≤ 2023, restrita aos pacotes informados. Sem a flag, o `arc-1` no DEV fica somente leitura e não pede pacotes. |
-| `VSP_FALLBACK_2025=true` / `ARC1_FALLBACK_2025=true` | Fallback do `abap-adt` num DEV/SANDBOX S/4HANA 2025+ (política 4.4), quando ele não oferecer uma operação de desenvolvimento. No `arc-1`, exige também `ARC1_ALLOW_DEV_WRITES=true` e `ARC1_ALLOWED_PACKAGES`. Ignorada fora de DEV/SANDBOX. Ligue só quando necessário e reinicie a sessão da ferramenta de IA. |
+| `ARC1_DEV_ALLOW_DEV_WRITES=true` + `ARC1_DEV_ALLOWED_PACKAGES=Z*` | Exceção controlada da política (4.2): habilita a escrita do `arc-1` num DEV/SANDBOX ≤ 2023, restrita aos pacotes informados. Vale na entrada `arc-1-dev`, que já vem no template. Sem a flag, o `arc-1` no DEV fica somente leitura e não pede pacotes. |
+| `VSP_FALLBACK_2025=true` / `ARC1_DEV_FALLBACK_2025=true` | Fallback do `abap-adt` num DEV/SANDBOX S/4HANA 2025+ (política 4.4), quando ele não oferecer uma operação de desenvolvimento. No `arc-1`, vale na entrada `arc-1-dev` e exige também `ARC1_DEV_ALLOW_DEV_WRITES=true` e `ARC1_DEV_ALLOWED_PACKAGES`. Ignorada fora de DEV/SANDBOX. Ligue só quando necessário e reinicie a sessão da ferramenta de IA. |
 | `ARC1_BLOCKED_DATA_SOURCES` | Tabelas a bloquear na leitura (experimental). Ex.: `USR02,PA0002`. |
 
 ---
@@ -163,8 +174,8 @@ O launcher é coberto por testes automatizados (`node --test scripts/test/*.test
 
 Falta, antes de levar a `develop` para a `main`:
 
-1. **ARC-1 no DEV ≤ 2023:** `node scripts/mcp-launch.mjs arc-1 --diagnostico` com o ARC-1 apontando para o DEV. Conferir SID, `sidOrigem`, produto, ambiente `DEV`, modo, e `acoesNegadas` só com `SAPWrite.delete`.
-2. **QAS ≤ 2023:** `node scripts/mcp-launch.mjs arc-1 --diagnostico`. Conferir ambiente `QAS`, modo somente leitura e `acoesNegadas` com `SAPDiagnose.unittest` e `SAPDiagnose.unittest_ci`.
+1. **ARC-1 no DEV ≤ 2023:** `node scripts/mcp-launch.mjs arc-1-dev --diagnostico`, com `ARC1_DEV_*` apontando para o DEV. Conferir SID, `sidOrigem`, produto, ambiente `DEV`, modo, e `acoesNegadas` só com `SAPWrite.delete`.
+2. **QAS ≤ 2023:** `node scripts/mcp-launch.mjs arc-1-qas --diagnostico`. Conferir ambiente `QAS`, modo somente leitura e `acoesNegadas` com `SAPDiagnose.unittest` e `SAPDiagnose.unittest_ci`.
 3. **Subpasta:** em cada ferramenta, abrir a sessão numa subpasta e registrar o resultado na tabela da seção anterior.
 
 **Versões novas do ARC-1 e do vsp** entram sozinhas (última estável). Se uma delas renomear uma ação negada (`ARC1_NEGADAS_*` em `scripts/mcp-politica.mjs`, conferidas em `dist/authz/policy.js`), o próprio ARC-1 recusa iniciar com o nome desconhecido. Se renomear uma variável ou flag de segurança, o launcher recusa. Nos dois casos, fixe a versão anterior (`ARC1_VERSION`/`VSP_VERSION`) e ajuste o launcher por PR.
@@ -178,7 +189,7 @@ Falta, antes de levar a `develop` para a `main`:
 | Ambos | Acesso ao ADT: serviço ICF `/sap/bc/adt` ativo e autorizações de desenvolvedor ADT. |
 | Ambos | Data preview na `T000`, usado na detecção do ambiente. Sem ela, o sistema é tratado como **PRD**, e o `vsp` não sobe. |
 | `vsp` (DEV) | Autorizações de desenvolvimento, restritas aos pacotes do projeto. |
-| `arc-1` (QAS/PRD) | Somente leitura. O launcher já força leitura, mas a autorização SAP é a segunda barreira. |
+| `arc-1-qas` / `arc-1-prd` | Somente leitura. O launcher já força leitura, mas a autorização SAP é a segunda barreira. |
 
 ---
 
@@ -188,7 +199,7 @@ Num sistema 2025+, o servidor é o `abap-adt`. Se ele **não oferecer** uma oper
 
 O `vsp` e o `arc-1` ficam **desligados por padrão** num sistema 2025+ (opt-in): o `vsp` recusa iniciar e o `arc-1` sobe somente leitura. Só sobem como fallback quando você liga a variável.
 
-**Quando usar:** só quando o orquestrador informar que o `abap-adt` não oferece a operação. Erro de sintaxe, objeto bloqueado, falta de autorização ou request inválida não são motivo para ligar o fallback.
+**Quando usar:** só quando o orquestrador mostrar que o `abap-adt` não oferece a operação. Antes de propor o fallback, ele apresenta a evidência (a ferramenta consultada ou a mensagem de erro literal) e o sinal correspondente na tabela da política, seção 4.4. Confira a evidência antes de confirmar. Erro de sintaxe, objeto bloqueado, falta de autorização, request inválida ou timeout não são motivo para ligar o fallback.
 
 **Passo a passo:**
 
@@ -205,16 +216,30 @@ O `vsp` e o `arc-1` ficam **desligados por padrão** num sistema 2025+ (opt-in):
    ```
 
 3. **Reinicie a sessão** da ferramenta de IA e confira com `/mcp` que o `vsp` conectou. Peça de novo a operação. O orquestrador usa o `vsp` só para ela; o restante, inclusive o ATC, continua no `abap-adt`.
-4. **Se o `vsp` também não atender, ligue o `arc-1`** com as três variáveis abaixo (as `ARC1_*` apontando para o mesmo DEV) e repita os passos 2 e 3 com `arc-1`. O modo esperado é `escrita restrita a pacotes (fallback do abap-adt)`.
+4. **Se o `vsp` também não atender, use o `arc-1` no DEV.** Use a entrada `arc-1-dev`, que já vem no template (as `arc-1-qas` e `arc-1-prd` apontam para outros sistemas). Preencha `ARC1_DEV_SAP_*` com o **mesmo DEV** e descomente as variáveis abaixo. Repita os passos 2 e 3 com `arc-1-dev`. O modo esperado é `escrita restrita a pacotes (fallback do abap-adt)`.
 
    ```env
-   ARC1_FALLBACK_2025=true
-   ARC1_ALLOW_DEV_WRITES=true
-   ARC1_ALLOWED_PACKAGES=Z*
+   ARC1_DEV_FALLBACK_2025=true
+   ARC1_DEV_ALLOW_DEV_WRITES=true
+   ARC1_DEV_ALLOWED_PACKAGES=Z*
    ```
 
 5. **Se nenhum atender,** o orquestrador informa o que faltou e, se você autorizar, entrega o código e o passo a passo para criar o objeto no ADT (Eclipse). Depois que você criar e ativar, ele confere o objeto pelo `abap-adt`, e o ATC roda normalmente.
 6. **Ao terminar, desligue** as variáveis (comente as linhas no `.env`) e reinicie a sessão.
+
+**Qual conexão usar no dia a dia:** o projeto é usado com um clone por cliente/desenvolvimento. O cliente tem um DEV e pode ter QAS e PRD. Num cliente 2025+:
+
+| Sistema | Servidor no dia a dia | Contingência / fallback | Entrada |
+|---|---|---|---|
+| DEV | `abap-adt` | `vsp` como fallback de desenvolvimento (flag) | `vsp` (padrão) |
+| QAS | `abap-adt` (leitura) | `arc-1` só leitura, se o `abap-adt` cair (opcional) | `arc-1-qas` |
+| PRD | `abap-adt` (leitura) | `arc-1` só leitura, se o `abap-adt` cair (opcional) | `arc-1-prd` |
+| DEV (raro) | — | `arc-1` como 2º fallback, se o `vsp` não atender | `arc-1-dev` |
+
+- **Use a entrada `vsp`** que já vem no template. Deixe `VSP_*` apontando de vez para o DEV do cliente, com `VSP_FALLBACK_2025=true` comentado. Para usar, descomente essa linha e reinicie a sessão.
+- **`arc-1-qas` e `arc-1-prd`** também já vêm no template. Preencha-as só se quiser a contingência de análise. A `arc-1-dev` também já vem no template: preencha `ARC1_DEV_*` só se o `vsp` não atender. Nomeie pelo sistema, não como "fallback": o papel de fallback vem da detecção do release e da flag.
+- **Use o seu próprio usuário SAP de desenvolvimento**, não um usuário técnico compartilhado. Assim, as alterações ficam registradas no seu nome, como no Eclipse. Restrinja as autorizações aos pacotes do projeto.
+- **Defina `<P>_SAP_SID`** com o SID do DEV 2025, para o launcher recusar se a URL estiver trocada. Esse SID precisa ser o mesmo de `cliente.sistemaDesenvolvimento` em `standards/naming-conventions.json`.
 
 > Usar `vsp`/`arc-1` num sistema de cliente exige aceite formal do cliente (política, seção 7). Decisão registrada no [ADR-0011](adr/0011-fallback-de-desenvolvimento-em-s4hana-2025.md).
 
@@ -222,17 +247,18 @@ O `vsp` e o `arc-1` ficam **desligados por padrão** num sistema 2025+ (opt-in):
 
 ## Vários sistemas do mesmo tipo
 
-Exemplo: dois QAS, XXX e YYY.
+O template já traz uma entrada por sistema do cliente: `vsp` (DEV), `arc-1-qas`, `arc-1-prd` e `arc-1-dev`. Para uma conexão a mais, por exemplo um sandbox além do DEV (`vsp-sandbox`):
 
-1. Em `.agents/mcp.servers.json`, troque a entrada `arc-1` por duas:
+1. Em `.agents/mcp.servers.json`, acrescente a entrada:
 
    ```json
-   "arc-1-qas-xxx": { "transport": "stdio", "command": "node", "args": ["scripts/mcp-launch.mjs", "arc-1-qas-xxx"], "timeoutSec": 300 },
-   "arc-1-qas-yyy": { "transport": "stdio", "command": "node", "args": ["scripts/mcp-launch.mjs", "arc-1-qas-yyy"], "timeoutSec": 300 }
+   "vsp-sandbox": { "transport": "stdio", "command": "node", "args": ["scripts/mcp-launch.mjs", "vsp-sandbox"], "timeoutSec": 120 }
    ```
 
 2. Rode `node scripts/sync-agents.mjs` e faça commit.
-3. No `.env`, use os prefixos derivados do nome do servidor: `ARC1_QAS_XXX_SAP_URL`, `ARC1_QAS_YYY_SAP_URL` etc.
+3. No `.env`, use o prefixo derivado do nome da entrada: `VSP_SANDBOX_SAP_URL`, `VSP_SANDBOX_SAP_CLIENT` etc.
+
+O nome define o prefixo: o que vem depois de `arc-1` ou `vsp` vira sufixo em maiúsculas (`arc-1-dev` → `ARC1_DEV_*`, `vsp-sandbox` → `VSP_SANDBOX_*`).
 
 ---
 
@@ -279,10 +305,10 @@ Todas as mensagens do launcher começam com `mcp-launch:`. Para vê-las, rode o 
 | `aviso: não foi possível consultar a última versão do ARC-1 ...; usando a vX do cache` | Sem acesso ao npm no momento. O launcher seguiu com a versão já instalada. |
 | `não foi possível instalar o ARC-1 vX` | O `npm install` falhou. A mensagem traz o fim do erro do npm (rede, proxy, registry ou compilação do `better-sqlite3`). Para contornar, use `ARC1_BIN`. |
 | `o ARC-1 vX não reconhece SAP_...` | A versão nova renomeou ou removeu uma variável que o launcher usa para aplicar a política. Fixe a versão anterior com `ARC1_VERSION` e avise quem mantém o projeto, para ajustar `scripts/mcp-politica.mjs`. |
-| `arc-1` dá timeout na 1ª vez | A primeira instalação (ou a de uma versão nova) passou do tempo limite da ferramenta de IA. Rode `node scripts/mcp-launch.mjs arc-1 --diagnostico` uma vez no terminal e reabra a ferramenta. |
+| `arc-1-*` dá timeout na 1ª vez | A primeira instalação (ou a de uma versão nova) passou do tempo limite da ferramenta de IA. Rode `node scripts/mcp-launch.mjs arc-1-qas --diagnostico` uma vez no terminal e reabra a ferramenta. |
 | Servidor falho no `/mcp`, mas o diagnóstico passa | A ferramenta foi aberta fora da raiz do projeto, ou não foi reiniciada após mudar o `.env`. |
 | `"...\arc-1.cmd" não pôde ser executado (EINVAL)` | O caminho não aponta para um arquivo executável (pasta ou atalho). Confira `ARC1_BIN`/`VSP_BIN`. |
 | `... é um script .cmd/.bat e precisa do cmd.exe, mas ... contém caractere` | O caminho ou um valor de `VSP_*` tem `%`, `!`, `^` ou aspas, que o `cmd.exe` interpretaria. Use o `.exe` ou remova o caractere. |
-| `aviso: ... o ARC-1 inicia somente leitura; ... defina ARC1_ALLOW_DEV_WRITES=true` | O `arc-1` aponta para um DEV. Só defina a flag se o cliente não autorizou o `vsp` (política 4.2). |
+| `aviso: ... o ARC-1 inicia somente leitura; ... defina ARC1_..._ALLOW_DEV_WRITES=true` | A entrada `arc-1-*` aponta para um DEV. Se for a `arc-1-qas` ou a `arc-1-prd`, a URL está trocada. Só defina a flag se o cliente não autorizou o `vsp` (política 4.2). |
 
 > Antes de usar `arc-1` ou `vsp` em ambiente de cliente, obtenha o aceite formal do cliente. A política de APIs da SAP classifica as APIs ADT como internas (ver seção 7 da [política](../standards/politica-mcp-abap.md)).

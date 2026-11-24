@@ -4,13 +4,33 @@
       "url": "http://localhost:2236/mcp",
       "bearerTokenEnvVar": "ABAP_ADT_TOKEN"
     },
-    "arc-1": {
+    "arc-1-qas": {
       "command": "cmd",
       "args": [
         "/c",
         "node",
         "scripts/mcp-launch.mjs",
-        "arc-1"
+        "arc-1-qas"
+      ],
+      "startupTimeoutMs": 300000
+    },
+    "arc-1-prd": {
+      "command": "cmd",
+      "args": [
+        "/c",
+        "node",
+        "scripts/mcp-launch.mjs",
+        "arc-1-prd"
+      ],
+      "startupTimeoutMs": 300000
+    },
+    "arc-1-dev": {
+      "command": "cmd",
+      "args": [
+        "/c",
+        "node",
+        "scripts/mcp-launch.mjs",
+        "arc-1-dev"
       ],
       "startupTimeoutMs": 300000
     },

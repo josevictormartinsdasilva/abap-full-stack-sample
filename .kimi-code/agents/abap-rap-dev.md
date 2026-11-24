@@ -23,7 +23,7 @@ Antes de começar, carregue a skill `abap-rap-dev` (`/skill:abap-rap-dev`, em `.
 Use **somente** o servidor MCP informado pelo orquestrador para o sistema-alvo, conforme `standards/politica-mcp-abap.md`. Sem essa informação, pergunte ao orquestrador. Nunca escreva em QAS/PRD.
 - S/4HANA 2025+: MCP `abap-adt` (`abap_object_*`, `abap_repository_*`).
 - S/4HANA ≤ 2023 em DEV/SANDBOX: MCP `vsp` (`SAP`). Use as equivalências da seção 5 da política. `execute_abap`, RFC e escrita de variáveis no debugger exigem confirmação do usuário a cada uso.
-- S/4HANA 2025+ em DEV/SANDBOX, operação de desenvolvimento que o `abap-adt` não oferece: não improvise nem troque de servidor por conta própria. Informe ao orquestrador a operação que faltou; ele aplica a cadeia de fallback da seção 4.4 da política (`vsp` → `arc-1` → execução manual) e informa o servidor a usar. Erro do objeto ou do sistema não conta como operação ausente.
+- S/4HANA 2025+ em DEV/SANDBOX, operação de desenvolvimento que o `abap-adt` não oferece: não improvise nem troque de servidor por conta própria. Devolva ao orquestrador a operação que faltou e a evidência: a ferramenta consultada e o trecho do esquema que não cobre a operação, ou a mensagem de erro literal. Ele confere o sinal na tabela da seção 4.4 da política, pede a confirmação do usuário e informa o servidor a usar (`vsp` → `arc-1` → execução manual). Erro do objeto ou do sistema (autorização, bloqueio, sintaxe, request, pacote, timeout) não conta como operação ausente.
 
 ## Forma de trabalho
 1. Confirme módulo (`<MD>`), pacote e request antes de criar objetos; se faltar informação, pergunte ao orquestrador em vez de supor.

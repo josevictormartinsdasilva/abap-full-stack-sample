@@ -7,14 +7,36 @@
         "Authorization": "Bearer ${ABAP_ADT_TOKEN}"
       }
     },
-    "arc-1": {
+    "arc-1-qas": {
       "type": "stdio",
       "command": "cmd",
       "args": [
         "/c",
         "node",
         "scripts/mcp-launch.mjs",
-        "arc-1"
+        "arc-1-qas"
+      ],
+      "env": {}
+    },
+    "arc-1-prd": {
+      "type": "stdio",
+      "command": "cmd",
+      "args": [
+        "/c",
+        "node",
+        "scripts/mcp-launch.mjs",
+        "arc-1-prd"
+      ],
+      "env": {}
+    },
+    "arc-1-dev": {
+      "type": "stdio",
+      "command": "cmd",
+      "args": [
+        "/c",
+        "node",
+        "scripts/mcp-launch.mjs",
+        "arc-1-dev"
       ],
       "env": {}
     },

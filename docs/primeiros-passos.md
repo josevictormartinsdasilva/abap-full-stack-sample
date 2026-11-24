@@ -119,7 +119,7 @@ Siga os passos 1 a 7 de [docs/setup-mcp-abap.md](setup-mcp-abap.md). Em resumo:
 
 1. Nada a instalar para o `vsp`: o launcher baixa a última versão estável na primeira execução (e quando sai uma nova) e confere o SHA-256. Se a rede bloquear o GitHub, veja o passo 2 do guia.
 2. Se o SAP usar CA interna, aponte `NODE_EXTRA_CA_CERTS` para o `.pem`.
-3. Preencha no `.env` as variáveis `VSP_*` (DEV) e, se for usar, `ARC1_*` (QAS/PRD).
+3. Preencha no `.env` as variáveis `VSP_*` (DEV) e, se for usar, `ARC1_QAS_*` (QAS) e `ARC1_PRD_*` (PRD).
 4. Teste:
 
    ```powershell
@@ -142,7 +142,7 @@ Siga os passos 1 a 7 de [docs/setup-mcp-abap.md](setup-mcp-abap.md). Em resumo:
 2. No Claude Code, digite `/mcp`. Devem aparecer conectados:
    - `fiori-mcp`, sempre;
    - `abap-adt` (caminho 5A) **ou** `vsp` (caminho 5B);
-   - `arc-1`, se você configurou QAS/PRD.
+   - `arc-1-qas` e `arc-1-prd`, se você configurou QAS e PRD.
 
    Um servidor que você não configurou aparece como falho. Isso é esperado (ex.: `abap-adt` falho num cliente só com S/4HANA 2023).
 
