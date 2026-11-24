@@ -56,6 +56,15 @@ Os textos foram traduzidos, resumidos e corrigidos. Os exemplos de código foram
 
 `classes-liberadas.md` resume o cheat sheet `22_Released_ABAP_Classes.md`, que o repositório `likweitan/abap-skills` reproduz. O resumo lista classes e reescreve exemplos de uso com base nesse material. Os demais arquivos citam os cheat sheets como fonte, sem reproduzi-los.
 
+## SAP-samples/abap-platform-rap130
+
+- Repositório: <https://github.com/SAP-samples/abap-platform-rap130>
+- Versão usada: commit `61b6d24`, pasta `exercises/ex01/images/`
+- Licença: Apache License 2.0 (cópia em [imagens/adt-mcp/LICENSE-abap-platform-rap130.txt](imagens/adt-mcp/LICENSE-abap-platform-rap130.txt))
+- Copyright: SAP SE ou empresa afiliada da SAP e colaboradores do projeto
+
+As capturas de tela do ADT for Visual Studio Code em `imagens/adt-mcp/vscode-*.png`, usadas na etapa 4 de [docs/primeiros-passos.md](docs/primeiros-passos.md), foram copiadas sem alteração do exercício 1 desse repositório. Só os nomes dos arquivos mudaram (prefixo `vscode-` no lugar de `ex01_`).
+
 ## Material da SAP citado
 
 Os arquivos de clean core resumem conceitos do guia da SAP *Extend SAP S/4HANA in the cloud and on premise with ABAP based extensions* (v2.3, agosto de 2025) e das SAP Notes 3565942 e 3578329. Esse material é citado como referência; nenhum trecho foi reproduzido.

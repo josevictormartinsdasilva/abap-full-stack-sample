@@ -152,6 +152,9 @@ const adt = servidores["abap-adt"];
 if (adt) {
   const variavel = adt.tokenEnvVar || "ABAP_ADT_TOKEN";
   const token = valorDeVariavel(variavel, process.env[variavel]).valor;
+  // As ferramentas de IA não leem o .env: um token lá não funciona e é um segredo a mais em disco.
+  if (valorDeVariavel(variavel, dotenv[variavel]).valor)
+    item("aviso", `${variavel} está no .env, que as ferramentas de IA não leem`, "rode node scripts/setup.mjs --apenas=token para movê-lo às variáveis do usuário e apagá-lo do .env");
   let tokenNoUsuario = false;
   if (!token && process.platform === "win32") {
     const r = spawnSync("reg", ["query", "HKCU\\Environment", "/v", variavel], { encoding: "utf8", windowsHide: true });
@@ -177,7 +180,7 @@ if (adt) {
     if (respondeu) {
       item("ok", `servidor respondendo em ${adt.url}`);
       if (token) rotaDev = true;
-    } else item(nivel, `servidor não responde em ${adt.url} (${falhaConexao})`, "inicie o servidor abap-adt (seção 5A de docs/primeiros-passos.md)");
+    } else item(nivel, `servidor não responde em ${adt.url} (${falhaConexao})`, "inicie o servidor abap-adt (etapa 4 de docs/primeiros-passos.md)");
   }
 }
 
