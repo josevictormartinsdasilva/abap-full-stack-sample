@@ -12,11 +12,51 @@
 //      fallback do SID. É uma linha de configuração do mandante, sem dado de negócio.
 //
 // Princípio: falha fechada. O que não puder ser lido é tratado como o caso mais restritivo.
-// Sem dependências: só Node.js >= 18. TLS nunca é desligado (use NODE_EXTRA_CA_CERTS se
-// o certificado do SAP for de CA interna) e a URL precisa ser https:// (exceto localhost),
-// porque a autenticação Basic levaria usuário e senha em texto claro.
+// Sem dependências: só Node.js >= 18. TLS nunca é desligado e a URL precisa ser https://
+// (exceto localhost), porque a autenticação Basic levaria usuário e senha em texto claro.
+// Certificado autoassinado ou de CA interna: conn.ca traz o .pem fixado para a conexão
+// (<P>_SAP_CA_CERT, scripts/sap-tls.mjs), que passa a ser a única âncora confiável.
+
+import http from "node:http";
+import https from "node:https";
 
 const TIMEOUT_MS = 20000;
+
+// fetch não aceita uma CA própria sem dependências; com conn.ca, a requisição vai por node:https.
+// Devolve o mesmo formato usado por Sessao.req: { status, setCookies, header(nome), text }.
+function requisicaoComCa(url, { method, headers, body, ca }) {
+  const u = new URL(url);
+  const mod = u.protocol === "https:" ? https : http;
+  return new Promise((resolve, reject) => {
+    // agent: false fecha a conexão ao fim de cada requisição (keep-alive prenderia o processo).
+    const tlsOpts = u.protocol === "https:" ? { ca } : {};
+    const r = mod.request(u, { method, headers, ...tlsOpts, agent: false, timeout: TIMEOUT_MS }, (res) => {
+      const partes = [];
+      res.on("data", (d) => partes.push(d));
+      res.on("end", () => resolve({
+        status: res.statusCode,
+        setCookies: [].concat(res.headers["set-cookie"] ?? []),
+        header: (n) => [].concat(res.headers[n.toLowerCase()] ?? [])[0] ?? null,
+        text: Buffer.concat(partes).toString("utf8"),
+      }));
+      res.on("error", reject);
+    });
+    r.on("timeout", () => r.destroy(Object.assign(new Error("TimeoutError: sem resposta do SAP"), { code: "ETIMEDOUT" })));
+    r.on("error", reject);
+    if (body !== undefined) r.write(body);
+    r.end();
+  });
+}
+
+async function requisicaoFetch(url, { method, headers, body }) {
+  const res = await fetch(url, { method, headers, body, redirect: "manual", signal: AbortSignal.timeout(TIMEOUT_MS) });
+  return {
+    status: res.status,
+    setCookies: typeof res.headers.getSetCookie === "function" ? res.headers.getSetCookie() : [],
+    header: (n) => res.headers.get(n),
+    text: await res.text(),
+  };
+}
 
 // Ordem de restrição: quanto maior, mais restritivo.
 export const RESTRICAO = Object.freeze({ DEV: 0, SANDBOX: 1, QAS: 2, PRD: 3 });
@@ -53,8 +93,9 @@ const PRODUTO_POR_BASIS = {
 };
 
 class Sessao {
-  constructor({ url, client, user, password }) {
+  constructor({ url, client, user, password, ca }) {
     validarUrlSap(url);
+    this.ca = ca;
     this.base = url.replace(/\/+$/, "");
     this.client = client;
     this.auth = "Basic " + Buffer.from(`${user}:${password}`).toString("base64");
@@ -65,8 +106,7 @@ class Sessao {
     return `${this.base}${p}${p.includes("?") ? "&" : "?"}sap-client=${encodeURIComponent(this.client)}`;
   }
   guardarCookies(res) {
-    const lista = typeof res.headers.getSetCookie === "function" ? res.headers.getSetCookie() : [];
-    for (const c of lista) {
+    for (const c of res.setCookies) {
       const [par] = c.split(";");
       const i = par.indexOf("=");
       if (i > 0) this.cookies.set(par.slice(0, i).trim(), par.slice(i + 1).trim());
@@ -81,11 +121,12 @@ class Sessao {
     const h = this.headers({ ...(accept ? { Accept: accept } : {}), ...(contentType ? { "Content-Type": contentType } : {}) });
     if (method === "GET" && !this.csrf) h["x-csrf-token"] = "fetch";
     if (method !== "GET" && this.csrf) h["x-csrf-token"] = this.csrf;
-    const res = await fetch(this.url(p), { method, headers: h, body, redirect: "manual", signal: AbortSignal.timeout(TIMEOUT_MS) });
+    const enviar = this.ca ? requisicaoComCa : requisicaoFetch;
+    const res = await enviar(this.url(p), { method, headers: h, body, ca: this.ca });
     this.guardarCookies(res);
-    const token = res.headers.get("x-csrf-token");
+    const token = res.header("x-csrf-token");
     if (token && token.toLowerCase() !== "required") this.csrf = token;
-    return { status: res.status, text: await res.text() };
+    return { status: res.status, text: res.text };
   }
 }
 

@@ -45,7 +45,16 @@ Rode o diagnóstico (passo 7) antes de abrir a ferramenta de IA. Assim o primeir
 
 **Rede que bloqueia o GitHub:** baixe manualmente o asset da sua plataforma (ex.: `vsp-windows-amd64.exe`) da [última release](https://github.com/oisee/vibing-steampunk/releases/latest) e defina `VSP_BIN` no `.env` com o caminho completo (passo 4). Com `VSP_BIN` definido, o launcher não baixa nada, mas continua conferindo as flags. O `vsp` que estiver no PATH não é usado.
 
-**3. Certificado HTTPS — só se o SAP usar certificado de CA interna.** O launcher nunca desliga a verificação TLS. Peça ao time de Basis ou de infraestrutura a CA raiz em formato `.pem` e aponte o Node para ela:
+**3. Certificado HTTPS — só se o SAP usar certificado autoassinado ou de CA interna.** O caso mais comum é o certificado autoassinado que o STRUST gera, com erro `DEPTH_ZERO_SELF_SIGNED_CERT`. O `node scripts/setup.mjs` resolve isso sozinho ([ADR-0013](adr/0013-certificado-fixado-e-tls-do-vsp.md)):
+
+1. Ele baixa o certificado do servidor (só o handshake TLS, sem usuário nem senha) e mostra assunto, SAN, validade e o **SHA-256**.
+2. **Confira o SHA-256 com o Basis** (STRUST, PSE "SSL Server Standard") antes de confirmar. É isso que garante que ninguém trocou o certificado no caminho.
+3. Confirmado, ele grava o arquivo em `.agents/certs/<servidor>.pem` (não versionado) e `<P>_SAP_CA_CERT` no `.env`. O launcher passa a confiar só nesse certificado para essa conexão, no probe e no `arc-1`. Não é preciso variável global nem reabrir o terminal.
+4. Se o servidor não enviar a CA raiz da cadeia, o setup pede o `.pem` dela, que você obtém com o Basis.
+
+**`vsp` com certificado fixado:** o `vsp` é um binário Go. Ele não lê o certificado fixado nem o `NODE_EXTRA_CA_CERTS`, e recusa certificado sem SAN mesmo que confiável. O setup oferece `VSP_SAP_INSECURE=true`: o launcher confere o certificado fixado ao iniciar e só então passa `--insecure` ao `vsp`. Durante a sessão, o `vsp` não verifica o TLS. Use isso até o Basis emitir um certificado com SAN (`DNS:<host>`). Depois, importe a CA em "Autoridades de Certificação Raiz Confiáveis" do usuário no Windows e remova a variável.
+
+**CA corporativa para todos os sistemas:** o `NODE_EXTRA_CA_CERTS` global continua valendo, para o probe e o `arc-1`:
 
 ```powershell
 [Environment]::SetEnvironmentVariable('NODE_EXTRA_CA_CERTS', 'C:\certs\ca-cliente.pem', 'User')
@@ -295,7 +304,7 @@ Todas as mensagens do launcher começam com `mcp-launch:`. Para vê-las, rode o 
 | `vsp recusado: o SID DS4 veio do T000-LOGSYS` | O release não informa o SID pelo ADT. Se o SID estiver certo, defina `VSP_SAP_SID=DS4`. Sem isso, o `arc-1` também só inicia em leitura. |
 | `o T000-LOGSYS indica o SID QS4, mas VSP_SAP_SID diz DS4` | A URL está trocada, ou o LOGSYS ficou errado depois de uma cópia de mandante. Confira a URL; se for o LOGSYS, peça a correção ao Basis. |
 | `a URL do SAP precisa ser https://` | Use a porta HTTPS do ICM (ex.: `https://host:44300`). `http://` só é aceito para `localhost`. |
-| `NODE_TLS_REJECT_UNAUTHORIZED=0 desliga a verificação TLS` | Remova a variável do ambiente. Para certificado de CA interna, use `NODE_EXTRA_CA_CERTS` (passo 3). |
+| `NODE_TLS_REJECT_UNAUTHORIZED=0 desliga a verificação TLS` | Remova a variável do ambiente. Para certificado autoassinado ou de CA interna, fixe o certificado pelo setup (passo 3). |
 | `standards/sistemas-sap.json ...` | O registro de restrições tem JSON inválido ou uma entrada sem `sid`/`ambiente` válidos. A mensagem aponta a entrada (`restricoes[n]`). |
 | `não foi possível baixar .../vsp-...` | A rede bloqueou o GitHub ou exige proxy (o download do launcher não usa proxy). Baixe o arquivo manualmente e defina `VSP_BIN` (passo 2). |
 | `não foi possível consultar a última versão do vsp ... e não há versão no cache` | Primeiro uso sem acesso ao GitHub. Baixe o arquivo manualmente e defina `VSP_BIN` (passo 2). |

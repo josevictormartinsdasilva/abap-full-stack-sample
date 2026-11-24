@@ -150,7 +150,7 @@ Outras regras desta seção já são garantidas pelo modo somente leitura e pela
 
 - Só inicia para sistemas **detectados** como DEV/SANDBOX, com SAP_BASIS 750–815 e SID confirmado (seção 2). Em SAP_BASIS ≥ 816, só como fallback do `abap-adt`, com `VSP_FALLBACK_2025=true` (seção 4.4).
 - Sempre com `--expect SID.MANDANTE/USUARIO`, `--allowed-packages` e `--block-free-sql`.
-- `--insecure` nunca é usado.
+- `--insecure` só com o opt-in `VSP_SAP_INSECURE=true`, desligado por padrão ([ADR-0013](../docs/adr/0013-certificado-fixado-e-tls-do-vsp.md)). O `vsp` (Go) não aceita CA própria nem certificado sem SAN. O launcher só passa a flag depois de o probe verificar o certificado do servidor (fixado ou da cadeia do sistema) na mesma inicialização, e avisa a cada início. Use só enquanto o Basis não emite um certificado com SAN. No `arc-1`, a variável é ignorada.
 - Edição de objetos transportáveis só com `VSP_ALLOWED_TRANSPORTS` definido.
 
 **Permitido em DEV/SANDBOX:**

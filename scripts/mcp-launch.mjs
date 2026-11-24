@@ -14,6 +14,9 @@
 //   <P>_SAP_URL, <P>_SAP_CLIENT, <P>_SAP_USER, <P>_SAP_PASSWORD   obrigatórias
 //   <P>_SAP_SID   opcional: se informado, precisa bater com o SID detectado; obrigatório quando
 //                 o SID só puder ser inferido do T000-LOGSYS (senão vsp recusa e ARC-1 só lê)
+//   <P>_SAP_CA_CERT  opcional: .pem fixado para a conexão (certificado autoassinado ou de CA
+//                 interna), gravado pelo setup em .agents/certs/<servidor>.pem
+//   <P>_SAP_INSECURE=true  só vsp: passa --insecure (Go não aceita CA própria nem cert sem SAN)
 //   ARC-1: <P>_ALLOW_DEV_WRITES=true + <P>_ALLOWED_PACKAGES (escrita, só em DEV/SANDBOX ≤ 2023),
 //          <P>_BLOCKED_DATA_SOURCES, ARC1_BIN (sem ele, o launcher instala a última versão estável
 //          do npm; ver scripts/arc1-pacote.mjs), ARC1_VERSION (fixa uma versão)
@@ -30,8 +33,11 @@
 // Travas aplicadas (não dependem do agente; as decisões ficam em scripts/mcp-politica.mjs):
 //   - SAP_BASIS < 750: recusa, para os dois servidores.
 //   - URL só https:// (http:// apenas para localhost); NODE_TLS_REJECT_UNAUTHORIZED=0 recusa.
+//     O probe sempre verifica o certificado; com <P>_SAP_CA_CERT, só confia no .pem fixado
+//     (que também vai para o ARC-1 por NODE_EXTRA_CA_CERTS). ADR-0013.
 //   - vsp: só em DEV/SANDBOX detectado e SAP_BASIS 750–815 (≥ 816 só com <P>_FALLBACK_2025=true);
-//     sempre com --expect (SID detectado), --allowed-packages e --block-free-sql; nunca --insecure.
+//     sempre com --expect (SID detectado), --allowed-packages e --block-free-sql; --insecure só
+//     com o opt-in <P>_SAP_INSECURE=true, depois de o probe conferir o certificado.
 //   - ARC-1: somente leitura, exceto em DEV/SANDBOX com SID confirmado e opt-in
 //     <P>_ALLOW_DEV_WRITES=true (em ≥ 816, também <P>_FALLBACK_2025=true); prévia de dados, SQL livre, escrita em transporte/Git e plugins
 //     sempre desligados; SAPWrite.delete sempre negado e ABAP Unit negado fora de DEV/SANDBOX.
@@ -58,6 +64,7 @@ import { FalhaVsp, flagsAusentes, garantirVsp } from "./vsp-binario.mjs";
 import { FalhaArc1, garantirArc1 } from "./arc1-pacote.mjs";
 import { RUNTIME_DIR, gravarEstado, listarAtivos, removerEstado } from "./mcp-runtime.mjs";
 import { lerDotEnv, prefixoDoServidor } from "./config-local.mjs";
+import { ehErroCertificado, lerCertificado } from "./sap-tls.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const REGISTRO = "standards/sistemas-sap.json";
@@ -119,6 +126,17 @@ try {
 } catch (e) {
   fail(`${prefix}_SAP_URL: ${e.message}`);
 }
+// Certificado fixado para a conexão (ADR-0013): âncora única do probe e do ARC-1.
+let caCert;
+if (v("SAP_CA_CERT")) {
+  try {
+    const { arquivo, pem } = lerCertificado(ROOT, v("SAP_CA_CERT"));
+    caCert = arquivo;
+    conn.ca = pem;
+  } catch (e) {
+    fail(`${prefix}_SAP_CA_CERT: ${e.message}. Rode node scripts/setup.mjs para baixar e conferir o certificado de novo.`);
+  }
+}
 
 // ---------------------------------------------------------------- executáveis (antes de tocar no SAP)
 const GUIA = "docs/setup-mcp-abap.md";
@@ -171,7 +189,13 @@ let det;
 try {
   det = await detectar(conn);
 } catch (e) {
-  fail(`não foi possível identificar o sistema em ${conn.url}: ${e.message}`);
+  const codigo = e?.cause?.code || e?.code;
+  const dica = ehErroCertificado(e)
+    ? caCert
+      ? `. O certificado do servidor não confere com ${prefix}_SAP_CA_CERT: ele foi trocado (renovação no STRUST) ou a conexão está sendo interceptada. Confira com o Basis e rode node scripts/setup.mjs para fixar o novo`
+      : `. Certificado não confiável (autoassinado ou de CA interna): rode node scripts/setup.mjs para baixar, conferir e fixar o certificado desta conexão`
+    : "";
+  fail(`não foi possível identificar o sistema em ${conn.url}: ${e.message}${codigo ? ` (${codigo})` : ""}${dica}`);
 }
 det.avisos.forEach((a) => log(`aviso: ${a}`));
 
@@ -193,18 +217,18 @@ if (fs.existsSync(arquivoRegistro)) {
 
 // ---------------------------------------------------------------- decisão por ferramenta
 const sistema = { sid, sidPendente: sidInfo.sidPendente, mandante, ambiente, motivo, sapBasis: det.sapBasis, produto: det.produto };
-const { command, args, shell, modo, acoesNegadas, childEnv, avisos } = politica(() =>
-  decidir({ tool, prefix, sistema, conn, v, env: process.env, platform: process.platform, arc1 }));
+const { command, args, shell, modo, tls, acoesNegadas, childEnv, avisos } = politica(() =>
+  decidir({ tool, prefix, sistema, conn, v, env: process.env, platform: process.platform, arc1, caCert }));
 avisos.forEach((a) => log(`aviso: ${a}`));
 
 const estado = {
   servidor: server, ferramenta: tool, sid, mandante, usuario: conn.user,
-  sapBasis: det.sapBasis, produto: det.produto, ambiente, motivo, modo,
+  sapBasis: det.sapBasis, produto: det.produto, ambiente, motivo, modo, tls,
   ...(acoesNegadas ? { acoesNegadas } : {}),
   sidConfirmado: sidInfo.sidConfirmado, sidOrigem: sidInfo.sidOrigem,
   detectadoEm: new Date().toISOString(), pid: process.pid,
 };
-log(`${server} -> ${sid}/${mandante} · ${det.produto} · ${ambiente} (${motivo}) · ${modo}`);
+log(`${server} -> ${sid}/${mandante} · ${det.produto} · ${ambiente} (${motivo}) · ${modo} · TLS: ${tls}`);
 
 if (DIAGNOSTICO) {
   console.error(JSON.stringify({ ...estado, t000: det.t000, args: tool === "vsp" ? args : undefined }, null, 2));

@@ -171,8 +171,8 @@ const CONN = { url: "https://sap.exemplo.com", client: "100", user: "DEV", passw
 const variaveis = (mapa) => (nome) => mapa[nome];
 const base = { sid: "DS4", sidPendente: false, mandante: "100", ambiente: "DEV", motivo: "teste", sapBasis: 758, produto: "S/4HANA 2023" };
 const ARC1 = { command: "/usr/bin/node", args: ["/cache/arc-1/1.10.1/node_modules/arc-1/bin/arc1.js"] };
-const decidirCom = ({ tool, sistema = {}, vars = {}, env = { PATH: "/bin" }, platform = "linux", arc1 = ARC1 }) =>
-  decidir({ tool, prefix: tool === "vsp" ? "VSP" : "ARC1", sistema: { ...base, ...sistema }, conn: CONN, v: variaveis(vars), env, platform, arc1 });
+const decidirCom = ({ tool, sistema = {}, vars = {}, env = { PATH: "/bin" }, platform = "linux", arc1 = ARC1, caCert, conn = CONN }) =>
+  decidir({ tool, prefix: tool === "vsp" ? "VSP" : "ARC1", sistema: { ...base, ...sistema }, conn, v: variaveis(vars), env, platform, arc1, caCert });
 
 describe("decidir — SAP_BASIS mínimo (1.5)", () => {
   for (const tool of ["arc-1", "vsp"])
