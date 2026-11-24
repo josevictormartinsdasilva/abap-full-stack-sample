@@ -59,7 +59,9 @@ O operador só informa **como conectar**: URL, mandante, usuário e senha (`ARC1
 - O `vsp` recebe o SID detectado em `--expect` e o confere de novo a cada sessão.
 - SAP_BASIS < 750 recusa os dois servidores (regra absoluta 5).
 - Ambiente PRD recusa os dois servidores (regra absoluta 6). Para chegar a essa conclusão, o launcher faz só a detecção acima (identidade, componentes e a linha da T000) e não inicia nenhum servidor MCP.
-- A URL precisa ser `https://` (exceto `localhost`), porque a autenticação é Basic. `NODE_TLS_REJECT_UNAUTHORIZED=0` faz o launcher recusar iniciar; para certificado de CA interna, use `NODE_EXTRA_CA_CERTS`. `NODE_OPTIONS` e `NODE_TLS_REJECT_UNAUTHORIZED` não são repassados ao servidor.
+- A URL precisa ser `https://` (exceto `localhost`), porque a autenticação é Basic. `NODE_TLS_REJECT_UNAUTHORIZED=0` faz o launcher recusar iniciar. `NODE_OPTIONS` e `NODE_TLS_REJECT_UNAUTHORIZED` não são repassados ao servidor.
+- **Certificado autoassinado ou de CA interna** ([ADR-0013](../docs/adr/0013-certificado-fixado-e-tls-do-vsp.md)): o `setup.mjs` baixa o certificado do servidor, mostra o SHA-256 para o usuário conferir com o Basis e o fixa na conexão (`<P>_SAP_CA_CERT`, arquivo em `.agents/certs/`). O probe e o `arc-1` passam a confiar só nele; se o certificado do servidor mudar, o launcher recusa iniciar. O `NODE_EXTRA_CA_CERTS` global continua valendo para uma CA corporativa.
+- **O probe sempre verifica o TLS**, em qualquer servidor. A única exceção à verificação é o opt-in `<P>_SAP_INSECURE=true` do `vsp` (seção 4.3), aplicado depois dessa verificação.
 
 **Restrições adicionais (opcional):** [sistemas-sap.json](sistemas-sap.json) permite declarar um sistema como mais restritivo do que o detectado. Exemplo: um QAS cujo mandante foi cadastrado como customizing (`C`) na SCC4. Uma declaração **nunca libera**: vale sempre o mais restritivo entre o detectado e o declarado (DEV < SANDBOX < QAS < PRD). Declarar um sistema como `PRD` o bloqueia por completo.
 

@@ -295,7 +295,10 @@ Todas as mensagens do launcher começam com `mcp-launch:`. Para vê-las, rode o 
 |---|---|
 | `variável VSP_SAP_URL não definida` | `.env` ausente ou incompleto. Refaça os passos 4 a 6. |
 | `logon recusado (401)` | Usuário ou senha errados, ou usuário bloqueado no SAP. |
-| `fetch failed` / erro de certificado | URL ou porta erradas, VPN desligada ou CA interna. Ver passo 3. |
+| `fetch failed` / erro de certificado | URL ou porta erradas, VPN desligada, ou certificado autoassinado ou de CA interna. Ver passo 3. |
+| `DEPTH_ZERO_SELF_SIGNED_CERT` ou `SELF_SIGNED_CERT_IN_CHAIN` | Certificado autoassinado (padrão do STRUST). Rode `node scripts/setup.mjs` e fixe o certificado (passo 3). Não há CA a pedir ao Basis. |
+| `O certificado do servidor não confere com <P>_SAP_CA_CERT` | O certificado foi renovado no STRUST, ou a conexão está sendo interceptada. Confira o SHA-256 com o Basis e fixe de novo com `node scripts/setup.mjs --apenas=dev` (ou `qas`). |
+| `vsp`: `x509: certificate signed by unknown authority` ou `relies on legacy Common Name field` | O `vsp` (Go) não usa o certificado fixado e recusa certificado sem SAN. Ver "`vsp` com certificado fixado" no passo 3. |
 | `T000 ilegível ... tratado como PRD` / `recusado: ... é PRD` | Se o sistema não for produtivo, o usuário não tem autorização de data preview na T000: peça-a ao time de segurança SAP. Se for o PRD, é o esperado: nenhum servidor acessa o ambiente produtivo (ADR-0014). |
 | `vsp recusado: ... é QAS` | A URL do `vsp` aponta para um QAS, ou o mandante do DEV não está como customizing (`C`) na SCC4. |
 | `o sistema conectado é QS4, mas VSP_SAP_SID diz DS4` | A URL está trocada. Corrija `VSP_SAP_URL`. |
