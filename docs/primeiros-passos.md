@@ -2,7 +2,7 @@
 
 Guia para quem vai **usar** o projeto no dia a dia: um desenvolvedor ABAP que recebeu o repositório e quer sair do zero até o primeiro objeto criado pelos agentes. Se você vai **manter o template** (editar agentes, skills e MCPs), leia depois a seção [Estrutura](../README.md#-estrutura-fonte-única--adaptadores-gerados) do README.
 
-Tempo estimado: 1 a 2 horas de configuração, sem contar a espera pelas liberações da etapa 1.
+Tempo estimado: uns 15 minutos com o assistente (etapa 3), sem contar a espera pelas liberações da etapa 1.
 
 ---
 
@@ -56,9 +56,33 @@ Estes itens não dependem de você. Peça logo no início, porque costumam demor
 
 ---
 
-## 3. Variáveis de ambiente: o básico
+## 3. Configurar com o assistente
 
-Os MCPs leem senhas e tokens de **variáveis de ambiente** ou do arquivo `.env`. Nunca grave esses valores em arquivos versionados.
+Na raiz do projeto:
+
+```powershell
+node scripts/setup.mjs
+```
+
+O assistente faz as etapas 4 e 5 por você:
+
+1. Confere o Node e, no macOS/Linux, gera os arquivos de MCP sem o `cmd /c`.
+2. Para o **DEV** (e, se você quiser, **QAS** e **PRD**), pede só URL, mandante, usuário e senha. A senha não aparece na tela.
+3. Conecta no SAP e mostra o que detectou: SID, release e ambiente. Você não precisa saber o release antes: se for S/4HANA 2025+, ele avisa que o caminho é o `abap-adt` (5A); se for 2023 ou inferior, o `vsp` (5B). Se a URL do DEV apontar para um QAS, ele avisa antes de gravar.
+4. Grava o `.env`, com o SID detectado como conferência.
+5. Pede os parâmetros do cliente (etapa 4). O `sistemaDesenvolvimento` vem do SID detectado no DEV, sem digitar.
+6. Em S/4HANA 2025+, oferece gravar o `ABAP_ADT_TOKEN` nas variáveis do usuário.
+7. Roda o **doctor**, que confere tudo e diz o que fazer em cada falha.
+
+Senhas e token ficam só na sua máquina: o assistente é um script local e não passa nada pela ferramenta de IA. Nada é gravado sem a sua confirmação.
+
+Para refazer uma etapa: `node scripts/setup.mjs --apenas=dev` (ou `qas`, `prd`, `cliente`, `token`, separados por vírgula). Para só conferir, a qualquer momento: `node scripts/doctor.mjs`.
+
+As etapas 4 e 5 abaixo descrevem o que o assistente faz, para quem preferir configurar à mão ou precisar entender um erro.
+
+### Variáveis de ambiente: o básico
+
+Os MCPs leem senhas e tokens de **variáveis de ambiente** ou do arquivo `.env`. Nunca grave esses valores em arquivos versionados. O assistente cria o `.env`; à mão, seria:
 
 ```powershell
 Copy-Item .env.example .env
@@ -72,9 +96,11 @@ Copy-Item .env.example .env
 
 ## 4. Parâmetros do cliente (uma vez por projeto)
 
+O assistente pergunta e grava estes valores (`node scripts/setup.mjs --apenas=cliente`). À mão:
+
 Se outra pessoa já adotou o template para este cliente, pule esta etapa e só confira se não há valores `<...>` no bloco `cliente`.
 
-1. Preencha o bloco `cliente` de [standards/naming-conventions.json](../standards/naming-conventions.json) com os dados da etapa 1: empresa, sigla, pacote e variante ATC, namespace Fiori, pasta dos apps e `sistemaDesenvolvimento` (SID do DEV).
+1. Preencha o bloco `cliente` de [standards/naming-conventions.json](../standards/naming-conventions.json) com os dados da etapa 1: empresa, sigla, pacote e variante ATC, projeto CTS, namespace Fiori, pasta dos apps e `sistemaDesenvolvimento` (SID do DEV).
 2. Preencha os placeholders de [standards/padrao-desenvolvimento.md](../standards/padrao-desenvolvimento.md): `<VARIANTE_ATC>`, `<PROJETO_CTS>`, `<ID_PROJETO_CTS>`, `<DESCRICAO_PROJETO_CTS>` e `[EMPRESA]`.
 
 Enquanto houver `<...>`, os agentes perguntam em vez de supor. O projeto funciona, mas você vai responder às mesmas perguntas várias vezes.
@@ -204,6 +230,7 @@ Regras que valem sempre e que você vai notar:
 
 | Sintoma | O que fazer |
 |---|---|
+| Qualquer problema de configuração | Rode `node scripts/doctor.mjs`: ele mostra o que falhou e o que fazer |
 | Servidor falho no `/mcp`, mas o `--diagnostico` passa | Abra a ferramenta na raiz do projeto e reinicie-a depois de mudar o `.env` |
 | `abap-adt` com `ECONNREFUSED` | O servidor `abap-adt` não está rodando em `localhost:2236` (etapa 5A) |
 | `vsp` recusado por ser QAS/PRD | A URL aponta para outro sistema, ou o usuário não tem data preview na T000 |

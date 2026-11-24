@@ -164,9 +164,15 @@ Quando uma nova funcionalidade completa precisa ser entregue, o **Orquestrador C
 
 ## 🚀 Adotando o template num projeto
 
-1. Preencha o bloco `cliente` de [standards/naming-conventions.json](standards/naming-conventions.json): empresa, sigla, pacote e variante ATC, namespace Fiori, pasta dos apps e sistema de desenvolvimento. Enquanto houver placeholders `<...>`, os agentes perguntam em vez de supor.
-2. Preencha os placeholders restantes de [standards/padrao-desenvolvimento.md](standards/padrao-desenvolvimento.md) (`<VARIANTE_ATC>`, `<PROJETO_CTS>`, `<ID_PROJETO_CTS>`, `<DESCRICAO_PROJETO_CTS>` e `[EMPRESA]`) ou substitua o documento pelo padrão do cliente.
-3. Configure o token MCP (seção abaixo). Se o cliente tiver sistemas S/4HANA 2023 ou inferior, configure também `arc-1` e/ou `vsp` ([passo a passo](docs/setup-mcp-abap.md)). Confirme a conexão com `/mcp`.
+1. Rode o assistente na raiz do projeto:
+
+   ```powershell
+   node scripts/setup.mjs
+   ```
+
+   Ele pede só a conexão de cada sistema (URL, mandante, usuário, senha), detecta no próprio SAP o SID, o release e o ambiente, e grava o `.env`. Depois pede os parâmetros do cliente e preenche o bloco `cliente` de [standards/naming-conventions.json](standards/naming-conventions.json) e os placeholders de [standards/padrao-desenvolvimento.md](standards/padrao-desenvolvimento.md). O `sistemaDesenvolvimento` vem do SID detectado no DEV. Em S/4HANA 2025+, oferece gravar o token do `abap-adt`. Para refazer uma etapa: `--apenas=dev` (ou `qas`, `prd`, `cliente`, `token`).
+2. Confira tudo com `node scripts/doctor.mjs` (o setup já roda no fim). Ele verifica Node, arquivos gerados, testes das travas, parâmetros do cliente, cada conexão (pelo diagnóstico do launcher), o `abap-adt` e o `fiori-mcp`, e diz o que fazer em cada falha.
+3. Abra a ferramenta de IA na raiz e confirme com `/mcp`. Os detalhes de cada servidor estão em [Configuração do Token MCP](#-configuração-do-token-mcp-abap-adt) e no [passo a passo do vsp/arc-1](docs/setup-mcp-abap.md).
 4. **Libere os agentes apenas no sistema de desenvolvimento.** Eles criam e ativam objetos diretamente via `abap-adt` ou `vsp`; use um usuário com autorizações restritas a DEV/sandbox. Para `arc-1` em QAS/PRD, use um usuário somente leitura.
 
 ---
@@ -257,6 +263,9 @@ standards/
   skills/<nome>/references/     ← material técnico de apoio das skills (fonte; ver THIRD_PARTY_NOTICES.md)
   mcp.servers.json              ← servidores MCP (fonte)
   mcp_config.json               ← gerado (Antigravity)
+scripts/setup.mjs               ← assistente de configuração do projeto (.env, parâmetros do cliente, token)
+scripts/doctor.mjs              ← verificação de tudo de uma vez, com a ação para cada falha
+scripts/config-local.mjs        ← leitura/escrita do .env e do bloco cliente (funções puras)
 scripts/sync-agents.mjs         ← gerador
 scripts/mcp-launch.mjs          ← launcher de arc-1/vsp com as travas da política
 scripts/sap-probe.mjs           ← detecção de SID, release e ambiente no próprio SAP

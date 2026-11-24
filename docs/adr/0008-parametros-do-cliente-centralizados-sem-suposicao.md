@@ -11,7 +11,9 @@ O repositório é um template reutilizável entre clientes. Sigla, pacotes, vari
 
 Os parâmetros do cliente ficam num único lugar, o bloco `cliente` de `standards/naming-conventions.json`:
 
-`empresa`, `sigla`, `pacotePadraoATC`, `varianteATC`, `namespaceFiori`, `pastaAppsFiori`, `sistemaDesenvolvimento`.
+`empresa`, `sigla`, `pacotePadraoATC`, `varianteATC`, `projetoCTS`, `idProjetoCTS`, `descricaoProjetoCTS`, `namespaceFiori`, `pastaAppsFiori`, `sistemaDesenvolvimento`.
+
+O assistente `node scripts/setup.mjs` preenche o bloco (o `sistemaDesenvolvimento` vem do SID detectado no DEV) e, a partir dele, os placeholders de `standards/padrao-desenvolvimento.md`.
 
 Os valores não preenchidos aparecem como placeholders (`<...>`). Se um valor necessário ainda for placeholder, o agente **pergunta ao usuário e nunca supõe**.
 
