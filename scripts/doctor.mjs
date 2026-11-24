@@ -106,6 +106,10 @@ function diagnosticar(servidor) {
   });
 }
 
+// ADR-0014: não há mais conexão com o PRD. Credenciais esquecidas no .env são só risco.
+if (Object.keys(dotenv).some((k) => /^ARC1_PRD_/.test(k) && !ehPlaceholder(dotenv[k])))
+  item("aviso", "o .env ainda tem variáveis ARC1_PRD_*: o projeto não acessa mais o ambiente produtivo (ADR-0014)", "apague essas linhas do .env, inclusive a senha");
+
 const configurados = [];
 for (const s of abapServidores) {
   const { prefix } = prefixoDoServidor(s);
@@ -117,7 +121,7 @@ for (const s of abapServidores) {
 if (configurados.length) console.log(cinza(`    detectando ${configurados.join(", ")} no SAP (a 1ª vez pode baixar o vsp/ARC-1)...`));
 const diagnosticos = Object.fromEntries(await Promise.all(configurados.map(async (s) => [s, await diagnosticar(s)])));
 
-const papelEsperado = (s) => (/-qas/.test(s) ? "QAS" : /-prd/.test(s) ? "PRD" : /-dev|^vsp/.test(s) ? "DEV" : null);
+const papelEsperado = (s) => (/-qas/.test(s) ? "QAS" : /-dev|^vsp/.test(s) ? "DEV" : null);
 let rotaDev = false;
 let algum2025 = false;
 for (const s of configurados) {

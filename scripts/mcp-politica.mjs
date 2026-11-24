@@ -36,7 +36,7 @@ export const BASIS_MCP_OFICIAL = 816; // S/4HANA 2025+: abap-adt
 export const ARC1_NEGADAS_SEMPRE = ["SAPWrite.delete"];
 // Política 4.2: ABAP Unit só em DEV/SANDBOX. Teste unitário executa código e pode ter efeito
 // colateral (gravação, RFC, bloqueio). As ações são do tipo Test, que o modo somente leitura não
-// bloqueia; por isso a negação explícita em QAS e PRD.
+// bloqueia; por isso a negação explícita em QAS (o PRD é recusado antes, ADR-0014).
 export const ARC1_NEGADAS_FORA_DEV = ["SAPDiagnose.unittest", "SAPDiagnose.unittest_ci"];
 
 // ---------------------------------------------------------------- comando (2.4)
@@ -180,6 +180,15 @@ export function decidir({ tool, prefix, sistema, conn, v, env, platform, arc1 })
   // Regra absoluta 5: SAP_BASIS < 750 está fora do escopo, para qualquer servidor.
   if (!Number.isFinite(sapBasis) || sapBasis < BASIS_MINIMO)
     recusar(`${tool} recusado: SAP_BASIS ${sapBasis} (${produto}) está fora do escopo da política (mínimo ${BASIS_MINIMO}).`);
+
+  // Regra absoluta 6 (ADR-0014): nenhum servidor acessa produção, nem para leitura. Vale também
+  // para o PRD por precaução (T000 ilegível) e para o registro que restringe um sistema a PRD.
+  if (ambiente === "PRD") {
+    const dica = /T000 ilegível/.test(motivo ?? "")
+      ? " Se o sistema não for produtivo, dê ao usuário autorização de data preview na T000 para o launcher classificar o mandante."
+      : "";
+    recusar(`${tool} recusado: ${sid}/${mandante} é PRD — ${motivo}. Política MCP: nenhum servidor acessa o ambiente produtivo, nem para leitura (ADR-0014).${dica}`);
+  }
 
   const isDev = ambiente === "DEV" || ambiente === "SANDBOX";
   const childEnv = filtrarEnvFilho(env);

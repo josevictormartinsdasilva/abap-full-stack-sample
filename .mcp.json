@@ -18,17 +18,6 @@
       ],
       "env": {}
     },
-    "arc-1-prd": {
-      "type": "stdio",
-      "command": "cmd",
-      "args": [
-        "/c",
-        "node",
-        "scripts/mcp-launch.mjs",
-        "arc-1-prd"
-      ],
-      "env": {}
-    },
     "arc-1-dev": {
       "type": "stdio",
       "command": "cmd",

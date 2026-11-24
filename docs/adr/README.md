@@ -26,6 +26,7 @@ Formato: MADR simplificado, em português. Um arquivo por decisão: `NNNN-titulo
 | [0010](0010-material-de-referencia-de-terceiros-nas-skills.md) | Material de referência de terceiros nas skills | Proposto |
 | [0011](0011-fallback-de-desenvolvimento-em-s4hana-2025.md) | Fallback de desenvolvimento em S/4HANA 2025+ | Aceito |
 | [0012](0012-fallback-de-analise-em-qas-prd-s4hana-2025.md) | Fallback de análise em QAS/PRD S/4HANA 2025+ | Proposto |
+| [0014](0014-ambiente-produtivo-fora-do-alcance-dos-agentes.md) | Ambiente produtivo fora do alcance dos agentes | Proposto |
 
 ## Modelo
 

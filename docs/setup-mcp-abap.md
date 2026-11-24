@@ -5,12 +5,12 @@ Guia para preparar a máquina de cada desenvolvedor para os servidores `vsp` e `
 | Servidor | Sistema | Modo |
 |---|---|---|
 | `vsp` | DEV / Sandbox ≤ 2023 (em 2025+, só como [fallback](#fallback-do-abap-adt-em-s4hana-2025)) | Desenvolvimento |
-| `arc-1-qas` | QAS ≤ 2023 (em 2025+, só contingência e [fallback de análise](#fallback-de-análise-em-qasprd-2025)) | Somente leitura |
-| `arc-1-prd` | PRD ≤ 2023 (em 2025+, só contingência e [fallback de análise](#fallback-de-análise-em-qasprd-2025)) | Somente leitura |
+| `arc-1-qas` | QAS ≤ 2023 (em 2025+, só contingência e [fallback de análise](#fallback-de-análise-em-qas-2025)) | Somente leitura |
+| — | PRD: **nenhum servidor**, nem para leitura ([ADR-0014](adr/0014-ambiente-produtivo-fora-do-alcance-dos-agentes.md)) | Recusado pelo launcher |
 | `arc-1-dev` (opcional) | DEV, o mesmo do `vsp`: exceção da política 4.2 em ≤ 2023 ou 2º fallback em 2025+ | Somente leitura, salvo opt-in |
 | `abap-adt` | S/4HANA 2025+ | Ver [Configuração do Token MCP](../README.md#-configuração-do-token-mcp-abap-adt) |
 
-Você **não edita** nenhum arquivo de MCP (`.mcp.json`, `.codex/config.toml` etc.). Eles já vêm gerados com uma entrada por sistema do cliente: `vsp` (DEV), `arc-1-qas` (QAS), `arc-1-prd` (PRD) e `arc-1-dev` (DEV pelo ARC-1, opcional), todas apontando para `scripts/mcp-launch.mjs`. O projeto é usado com um clone por cliente, e o nome de cada entrada define o prefixo das variáveis no `.env` (`vsp` → `VSP_*`, `arc-1-qas` → `ARC1_QAS_*`, `arc-1-prd` → `ARC1_PRD_*`, `arc-1-dev` → `ARC1_DEV_*`). Preparar a máquina é só instalar os executáveis, preencher o `.env` e conferir a detecção.
+Você **não edita** nenhum arquivo de MCP (`.mcp.json`, `.codex/config.toml` etc.). Eles já vêm gerados com uma entrada por sistema do cliente: `vsp` (DEV), `arc-1-qas` (QAS) e `arc-1-dev` (DEV pelo ARC-1, opcional), todas apontando para `scripts/mcp-launch.mjs`. O projeto é usado com um clone por cliente, e o nome de cada entrada define o prefixo das variáveis no `.env` (`vsp` → `VSP_*`, `arc-1-qas` → `ARC1_QAS_*`, `arc-1-dev` → `ARC1_DEV_*`). Preparar a máquina é só instalar os executáveis, preencher o `.env` e conferir a detecção.
 
 ---
 
@@ -82,28 +82,22 @@ VSP_SAP_PASSWORD=...
 VSP_ALLOWED_PACKAGES=$TMP,Z*
 ```
 
-**6. Preencher as conexões do QAS (`arc-1-qas`) e do PRD (`arc-1-prd`):**
+**6. Preencher a conexão do QAS (`arc-1-qas`):**
 
 ```ini
 ARC1_QAS_SAP_URL=https://qs4.cliente.com.br:44300
 ARC1_QAS_SAP_CLIENT=400
 ARC1_QAS_SAP_USER=USUARIO_LEITURA
 ARC1_QAS_SAP_PASSWORD=...
-
-ARC1_PRD_SAP_URL=https://ps4.cliente.com.br:44300
-ARC1_PRD_SAP_CLIENT=500
-ARC1_PRD_SAP_USER=USUARIO_LEITURA
-ARC1_PRD_SAP_PASSWORD=...
 ```
 
-Informe só a conexão. SID, release e ambiente são **detectados no próprio SAP**: o nome da entrada é só um rótulo, e se a URL de `arc-1-prd` apontar para um QAS, vale o QAS. A conexão `ARC1_DEV_*` (`arc-1-dev`) é opcional e só precisa ser preenchida para a exceção da política 4.2 ou para o 2º fallback em 2025+ (ver [Fallback](#fallback-do-abap-adt-em-s4hana-2025)). Se o cliente não tiver um dos sistemas, ou você não for usar o `arc-1` nele, deixe as variáveis dele com o placeholder: o servidor aparece como falho no `/mcp`, o que é esperado.
+Informe só a conexão. SID, release e ambiente são **detectados no próprio SAP**: o nome da entrada é só um rótulo, e se a URL de `arc-1-qas` apontar para um DEV, vale o DEV. **Não configure o PRD:** nenhum servidor acessa o ambiente produtivo, e o launcher recusa qualquer conexão detectada como PRD, qualquer que seja o nome da entrada ([ADR-0014](adr/0014-ambiente-produtivo-fora-do-alcance-dos-agentes.md)). A conexão `ARC1_DEV_*` (`arc-1-dev`) é opcional e só precisa ser preenchida para a exceção da política 4.2 ou para o 2º fallback em 2025+ (ver [Fallback](#fallback-do-abap-adt-em-s4hana-2025)). Se o cliente não tiver um dos sistemas, ou você não for usar o `arc-1` nele, deixe as variáveis dele com o placeholder: o servidor aparece como falho no `/mcp`, o que é esperado.
 
 **7. Testar a detecção:**
 
 ```powershell
 node scripts/mcp-launch.mjs vsp --diagnostico
 node scripts/mcp-launch.mjs arc-1-qas --diagnostico
-node scripts/mcp-launch.mjs arc-1-prd --diagnostico
 ```
 
 Resultado esperado:
@@ -114,7 +108,6 @@ mcp-launch: vsp v2.62.1 salvo em C:\Users\...\AppData\Local\abap-full-stack\vsp\
 mcp-launch: vsp encontrado: vsp version v2.62.1 (...)
 mcp-launch: vsp -> DS4/110 · S/4HANA 2023 · DEV (mandante de customizing ...) · desenvolvimento
 mcp-launch: arc-1-qas -> QS4/400 · S/4HANA 2023 · QAS (mandante de teste ...) · somente leitura
-mcp-launch: arc-1-prd -> PS4/500 · S/4HANA 2023 · PRD (mandante de produção ...) · somente leitura
 ```
 
 Antes de conectar ao SAP, o diagnóstico confere os executáveis: o binário do `vsp` (baixado e conferido pelo SHA-256, ou o `VSP_BIN`) e as flags de segurança dele, e o ARC-1 (instalado pelo npm, ou o `ARC1_BIN`) com as variáveis de segurança e o Node exigido. Se faltar algo, ele para com a indicação do passo deste guia que resolve.
@@ -126,7 +119,7 @@ Confira se SID, produto e ambiente estão corretos. Se aparecer uma recusa, veja
 **8. Abrir a ferramenta e conferir as conexões.**
 
 1. Abra a ferramenta de IA **na raiz do projeto**. O launcher é chamado por caminho relativo (`scripts/mcp-launch.mjs`) e não é encontrado se o servidor for iniciado em outra pasta (ver [Diretório de trabalho por ferramenta](#diretório-de-trabalho-por-ferramenta)).
-2. Rode `/mcp` (Claude Code). Devem aparecer conectados o `fiori-mcp` e os servidores que você configurou (`vsp`, `arc-1-qas` e/ou `arc-1-prd`; `abap-adt` só se houver S/4HANA 2025+). Um servidor não configurado aparece como falho, o que é esperado.
+2. Rode `/mcp` (Claude Code). Devem aparecer conectados o `fiori-mcp` e os servidores que você configurou (`vsp` e/ou `arc-1-qas`; `abap-adt` só se houver S/4HANA 2025+). Um servidor não configurado aparece como falho, o que é esperado.
 
 Se você alterar o `.env`, reinicie a ferramenta: os servidores só são iniciados na abertura da sessão.
 
@@ -134,7 +127,7 @@ Se você alterar o `.env`, reinicie a ferramenta: os servidores só são iniciad
 
 ## Variáveis opcionais
 
-As variáveis de conexão e de comportamento usam o prefixo da entrada: `VSP`, `ARC1_QAS`, `ARC1_PRD`, `ARC1_DEV`. Na tabela, `ARC1_*` vale para qualquer entrada `arc-1-*` (ex.: `ARC1_QAS_SAP_SID`). `VSP_BIN`, `VSP_VERSION`, `ARC1_BIN` e `ARC1_VERSION` são as únicas sem prefixo por entrada: valem para todas.
+As variáveis de conexão e de comportamento usam o prefixo da entrada: `VSP`, `ARC1_QAS`, `ARC1_DEV`. Na tabela, `ARC1_*` vale para qualquer entrada `arc-1-*` (ex.: `ARC1_QAS_SAP_SID`). `VSP_BIN`, `VSP_VERSION`, `ARC1_BIN` e `ARC1_VERSION` são as únicas sem prefixo por entrada: valem para todas.
 
 | Variável | Para quê |
 |---|---|
@@ -189,15 +182,15 @@ Falta, antes de levar a `develop` para a `main`:
 | Usuário | Precisa de |
 |---|---|
 | Ambos | Acesso ao ADT: serviço ICF `/sap/bc/adt` ativo e autorizações de desenvolvedor ADT. |
-| Ambos | Data preview na `T000`, usado na detecção do ambiente. Sem ela, o sistema é tratado como **PRD**, e o `vsp` não sobe. |
+| Ambos | Data preview na `T000`, usado na detecção do ambiente. Sem ela, o sistema é tratado como **PRD**, e o launcher recusa os dois servidores. |
 | `vsp` (DEV) | Autorizações de desenvolvimento, restritas aos pacotes do projeto. |
-| `arc-1-qas` / `arc-1-prd` | Somente leitura. O launcher já força leitura, mas a autorização SAP é a segunda barreira. |
+| `arc-1-qas` | Somente leitura. O launcher já força leitura, mas a autorização SAP é a segunda barreira. |
 
 ---
 
 ## Fallback do `abap-adt` em S/4HANA 2025+
 
-Num sistema 2025+, o servidor é o `abap-adt`. Se ele **não oferecer** uma operação de desenvolvimento (por exemplo, um tipo de objeto que a SAP ainda não entregou no MCP oficial), a [política, seção 4.4](../standards/politica-mcp-abap.md) define a cadeia `abap-adt` → `vsp` → `arc-1` → execução manual. Ela vale só em DEV/SANDBOX. Em QAS/PRD não há fallback.
+Num sistema 2025+, o servidor é o `abap-adt`. Se ele **não oferecer** uma operação de desenvolvimento (por exemplo, um tipo de objeto que a SAP ainda não entregou no MCP oficial), a [política, seção 4.4](../standards/politica-mcp-abap.md) define a cadeia `abap-adt` → `vsp` → `arc-1` → execução manual. Ela vale só em DEV/SANDBOX. No QAS não há fallback de desenvolvimento, e o PRD não é acessado.
 
 O `vsp` e o `arc-1` ficam **desligados por padrão** num sistema 2025+ (opt-in): o `vsp` recusa iniciar e o `arc-1` sobe somente leitura. Só sobem como fallback quando você liga a variável.
 
@@ -218,7 +211,7 @@ O `vsp` e o `arc-1` ficam **desligados por padrão** num sistema 2025+ (opt-in):
    ```
 
 3. **Reinicie a sessão** da ferramenta de IA e confira com `/mcp` que o `vsp` conectou. Peça de novo a operação. O orquestrador usa o `vsp` só para ela; o restante, inclusive o ATC, continua no `abap-adt`.
-4. **Se o `vsp` também não atender, use o `arc-1` no DEV.** Use a entrada `arc-1-dev`, que já vem no template (as `arc-1-qas` e `arc-1-prd` apontam para outros sistemas). Preencha `ARC1_DEV_SAP_*` com o **mesmo DEV** e descomente as variáveis abaixo. Repita os passos 2 e 3 com `arc-1-dev`. O modo esperado é `escrita restrita a pacotes (fallback do abap-adt)`.
+4. **Se o `vsp` também não atender, use o `arc-1` no DEV.** Use a entrada `arc-1-dev`, que já vem no template (a `arc-1-qas` aponta para outro sistema). Preencha `ARC1_DEV_SAP_*` com o **mesmo DEV** e descomente as variáveis abaixo. Repita os passos 2 e 3 com `arc-1-dev`. O modo esperado é `escrita restrita a pacotes (fallback do abap-adt)`.
 
    ```env
    ARC1_DEV_FALLBACK_2025=true
@@ -229,38 +222,38 @@ O `vsp` e o `arc-1` ficam **desligados por padrão** num sistema 2025+ (opt-in):
 5. **Se nenhum atender,** o orquestrador informa o que faltou e, se você autorizar, entrega o código e o passo a passo para criar o objeto no ADT (Eclipse). Depois que você criar e ativar, ele confere o objeto pelo `abap-adt`, e o ATC roda normalmente.
 6. **Ao terminar, desligue** as variáveis (comente as linhas no `.env`) e reinicie a sessão.
 
-**Qual conexão usar no dia a dia:** o projeto é usado com um clone por cliente/desenvolvimento. O cliente tem um DEV e pode ter QAS e PRD. Num cliente 2025+:
+**Qual conexão usar no dia a dia:** o projeto é usado com um clone por cliente/desenvolvimento. O cliente tem um DEV e pode ter QAS. O PRD não é acessado (ADR-0014). Num cliente 2025+:
 
 | Sistema | Servidor no dia a dia | Contingência / fallback | Entrada |
 |---|---|---|---|
 | DEV | `abap-adt` | `vsp` como fallback de desenvolvimento (flag) | `vsp` (padrão) |
 | QAS | `abap-adt` (leitura) | `arc-1` só leitura, se o `abap-adt` cair ou não oferecer a análise (opcional) | `arc-1-qas` |
-| PRD | `abap-adt` (leitura) | `arc-1` só leitura, se o `abap-adt` cair ou não oferecer a análise (opcional) | `arc-1-prd` |
+| PRD | — | — (nenhum servidor, nem para leitura) | — |
 | DEV (raro) | — | `arc-1` como 2º fallback, se o `vsp` não atender | `arc-1-dev` |
 
 - **Use a entrada `vsp`** que já vem no template. Deixe `VSP_*` apontando de vez para o DEV do cliente, com `VSP_FALLBACK_2025=true` comentado. Para usar, descomente essa linha e reinicie a sessão.
-- **`arc-1-qas` e `arc-1-prd`** também já vêm no template. Preencha-as só se quiser a contingência de análise. A `arc-1-dev` também já vem no template: preencha `ARC1_DEV_*` só se o `vsp` não atender. Nomeie pelo sistema, não como "fallback": o papel de fallback vem da detecção do release e da flag.
+- **`arc-1-qas`** também já vem no template. Preencha-a só se quiser a contingência de análise. A `arc-1-dev` também já vem no template: preencha `ARC1_DEV_*` só se o `vsp` não atender. Nomeie pelo sistema, não como "fallback": o papel de fallback vem da detecção do release e da flag.
 - **Use o seu próprio usuário SAP de desenvolvimento**, não um usuário técnico compartilhado. Assim, as alterações ficam registradas no seu nome, como no Eclipse. Restrinja as autorizações aos pacotes do projeto.
 - **Defina `<P>_SAP_SID`** com o SID do DEV 2025, para o launcher recusar se a URL estiver trocada. Esse SID precisa ser o mesmo de `cliente.sistemaDesenvolvimento` em `standards/naming-conventions.json`.
 
 > Usar `vsp`/`arc-1` num sistema de cliente exige aceite formal do cliente (política, seção 7). Decisão registrada no [ADR-0011](adr/0011-fallback-de-desenvolvimento-em-s4hana-2025.md).
 
-### Fallback de análise em QAS/PRD 2025+
+### Fallback de análise em QAS 2025+
 
-Num QAS/PRD 2025+, a análise é feita pelo `abap-adt`. Se ele estiver no ar, mas **não oferecer** a operação de análise pedida (por exemplo, dumps, traces ou onde-usado), a [política, seção 4.5](../standards/politica-mcp-abap.md) permite usar o `arc-1` **somente leitura** no mesmo sistema. Se o `arc-1` também não atender, o orquestrador para e informa. O `vsp` nunca é usado em QAS/PRD.
+Num QAS 2025+, a análise é feita pelo `abap-adt`. Se ele estiver no ar, mas **não oferecer** a operação de análise pedida (por exemplo, dumps, traces ou onde-usado), a [política, seção 4.5](../standards/politica-mcp-abap.md) permite usar o `arc-1` **somente leitura** no mesmo sistema. Se o `arc-1` também não atender, o orquestrador para e informa. O `vsp` nunca é usado no QAS.
 
-- **Não há flag para ligar.** Basta a entrada do sistema estar preenchida: `ARC1_QAS_*` para o QAS e `ARC1_PRD_*` para o PRD. Nesses ambientes, o launcher sempre sobe o `arc-1` somente leitura, com ABAP Unit negado e sem prévia de dados nem SQL livre.
+- **Não há flag para ligar.** Basta a entrada `arc-1-qas` estar preenchida (`ARC1_QAS_*`). No QAS, o launcher sempre sobe o `arc-1` somente leitura, com ABAP Unit negado e sem prévia de dados nem SQL livre.
 - **Mesma evidência do fallback de desenvolvimento:** antes de trocar de servidor, o orquestrador mostra a operação, a ferramenta consultada ou o erro literal e o sinal da tabela da seção 4.4, e espera a sua confirmação. Indisponibilidade do `abap-adt` não é lacuna: aí vale a contingência normal.
 - **Mesmo sistema:** confira em `node scripts/mcp-runtime.mjs` se o SID e o mandante do `arc-1` são os do sistema consultado pelo `abap-adt`.
 - **Dados:** dumps e traces podem conter dados de negócio. Considere a LGPD antes de ler esses dados num sistema de cliente (política, seção 7).
 
-> Decisão registrada no [ADR-0012](adr/0012-fallback-de-analise-em-qas-prd-s4hana-2025.md). Usar o `arc-1` num sistema de cliente também exige aceite formal do cliente.
+> Decisão registrada no [ADR-0012](adr/0012-fallback-de-analise-em-qas-prd-s4hana-2025.md), restrita ao QAS pelo [ADR-0014](adr/0014-ambiente-produtivo-fora-do-alcance-dos-agentes.md). No PRD não há fallback, porque nenhum servidor o acessa. Usar o `arc-1` num sistema de cliente também exige aceite formal do cliente.
 
 ---
 
 ## Vários sistemas do mesmo tipo
 
-O template já traz uma entrada por sistema do cliente: `vsp` (DEV), `arc-1-qas`, `arc-1-prd` e `arc-1-dev`. Para uma conexão a mais, por exemplo um sandbox além do DEV (`vsp-sandbox`):
+O template já traz uma entrada por sistema do cliente: `vsp` (DEV), `arc-1-qas` e `arc-1-dev`. Para uma conexão a mais, por exemplo um sandbox além do DEV (`vsp-sandbox`):
 
 1. Em `.agents/mcp.servers.json`, acrescente a entrada:
 
@@ -294,7 +287,7 @@ Todas as mensagens do launcher começam com `mcp-launch:`. Para vê-las, rode o 
 | `variável VSP_SAP_URL não definida` | `.env` ausente ou incompleto. Refaça os passos 4 a 6. |
 | `logon recusado (401)` | Usuário ou senha errados, ou usuário bloqueado no SAP. |
 | `fetch failed` / erro de certificado | URL ou porta erradas, VPN desligada ou CA interna. Ver passo 3. |
-| `T000 ilegível ... tratado como PRD` | O usuário não tem autorização de data preview. Peça-a ao time de segurança SAP. |
+| `T000 ilegível ... tratado como PRD` / `recusado: ... é PRD` | Se o sistema não for produtivo, o usuário não tem autorização de data preview na T000: peça-a ao time de segurança SAP. Se for o PRD, é o esperado: nenhum servidor acessa o ambiente produtivo (ADR-0014). |
 | `vsp recusado: ... é QAS` | A URL do `vsp` aponta para um QAS, ou o mandante do DEV não está como customizing (`C`) na SCC4. |
 | `o sistema conectado é QS4, mas VSP_SAP_SID diz DS4` | A URL está trocada. Corrija `VSP_SAP_URL`. |
 | `vsp recusado: SAP_BASIS 816 ... é servido pelo abap-adt` | É um S/4HANA 2025. Use o `abap-adt` (MCP oficial). Só para uma operação de desenvolvimento que ele não ofereça, defina `VSP_FALLBACK_2025=true` (política 4.4). |
@@ -322,6 +315,6 @@ Todas as mensagens do launcher começam com `mcp-launch:`. Para vê-las, rode o 
 | Servidor falho no `/mcp`, mas o diagnóstico passa | A ferramenta foi aberta fora da raiz do projeto, ou não foi reiniciada após mudar o `.env`. |
 | `"...\arc-1.cmd" não pôde ser executado (EINVAL)` | O caminho não aponta para um arquivo executável (pasta ou atalho). Confira `ARC1_BIN`/`VSP_BIN`. |
 | `... é um script .cmd/.bat e precisa do cmd.exe, mas ... contém caractere` | O caminho ou um valor de `VSP_*` tem `%`, `!`, `^` ou aspas, que o `cmd.exe` interpretaria. Use o `.exe` ou remova o caractere. |
-| `aviso: ... o ARC-1 inicia somente leitura; ... defina ARC1_..._ALLOW_DEV_WRITES=true` | A entrada `arc-1-*` aponta para um DEV. Se for a `arc-1-qas` ou a `arc-1-prd`, a URL está trocada. Só defina a flag se o cliente não autorizou o `vsp` (política 4.2). |
+| `aviso: ... o ARC-1 inicia somente leitura; ... defina ARC1_..._ALLOW_DEV_WRITES=true` | A entrada `arc-1-*` aponta para um DEV. Se for a `arc-1-qas`, a URL está trocada. Só defina a flag se o cliente não autorizou o `vsp` (política 4.2). |
 
 > Antes de usar `arc-1` ou `vsp` em ambiente de cliente, obtenha o aceite formal do cliente. A política de APIs da SAP classifica as APIs ADT como internas (ver seção 7 da [política](../standards/politica-mcp-abap.md)).

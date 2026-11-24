@@ -2,12 +2,12 @@
 // Assistente de configuração de um projeto (um clone por cliente).
 //
 //   node scripts/setup.mjs                       configura tudo, passo a passo
-//   node scripts/setup.mjs --apenas=dev          refaz só uma etapa: dev, qas, prd, cliente, token
-//   node scripts/setup.mjs --apenas=qas,prd      (várias, separadas por vírgula)
+//   node scripts/setup.mjs --apenas=dev          refaz só uma etapa: dev, qas, cliente, token
+//   node scripts/setup.mjs --apenas=dev,qas      (várias, separadas por vírgula)
 //
 // O que faz:
 //   1. Confere o Node e a plataforma; cria o .env a partir do .env.example.
-//   2. Para cada sistema (DEV pelo vsp, QAS e PRD pelo arc-1), pede só a conexão (URL, mandante,
+//   2. Para cada sistema (DEV pelo vsp, QAS pelo arc-1; PRD não é configurado, ADR-0014), pede só a conexão (URL, mandante,
 //      usuário, senha), detecta no próprio SAP o SID, o release e o ambiente
 //      (scripts/sap-probe.mjs) e grava no .env. O SID detectado vai para <P>_SAP_SID, que o
 //      launcher usa como conferência.
@@ -45,18 +45,19 @@ const ARQ = {
 };
 const NODE_MINIMO = ">=22.19";
 
-const ETAPAS = ["dev", "qas", "prd", "cliente", "token"];
+const ETAPAS = ["dev", "qas", "cliente", "token"];
 const argApenas = process.argv.find((a) => a.startsWith("--apenas="));
 const apenas = argApenas ? argApenas.split("=")[1].split(",").map((s) => s.trim().toLowerCase()).filter(Boolean) : ETAPAS;
+if (apenas.includes("prd")) sair("o PRD não é configurado: nenhum servidor acessa o ambiente produtivo, nem para leitura (ADR-0014)");
 for (const e of apenas) if (!ETAPAS.includes(e)) sair(`etapa desconhecida em --apenas: "${e}" (use ${ETAPAS.join(", ")})`);
 const faz = (etapa) => apenas.includes(etapa);
 
 // Um sistema por entrada de .agents/mcp.servers.json (projeto = um cliente). O DEV vai pelo vsp;
-// QAS e PRD, pelo arc-1, somente leitura. O arc-1-dev é opcional e avançado: fica de fora.
+// QAS, pelo arc-1, somente leitura. O arc-1-dev é opcional e avançado: fica de fora.
+// PRD não tem entrada: nenhum servidor acessa o ambiente produtivo (ADR-0014).
 const SISTEMAS = [
   { etapa: "dev", servidor: "vsp", rotulo: "DEV (desenvolvimento)", esperado: ["DEV", "SANDBOX"], padrao: true },
   { etapa: "qas", servidor: "arc-1-qas", rotulo: "QAS (somente leitura)", esperado: ["QAS"], padrao: false },
-  { etapa: "prd", servidor: "arc-1-prd", rotulo: "PRD (somente leitura)", esperado: ["PRD"], padrao: false },
 ];
 
 // ---------------------------------------------------------------- terminal
@@ -149,7 +150,7 @@ function valorAtual(nome, dotenv) {
 async function preRequisitos() {
   titulo("1. Pré-requisitos");
   if (nodeAtende(NODE_MINIMO, process.versions.node)) ok(`Node.js ${process.versions.node}`);
-  else aviso(`Node.js ${process.versions.node}: o ARC-1 (QAS/PRD) exige 22.19 ou superior. Instale a LTS de https://nodejs.org e rode o setup de novo.`);
+  else aviso(`Node.js ${process.versions.node}: o ARC-1 (QAS) exige 22.19 ou superior. Instale a LTS de https://nodejs.org e rode o setup de novo.`);
 
   if (process.platform !== "win32") {
     const mcp = fs.existsSync(path.join(ROOT, ".mcp.json")) ? ler(path.join(ROOT, ".mcp.json")) : "";
@@ -228,7 +229,7 @@ async function configurarSistema(s, servidores, resultados) {
     info("pulado. O servidor vai aparecer como falho no /mcp, o que é esperado se você não usa esse sistema.");
     return;
   }
-  if (s.etapa !== "dev") info("Use um usuário só de leitura: o ARC-1 roda somente leitura em QAS/PRD.");
+  if (s.etapa !== "dev") info("Use um usuário só de leitura: o ARC-1 roda somente leitura em QAS.");
 
   for (;;) {
     const conn = {
