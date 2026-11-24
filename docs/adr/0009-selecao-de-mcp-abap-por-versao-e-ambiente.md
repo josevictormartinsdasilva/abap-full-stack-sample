@@ -1,6 +1,6 @@
 # ADR-0009: Seleção de MCP ABAP por versão e ambiente
 
-- **Status:** Aceito (2026-11-19, PR #5 na `develop`)
+- **Status:** Aceito (2026-11-19, PR #5 na `develop`; complementado pelo [ADR-0013](0013-certificado-fixado-e-tls-do-vsp.md), que trata certificado autoassinado e o `--insecure` do `vsp`)
 - **Data:** 2026-11-17
 
 ## Contexto

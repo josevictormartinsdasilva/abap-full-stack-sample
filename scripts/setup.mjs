@@ -10,7 +10,9 @@
 //   2. Para cada sistema (DEV pelo vsp, QAS e PRD pelo arc-1), pede só a conexão (URL, mandante,
 //      usuário, senha), detecta no próprio SAP o SID, o release e o ambiente
 //      (scripts/sap-probe.mjs) e grava no .env. O SID detectado vai para <P>_SAP_SID, que o
-//      launcher usa como conferência.
+//      launcher usa como conferência. Certificado autoassinado ou de CA interna: baixa o
+//      certificado, mostra o SHA-256 para conferir e o fixa na conexão (<P>_SAP_CA_CERT); no
+//      vsp, oferece <P>_SAP_INSECURE=true (ADR-0013).
 //   3. Pede os parâmetros do cliente e grava no bloco "cliente" de
 //      standards/naming-conventions.json (o sistemaDesenvolvimento vem do SID detectado no DEV)
 //      e nos placeholders de standards/padrao-desenvolvimento.md.
@@ -30,6 +32,7 @@ import { fileURLToPath } from "node:url";
 import { detectar, validarUrlSap } from "./sap-probe.mjs";
 import { BASIS_MCP_OFICIAL, BASIS_MINIMO, valorDeVariavel } from "./mcp-politica.mjs";
 import { nodeAtende } from "./arc1-pacote.mjs";
+import { ehErroCertificado, gravarCertificado, lerCertificado, obterCertificado } from "./sap-tls.mjs";
 import {
   atualizarCliente, atualizarDotEnv, atualizarProjetoCTS, camposPendentes, ehPlaceholder, lerDotEnv,
   placeholdersPadrao, preencherPadrao, prefixoDoServidor, situacaoConexao, situacaoProjetoCTS,
@@ -172,25 +175,45 @@ async function preRequisitos() {
 // ---------------------------------------------------------------- 2. sistemas SAP
 function explicarFalha(e) {
   const msg = e?.cause?.code || e?.code ? `${e.message} (${e.cause?.code || e.code})` : e?.message || String(e);
-  if (/SELF_SIGNED|UNABLE_TO_VERIFY|UNABLE_TO_GET_ISSUER|CERT_/.test(msg))
-    return `${msg}\n      O certificado do SAP é de uma CA interna. Peça ao Basis a CA raiz em .pem e defina NODE_EXTRA_CA_CERTS (o setup oferece isso a seguir).`;
+  if (ehErroCertificado(e))
+    return `${msg}\n      O sistema não confia no certificado do SAP (autoassinado ou de CA interna). O setup oferece fixar o certificado desta conexão a seguir.`;
   if (/ENOTFOUND|EAI_AGAIN/.test(msg)) return `${msg}\n      Host não encontrado: confira a URL e se você está na VPN do cliente.`;
   if (/ECONNREFUSED|ETIMEDOUT|TimeoutError|aborted/i.test(msg)) return `${msg}\n      Sem resposta: confira a porta HTTPS do ICM, a VPN e o firewall.`;
   return msg;
 }
 
-async function oferecerCertificado() {
-  if (process.env.NODE_EXTRA_CA_CERTS) {
-    info(`NODE_EXTRA_CA_CERTS já está definido (${process.env.NODE_EXTRA_CA_CERTS}); confira se é a CA certa.`);
-    return;
+// Certificado não confiável (ADR-0013): baixa a cadeia do servidor (só o handshake TLS, sem
+// credencial), mostra o SHA-256 para o usuário conferir e grava o .pem em .agents/certs/.
+// Se o servidor não enviar a raiz da cadeia, pede o .pem da CA raiz ao usuário.
+// Devolve { rel, pem, semSan } ou null.
+async function oferecerConfianca(servidor, url) {
+  let cert;
+  try {
+    cert = await obterCertificado(url);
+  } catch (e) {
+    erro(`não foi possível ler o certificado do servidor: ${e.message}`);
+    return null;
   }
-  if (!(await confirmar("Informar agora o arquivo .pem da CA do cliente?", true))) return;
-  const pem = await perguntar("Caminho do .pem", {
-    validar: (p) => (fs.existsSync(p) && /BEGIN CERTIFICATE/.test(ler(p)) ? null : "arquivo não encontrado ou não é um certificado PEM"),
-  });
-  gravarVariavelUsuario("NODE_EXTRA_CA_CERTS", path.resolve(pem));
-  info("O Node só lê essa variável ao iniciar: feche este terminal, abra outro e rode o setup de novo.");
-  process.exit(0);
+  console.log(`\n    Certificado apresentado por ${new URL(url).host}:`);
+  info(`  assunto: ${cert.assunto} · emissor: ${cert.emissor}${cert.autoassinado ? " (autoassinado)" : ""}`);
+  info(`  SAN: ${cert.san ?? "nenhum"} · válido até ${cert.validoAte}`);
+  let pem;
+  if (cert.ancora) {
+    console.log(`    SHA-256 de ${cert.ancora.assunto}:\n    ${negrito(cert.ancora.sha256)}`);
+    aviso("Confira esse SHA-256 com o Basis (STRUST, PSE \"SSL Server Standard\") antes de confiar: é o que garante que ninguém trocou o certificado no caminho.");
+    if (!(await confirmar("Confiar neste certificado para esta conexão?", false))) return null;
+    pem = cert.ancora.pem;
+  } else {
+    aviso("O servidor não enviou a CA raiz da cadeia. Peça ao Basis a CA raiz em .pem (Base64).");
+    if (!(await confirmar("Informar agora o caminho do .pem da CA raiz?", true))) return null;
+    const arq = await perguntar("Caminho do .pem", {
+      validar: (p) => (fs.existsSync(p) && /BEGIN CERTIFICATE/.test(ler(p)) ? null : "arquivo não encontrado ou não é um certificado PEM"),
+    });
+    pem = ler(arq);
+  }
+  const rel = gravarCertificado(ROOT, servidor, pem);
+  ok(`certificado gravado em ${rel} (não versionado)`);
+  return { rel, pem, semSan: !cert.san };
 }
 
 // Grava uma variável de ambiente permanente do usuário. No Windows, pelo registro do usuário
@@ -242,16 +265,36 @@ async function configurarSistema(s, servidores, resultados) {
     };
     conn.client = conn.client.padStart(3, "0");
 
-    info("conectando ao SAP para detectar o sistema...");
-    let det;
-    try {
-      det = await detectar(conn);
-    } catch (e) {
-      erro(`não foi possível identificar o sistema: ${explicarFalha(e)}`);
-      if (/CA interna/.test(explicarFalha(e))) await oferecerCertificado();
+    // Certificado já fixado para esta conexão (<P>_SAP_CA_CERT), se houver.
+    let certConn = null;
+    if (atual("SAP_CA_CERT")) {
+      try {
+        certConn = { rel: atual("SAP_CA_CERT"), pem: lerCertificado(ROOT, atual("SAP_CA_CERT")).pem };
+      } catch (e) {
+        aviso(`${prefix}_SAP_CA_CERT: ${e.message}`);
+      }
+    }
+
+    let det, falha;
+    for (;;) {
+      info("conectando ao SAP para detectar o sistema...");
+      try {
+        det = await detectar({ ...conn, ca: certConn?.pem });
+        falha = null;
+        break;
+      } catch (e) {
+        falha = e;
+        erro(`não foi possível identificar o sistema: ${explicarFalha(e)}`);
+        if (!ehErroCertificado(e)) break;
+        const novo = await oferecerConfianca(s.servidor, conn.url);
+        if (!novo) break;
+        certConn = novo;
+      }
+    }
+    if (falha) {
       if (await confirmar("Corrigir e tentar de novo?", true)) continue;
       if (await confirmar("Gravar a conexão no .env mesmo assim (sem detectar)?", false)) {
-        gravarEnv(conexaoParaEnv(prefix, conn, s, null));
+        gravarEnv(conexaoParaEnv(prefix, conn, s, null, { certConn }));
         aviso("gravado sem detecção; rode o doctor depois para conferir");
       }
       return;
@@ -277,21 +320,34 @@ async function configurarSistema(s, servidores, resultados) {
       info(`${det.produto}: a análise é pelo abap-adt; o arc-1 fica como contingência de análise.`);
 
     if (problemas.length && (await confirmar("Corrigir e tentar de novo?", true))) continue;
+
+    // O vsp é escrito em Go: não lê o .pem fixado e recusa certificado sem SAN (ADR-0013).
+    let inseguro = false;
+    if (s.etapa === "dev" && certConn) {
+      aviso("O vsp não usa o certificado fixado (é um binário Go, sem opção de CA própria) e recusa certificado sem SAN.");
+      info("  Com VSP_SAP_INSECURE=true, o launcher confere o certificado fixado ao iniciar e passa --insecure ao vsp.");
+      info("  O definitivo é o Basis emitir um certificado com SAN e a CA ser importada no repositório do Windows.");
+      inseguro = await confirmar("Ligar VSP_SAP_INSECURE=true para esta conexão?", true);
+    }
+
     if (!(await confirmar("Gravar esta conexão no .env?", !problemas.length))) return;
-    gravarEnv(conexaoParaEnv(prefix, conn, s, det.sid));
+    gravarEnv(conexaoParaEnv(prefix, conn, s, det.sid, { certConn, inseguro }));
     ok(`gravado no .env (${prefix}_*)`);
     resultados[s.etapa] = { sid: det.sid, produto: det.produto, ambiente: det.ambiente, oficial };
     return;
   }
 }
 
-function conexaoParaEnv(prefix, conn, s, sid) {
+function conexaoParaEnv(prefix, conn, s, sid, { certConn = null, inseguro = false } = {}) {
   const valores = {
     [`${prefix}_SAP_URL`]: conn.url,
     [`${prefix}_SAP_CLIENT`]: conn.client,
     [`${prefix}_SAP_USER`]: conn.user,
     [`${prefix}_SAP_PASSWORD`]: conn.password,
+    // null remove a linha: sem certificado fixado, vale a cadeia confiável do sistema.
+    [`${prefix}_SAP_CA_CERT`]: certConn?.rel ?? null,
   };
+  if (s.etapa === "dev") valores[`${prefix}_SAP_INSECURE`] = inseguro ? "true" : null;
   // O SID detectado vira conferência: se a URL for trocada por engano, o launcher recusa.
   if (sid) valores[`${prefix}_SAP_SID`] = sid;
   if (s.etapa === "dev") {
