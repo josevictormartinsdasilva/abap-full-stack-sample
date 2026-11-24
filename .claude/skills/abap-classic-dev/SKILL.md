@@ -59,3 +59,14 @@ Esta skill orienta o desenvolvimento e manutenção de soluções em ABAP Tradic
    - SmartForms: `ZSF<MD>_<DESCRICAO>`, Adobe Forms: `ZAF<MD>_<DESCRICAO>`, Smart Styles: `ZST<MD>_<DESCRICAO>`.
    - Enhancement Implementation: `ZEI<MD>_<DESCRICAO>`.
    - BAdI: `Z<MD>_<DESCRICAO>`, User Exit / CMOD: `Z<MD>_<DESCRICAO>`.
+
+## Referências (leia sob demanda)
+
+Material técnico de apoio em `references/`. Leia o arquivo indicado **antes** de começar a tarefa correspondente. Nomes, prefixos e regras deste documento e de `padrao-desenvolvimento.md` prevalecem sobre os exemplos das referências.
+
+| Tarefa | Arquivo |
+|---|---|
+| Implementar ou criar BAdI, user/customer exit ou enhancement; avaliar substituição de enhancement implícito ou modificação | [references/badi-enhancements.md](references/badi-enhancements.md) |
+| Corrigir achados de clean core em código clássico, trocar FMs/tabelas/instruções não permitidas, criar wrapper, estimar remediação | [references/migracao-clean-core.md](references/migracao-clean-core.md) |
+| Classificar um objeto ou achado ATC por nível (A–D) | [../abap-qa-auditor/references/clean-core-niveis.md](../abap-qa-auditor/references/clean-core-niveis.md) |
+| Escolher classe liberada (UUID, e-mail, HTTP, log, bloqueio, numeração) | [../abap-rap-dev/references/classes-liberadas.md](../abap-rap-dev/references/classes-liberadas.md) |

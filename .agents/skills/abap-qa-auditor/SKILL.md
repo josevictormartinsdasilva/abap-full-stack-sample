@@ -37,3 +37,13 @@ Os nomes de ferramentas abaixo são os do `abap-adt` (MCP oficial, S/4HANA 2025+
 
 4. **Nomenclatura**:
    - Auditar os nomes dos objetos criados/alterados contra `naming-conventions.json`.
+
+## Referências (leia sob demanda)
+
+Material técnico de apoio em `references/`. Leia o arquivo indicado **antes** de começar a tarefa correspondente. As regras deste documento e o tópico 13 de `padrao-desenvolvimento.md` prevalecem.
+
+| Tarefa | Arquivo |
+|---|---|
+| Classificar achados ATC por nível de clean core (A–D) e redigir o relatório | [references/clean-core-niveis.md](references/clean-core-niveis.md) |
+| Interpretar checks de clean core, explicar check ausente na variante, recomendar isenções | [references/atc-cloudification.md](references/atc-cloudification.md) |
+| Escrever, revisar ou analisar falhas de ABAP Unit (dublês, CDS/OSQL test environment, RAP) | [references/abap-unit-testing.md](references/abap-unit-testing.md) |
