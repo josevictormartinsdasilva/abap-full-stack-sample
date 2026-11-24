@@ -32,7 +32,7 @@ flowchart TD
     QA --- SAP_MCP
     SAP_MCP -->|S/4HANA 2025+| ADT_MCP[(abap-adt<br/>MCP oficial SAP)]
     SAP_MCP -->|≤ 2023 · DEV/Sandbox| VSP_MCP[(vsp)]
-    SAP_MCP -->|≤ 2023 · QAS/PRD · leitura| ARC_MCP[(arc-1)]
+    SAP_MCP -->|≤ 2023 · QAS · leitura| ARC_MCP[(arc-1)]
     Fiori --- FIORI_MCP[(fiori-mcp MCP)]
 ```
 
@@ -47,7 +47,7 @@ flowchart TD
 | **`fiori-elements-dev`** | Frontend Fiori & UI5 | Gerenciamento agnóstico de apps Fiori (LROP, ALP, OVP, FCL), Page Map no `manifest.json`, rotas, alvos, anotações XML locais e scripts UI5. | `fiori-mcp`, Terminal UI5/npm | [SKILL.md](.agents/skills/fiori-elements-dev/SKILL.md) |
 | **`abap-qa-auditor`** | Qualidade & Governança | Execução de inspeções ATC, aplicação de QuickFixes automatizados, testes ABAP Unit e validação estática de código frontend (`eslint`). | `abap-adt`, `vsp` ou `arc-1`¹, Terminal | [SKILL.md](.agents/skills/abap-qa-auditor/SKILL.md) |
 
-¹ O servidor MCP SAP é escolhido por sistema, conforme a [política de MCP ABAP](standards/politica-mcp-abap.md): `abap-adt` em S/4HANA 2025+, `vsp` em DEV/Sandbox ≤ 2023 e `arc-1` (somente leitura) em QAS/PRD ≤ 2023.
+¹ O servidor MCP SAP é escolhido por sistema, conforme a [política de MCP ABAP](standards/politica-mcp-abap.md): `abap-adt` em S/4HANA 2025+, `vsp` em DEV/Sandbox ≤ 2023 e `arc-1` (somente leitura) em QAS ≤ 2023. Nenhum servidor acessa o PRD ([ADR-0014](docs/adr/0014-ambiente-produtivo-fora-do-alcance-dos-agentes.md)).
 
 ---
 
@@ -173,7 +173,7 @@ Quando uma nova funcionalidade completa precisa ser entregue, o **Orquestrador C
    Ele pede só a conexão de cada sistema (URL, mandante, usuário, senha), detecta no próprio SAP o SID, o release e o ambiente, e grava o `.env`. Depois pede os parâmetros do cliente e preenche o bloco `cliente` de [standards/naming-conventions.json](standards/naming-conventions.json) e os placeholders de [standards/padrao-desenvolvimento.md](standards/padrao-desenvolvimento.md). O `sistemaDesenvolvimento` vem do SID detectado no DEV. Em S/4HANA 2025+, oferece gravar o token do `abap-adt`. Para refazer uma etapa: `--apenas=dev` (ou `qas`, `prd`, `cliente`, `token`).
 2. Confira tudo com `node scripts/doctor.mjs` (o setup já roda no fim). Ele verifica Node, arquivos gerados, testes das travas, parâmetros do cliente, cada conexão (pelo diagnóstico do launcher), o `abap-adt` e o `fiori-mcp`, e diz o que fazer em cada falha.
 3. Abra a ferramenta de IA na raiz e confirme com `/mcp`. Os detalhes de cada servidor estão em [Configuração do Token MCP](#-configuração-do-token-mcp-abap-adt) e no [passo a passo do vsp/arc-1](docs/setup-mcp-abap.md).
-4. **Libere os agentes apenas no sistema de desenvolvimento.** Eles criam e ativam objetos diretamente via `abap-adt` ou `vsp`; use um usuário com autorizações restritas a DEV/sandbox. Para `arc-1` em QAS/PRD, use um usuário somente leitura.
+4. **Libere os agentes apenas no sistema de desenvolvimento.** Eles criam e ativam objetos diretamente via `abap-adt` ou `vsp`; use um usuário com autorizações restritas a DEV/sandbox. Para `arc-1` no QAS, use um usuário somente leitura. Não configure credenciais do PRD: nenhum servidor acessa o ambiente produtivo.
 
 ---
 
@@ -214,18 +214,18 @@ O token do servidor `abap-adt` **não é versionado**. Cada desenvolvedor config
 
 Definidos pela [política de MCP ABAP](standards/politica-mcp-abap.md) ([ADR-0009](docs/adr/0009-selecao-de-mcp-abap-por-versao-e-ambiente.md)). Os dois são iniciados por `scripts/mcp-launch.mjs`, nunca diretamente. O launcher:
 
-- identifica o sistema lendo o próprio SAP: SID, release (SAP_BASIS) e ambiente pelo papel do mandante na SCC4 (T000). Não depende do que o operador declarou, e o que não puder ler é tratado como PRD;
-- impõe as travas técnicas: `vsp` só em DEV/Sandbox, com `--expect`, `--allowed-packages` e `--block-free-sql`; `arc-1` somente leitura em QAS/PRD, sem prévia de dados nem SQL; SAP_BASIS < 750 recusado; conexão só por `https://` e sem TLS desligado;
+- identifica o sistema lendo o próprio SAP: SID, release (SAP_BASIS) e ambiente pelo papel do mandante na SCC4 (T000). Não depende do que o operador declarou, e o que não puder ler é tratado como PRD, que é recusado;
+- impõe as travas técnicas: `vsp` só em DEV/Sandbox, com `--expect`, `--allowed-packages` e `--block-free-sql`; `arc-1` somente leitura em QAS, sem prévia de dados nem SQL; PRD recusado para os dois (ADR-0014); SAP_BASIS < 750 recusado; conexão só por `https://` e sem TLS desligado;
 - isola as credenciais de cada servidor.
 
-**Fallback em S/4HANA 2025+:** se o `abap-adt` não oferecer uma operação de desenvolvimento num DEV/Sandbox 2025+, a cadeia é `abap-adt` → `vsp` → `arc-1` → execução manual (código e passos para o ADT, só com sua autorização). O `vsp` e o `arc-1` só sobem num sistema 2025+ com opt-in no `.env` (`VSP_FALLBACK_2025=true`; para o `arc-1`, a entrada `arc-1-dev` com `ARC1_DEV_FALLBACK_2025=true`), que fica desligado por padrão. Em QAS/PRD 2025+ não há fallback de desenvolvimento; se o `abap-adt` não oferecer uma operação de **análise**, ela segue pelo `arc-1` somente leitura no mesmo sistema, sem flag ([política, seção 4.5](standards/politica-mcp-abap.md), [ADR-0012](docs/adr/0012-fallback-de-analise-em-qas-prd-s4hana-2025.md)). Passo a passo em [docs/setup-mcp-abap.md](docs/setup-mcp-abap.md#fallback-do-abap-adt-em-s4hana-2025) e regras na [política, seção 4.4](standards/politica-mcp-abap.md) ([ADR-0011](docs/adr/0011-fallback-de-desenvolvimento-em-s4hana-2025.md)).
+**Fallback em S/4HANA 2025+:** se o `abap-adt` não oferecer uma operação de desenvolvimento num DEV/Sandbox 2025+, a cadeia é `abap-adt` → `vsp` → `arc-1` → execução manual (código e passos para o ADT, só com sua autorização). O `vsp` e o `arc-1` só sobem num sistema 2025+ com opt-in no `.env` (`VSP_FALLBACK_2025=true`; para o `arc-1`, a entrada `arc-1-dev` com `ARC1_DEV_FALLBACK_2025=true`), que fica desligado por padrão. No QAS 2025+ não há fallback de desenvolvimento; se o `abap-adt` não oferecer uma operação de **análise**, ela segue pelo `arc-1` somente leitura no mesmo sistema, sem flag. No PRD, nenhum servidor ([política, seção 4.5](standards/politica-mcp-abap.md), [ADR-0012](docs/adr/0012-fallback-de-analise-em-qas-prd-s4hana-2025.md)). Passo a passo em [docs/setup-mcp-abap.md](docs/setup-mcp-abap.md#fallback-do-abap-adt-em-s4hana-2025) e regras na [política, seção 4.4](standards/politica-mcp-abap.md) ([ADR-0011](docs/adr/0011-fallback-de-desenvolvimento-em-s4hana-2025.md)).
 
 As decisões ficam em `scripts/mcp-politica.mjs` e são cobertas por testes (`node --test scripts/test/*.test.mjs`), que a CI executa. O launcher já foi validado com o `vsp` num DEV S/4HANA 2023 real; o que falta validar está em [Validações pendentes](docs/setup-mcp-abap.md#validações-pendentes).
 
 **Configuração na máquina:** siga o passo a passo em [docs/setup-mcp-abap.md](docs/setup-mcp-abap.md). Ele cobre:
 
 - os requisitos: só Node.js ≥ 22.19. O binário do `vsp` e o pacote do ARC-1 não exigem instalação manual: o launcher baixa a última versão estável de cada um para um cache do usuário, confere a integridade (SHA-256 no `vsp`, hash do registry npm no ARC-1) e recusa iniciar se uma versão nova perder alguma flag ou variável de segurança (`VSP_VERSION`/`ARC1_VERSION` fixam uma versão);
-- o `.env`, com uma conexão por sistema do cliente: `VSP_*` (DEV), `ARC1_QAS_*` (QAS) e `ARC1_PRD_*` (PRD);
+- o `.env`, com uma conexão por sistema do cliente: `VSP_*` (DEV) e `ARC1_QAS_*` (QAS); não há conexão com o PRD;
 - o teste com `node scripts/mcp-launch.mjs <servidor> --diagnostico`;
 - vários sistemas do mesmo tipo;
 - macOS/Linux;

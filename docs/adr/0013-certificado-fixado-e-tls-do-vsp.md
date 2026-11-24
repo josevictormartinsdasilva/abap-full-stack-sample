@@ -25,7 +25,7 @@ Na prática, muitos sistemas usam o certificado **autoassinado** que o STRUST ge
 ## Alternativas consideradas
 
 - **Manter só o `NODE_EXTRA_CA_CERTS` global.** Não resolve o `vsp` e mantém o passo manual que gerou a dúvida.
-- **Desligar o TLS em todas as conexões, com opt-in.** Desnecessário para o `arc-1` e o probe (Node aceita o certificado fixado, mesmo sem SAN), e expõe a senha de QAS/PRD.
+- **Desligar o TLS em todas as conexões, com opt-in.** Desnecessário para o `arc-1` e o probe (Node aceita o certificado fixado, mesmo sem SAN), e expõe a senha do QAS.
 - **Importar o certificado no repositório do Windows para o `vsp`.** Não basta: o Go recusa certificado sem SAN mesmo confiável. Vale como solução definitiva junto com um certificado com SAN emitido pelo Basis.
 - **Fixar por SHA-256 em vez de `.pem`.** Exige desligar a validação da cadeia e conferir o hash por fora; com o `.pem` como âncora, a validação padrão do OpenSSL (inclusive o nome do host) continua valendo.
 
@@ -35,7 +35,7 @@ Na prática, muitos sistemas usam o certificado **autoassinado** que o STRUST ge
 - (+) Certificado trocado ou interceptação no início da sessão são detectados: o launcher recusa iniciar.
 - (−) Com `<P>_SAP_INSECURE=true`, o `vsp` não verifica o TLS durante a sessão. Uma interceptação que comece depois da verificação inicial não seria detectada, e a senha do DEV ficaria exposta. A mitigação é procedural: usar só enquanto o Basis não emite um certificado com SAN.
 - (−) A conferência do SHA-256 depende do usuário. Sem ela, o primeiro uso confia no que a rede entregou (*trust on first use*).
-- (−) Renovar o certificado no STRUST exige fixar de novo (`node scripts/setup.mjs --apenas=dev`, `qas` ou `prd`).
+- (−) Renovar o certificado no STRUST exige fixar de novo (`node scripts/setup.mjs --apenas=dev` ou `qas`).
 
 ## Evidências
 

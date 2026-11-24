@@ -196,7 +196,7 @@ describe("decidir — ARC-1", () => {
     assert.equal(d.childEnv.SAP_ALLOWED_PACKAGES, undefined);
   });
   test("travas fixas sempre presentes", () => {
-    for (const ambiente of ["DEV", "SANDBOX", "QAS", "PRD"]) {
+    for (const ambiente of ["DEV", "SANDBOX", "QAS"]) {
       const { childEnv } = decidirCom({ tool: "arc-1", sistema: { ambiente } });
       for (const k of ["SAP_INSECURE", "SAP_ALLOW_TRANSPORT_WRITES", "SAP_ALLOW_GIT_WRITES", "SAP_ALLOW_DATA_PREVIEW", "SAP_ALLOW_FREE_SQL", "SAP_ALLOW_PLUGIN_EXECUTE"])
         assert.equal(childEnv[k], "false", `${ambiente} ${k}`);
@@ -227,7 +227,7 @@ describe("decidir — ARC-1", () => {
   });
   test("opt-in não libera escrita fora de DEV/SANDBOX nem em 2025+ (2.1)", () => {
     const vars = { ALLOW_DEV_WRITES: "true", ALLOWED_PACKAGES: "Z*" };
-    for (const ambiente of ["QAS", "PRD"]) {
+    for (const ambiente of ["QAS"]) {
       const d = decidirCom({ tool: "arc-1", sistema: { ambiente }, vars });
       assert.equal(d.childEnv.SAP_ALLOW_WRITES, "false", ambiente);
       assert.match(d.avisos[0], /ALLOW_DEV_WRITES ignorada/, ambiente);
@@ -240,8 +240,8 @@ describe("decidir — ARC-1", () => {
     assert.equal(d.childEnv.SAP_ALLOW_WRITES, "false");
     assert.match(d.avisos[0], /ARC1_SAP_SID/);
   });
-  test("QAS e PRD: ABAP Unit negado (2.2)", () => {
-    for (const ambiente of ["QAS", "PRD"]) {
+  test("QAS: ABAP Unit negado (2.2)", () => {
+    for (const ambiente of ["QAS"]) {
       const d = decidirCom({ tool: "arc-1", sistema: { ambiente } });
       assert.deepEqual(d.acoesNegadas, ["SAPWrite.delete", ...ARC1_NEGADAS_FORA_DEV], ambiente);
       assert.equal(d.childEnv.SAP_DENY_ACTIONS, "SAPWrite.delete,SAPDiagnose.unittest,SAPDiagnose.unittest_ci", ambiente);
@@ -291,7 +291,7 @@ describe("decidir — vsp", () => {
     assert.deepEqual(d.args, ["--mode", "hyperfocused", "--expect", "DS4.100/DEV", "--allowed-packages", "ZMM*", "--block-free-sql"]);
     assert.ok(!d.args.includes("--insecure"));
   });
-  for (const ambiente of ["QAS", "PRD"])
+  for (const ambiente of ["QAS"])
     test(`${ambiente} recusa`, () => {
       assert.throws(() => decidirCom({ tool: "vsp", sistema: { ambiente }, vars }), recusa(/vsp só em DEV\/SANDBOX/));
     });
@@ -349,8 +349,8 @@ describe("decidir — fallback do abap-adt em 2025+ (política 4.4)", () => {
       assert.ok(d.avisos.some((a) => /fallback do abap-adt/.test(a)), ambiente);
     }
   });
-  test("vsp com opt-in continua recusado em QAS/PRD", () => {
-    for (const ambiente of ["QAS", "PRD"])
+  test("vsp com opt-in continua recusado em QAS", () => {
+    for (const ambiente of ["QAS"])
       assert.throws(() => decidirCom({ tool: "vsp", sistema: { ...s2025, ambiente }, vars: { ...vsp, FALLBACK_2025: "true" } }), recusa(/vsp só em DEV\/SANDBOX/), ambiente);
   });
   test("vsp com opt-in e SID pendente recusa", () => {
@@ -367,8 +367,8 @@ describe("decidir — fallback do abap-adt em 2025+ (política 4.4)", () => {
     const semEscrita = decidirCom({ tool: "arc-1", sistema: s2025, vars: { FALLBACK_2025: "true" } });
     assert.equal(semEscrita.modo, "somente leitura");
   });
-  test("ARC-1 com opt-in em QAS/PRD 2025+ continua somente leitura", () => {
-    for (const ambiente of ["QAS", "PRD"]) {
+  test("ARC-1 com opt-in em QAS 2025+ continua somente leitura", () => {
+    for (const ambiente of ["QAS"]) {
       const d = decidirCom({ tool: "arc-1", sistema: { ...s2025, ambiente }, vars: { ...arc1, FALLBACK_2025: "true" } });
       assert.equal(d.childEnv.SAP_ALLOW_WRITES, "false", ambiente);
       assert.ok(d.avisos.some((a) => /ARC1_FALLBACK_2025 ignorada/.test(a)), ambiente);
@@ -403,7 +403,7 @@ describe("decidir — TLS: certificado fixado e opt-in insecure do vsp (ADR-0013
     assert.ok(!decidirCom({ tool: "vsp", vars: vsp }).args.includes("--insecure"));
   });
   test("ARC-1 com certificado fixado recebe o .pem por NODE_EXTRA_CA_CERTS e continua verificando", () => {
-    for (const ambiente of ["DEV", "QAS", "PRD"]) {
+    for (const ambiente of ["DEV", "QAS"]) {
       const d = decidirCom({ tool: "arc-1", sistema: { ambiente }, caCert: CA });
       assert.equal(d.childEnv.NODE_EXTRA_CA_CERTS, CA, ambiente);
       assert.equal(d.childEnv.SAP_INSECURE, "false", ambiente);
@@ -415,7 +415,7 @@ describe("decidir — TLS: certificado fixado e opt-in insecure do vsp (ADR-0013
     assert.equal(d.childEnv.NODE_EXTRA_CA_CERTS, CA);
   });
   test("ARC-1 ignora SAP_INSECURE, com aviso", () => {
-    for (const ambiente of ["DEV", "QAS", "PRD"]) {
+    for (const ambiente of ["DEV", "QAS"]) {
       const d = decidirCom({ tool: "arc-1", sistema: { ambiente }, vars: { SAP_INSECURE: "true" } });
       assert.equal(d.childEnv.SAP_INSECURE, "false", ambiente);
       assert.ok(d.avisos.some((a) => /ARC1_SAP_INSECURE ignorada/.test(a)), ambiente);
@@ -438,5 +438,32 @@ describe("decidir — TLS: certificado fixado e opt-in insecure do vsp (ADR-0013
   test("valores que não ligam o opt-in", () => {
     for (const valor of ["false", "0", "", undefined])
       assert.ok(!decidirCom({ tool: "vsp", vars: { ...vsp, SAP_INSECURE: valor } }).args.includes("--insecure"), String(valor));
+  });
+});
+
+describe("decidir — PRD recusado para qualquer servidor (ADR-0014)", () => {
+  const vars = { ALLOWED_PACKAGES: "Z*", ALLOW_DEV_WRITES: "true", FALLBACK_2025: "true", READ_ONLY: "true" };
+  for (const tool of ["arc-1", "vsp"])
+    for (const sapBasis of [758, 816])
+      test(`${tool} recusa PRD (SAP_BASIS ${sapBasis}), mesmo com opt-ins`, () => {
+        assert.throws(() => decidirCom({ tool, sistema: { ambiente: "PRD", sapBasis, motivo: "mandante produtivo" }, vars }),
+          recusa(/é PRD — mandante produtivo.*nenhum servidor acessa o ambiente produtivo.*ADR-0014/));
+      });
+  test("PRD por precaução (T000 ilegível): recusa com a dica da autorização", () => {
+    assert.throws(() => decidirCom({ tool: "arc-1", sistema: { ambiente: "PRD", motivo: "T000 ilegível — tratado como PRD por precaução" } }),
+      recusa(/autorização de data preview na T000/));
+  });
+  test("mandante produtivo: recusa sem a dica da T000", () => {
+    assert.throws(() => decidirCom({ tool: "arc-1", sistema: { ambiente: "PRD", motivo: "mandante produtivo (CCCATEGORY=P)" } }),
+      (e) => e instanceof Recusa && !/data preview/.test(e.message));
+  });
+  test("registro que restringe um sistema a PRD também recusa", () => {
+    const r = aplicarRegistro({ sid: "QS4", mandante: "400", ambiente: "QAS", motivo: "x" },
+      lerRegistro(registro([{ sid: "QS4", ambiente: "PRD" }]), REG).restricoes, REG);
+    assert.equal(r.ambiente, "PRD");
+    assert.throws(() => decidirCom({ tool: "arc-1", sistema: { ambiente: r.ambiente, motivo: r.motivo } }), recusa(/ADR-0014/));
+  });
+  test("QAS continua aceito, somente leitura", () => {
+    assert.equal(decidirCom({ tool: "arc-1", sistema: { ambiente: "QAS" } }).modo, "somente leitura");
   });
 });

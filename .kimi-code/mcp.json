@@ -14,16 +14,6 @@
       ],
       "startupTimeoutMs": 300000
     },
-    "arc-1-prd": {
-      "command": "cmd",
-      "args": [
-        "/c",
-        "node",
-        "scripts/mcp-launch.mjs",
-        "arc-1-prd"
-      ],
-      "startupTimeoutMs": 300000
-    },
     "arc-1-dev": {
       "command": "cmd",
       "args": [

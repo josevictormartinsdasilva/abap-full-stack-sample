@@ -1,5 +1,5 @@
 {
-  "_comentario": "FONTE ÚNICA dos servidores MCP. Edite aqui e rode `node scripts/sync-agents.mjs`. O token nunca é versionado: vem da variável de ambiente indicada em tokenEnvVar. arc-1 e vsp são iniciados por scripts/mcp-launch.mjs, que aplica as travas de standards/politica-mcp-abap.md (ADR-0009); cada entrada é uma conexão, e o sufixo do nome define o prefixo das variáveis (vsp -> VSP_*, arc-1-qas -> ARC1_QAS_*, arc-1-prd -> ARC1_PRD_*, arc-1-dev -> ARC1_DEV_*). Para mais sistemas, copie uma entrada com outro sufixo (ex.: vsp-sandbox -> VSP_SANDBOX_*).",
+  "_comentario": "FONTE ÚNICA dos servidores MCP. Edite aqui e rode `node scripts/sync-agents.mjs`. O token nunca é versionado: vem da variável de ambiente indicada em tokenEnvVar. arc-1 e vsp são iniciados por scripts/mcp-launch.mjs, que aplica as travas de standards/politica-mcp-abap.md (ADR-0009). Não há entrada para PRD: nenhum servidor acessa o ambiente produtivo (ADR-0014); cada entrada é uma conexão, e o sufixo do nome define o prefixo das variáveis (vsp -> VSP_*, arc-1-qas -> ARC1_QAS_*, arc-1-dev -> ARC1_DEV_*). Para mais sistemas, copie uma entrada com outro sufixo (ex.: vsp-sandbox -> VSP_SANDBOX_*).",
   "servers": {
     "abap-adt": {
       "transport": "http",
@@ -10,12 +10,6 @@
       "transport": "stdio",
       "command": "node",
       "args": ["scripts/mcp-launch.mjs", "arc-1-qas"],
-      "timeoutSec": 300
-    },
-    "arc-1-prd": {
-      "transport": "stdio",
-      "command": "node",
-      "args": ["scripts/mcp-launch.mjs", "arc-1-prd"],
       "timeoutSec": 300
     },
     "arc-1-dev": {

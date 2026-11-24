@@ -24,8 +24,8 @@ Estes itens não dependem de você. Peça logo no início, porque costumam demor
 | Basis | Serviço ICF `/sap/bc/adt` ativo | Sem ele, nenhum MCP conecta |
 | Basis / infraestrutura | CA raiz em `.pem`, se o SAP usar certificado de CA interna | Conexão HTTPS (o launcher nunca desliga a verificação TLS) |
 | Segurança SAP | Usuário de DEV com autorizações de desenvolvedor ADT, restritas aos pacotes do projeto | Os agentes criam e ativam objetos com esse usuário |
-| Segurança SAP | Autorização de **data preview na T000** para esse usuário | O launcher lê a T000 para saber se o sistema é DEV, QAS ou PRD. Sem ela, o sistema é tratado como PRD e nada é criado |
-| Segurança SAP | Usuário **somente leitura** em QAS/PRD (opcional) | Análise com o `arc-1` |
+| Segurança SAP | Autorização de **data preview na T000** para esse usuário | O launcher lê a T000 para saber se o sistema é DEV, QAS ou PRD. Sem ela, o sistema é tratado como PRD e o launcher recusa conectar |
+| Segurança SAP | Usuário **somente leitura** no QAS (opcional) | Análise com o `arc-1` |
 | Responsável pela ferramenta de IA | Acesso/licença da ferramenta (Claude Code, Codex etc.) | Usar o orquestrador |
 
 > Use **sempre** um usuário restrito ao DEV para desenvolvimento. O projeto tem várias travas, mas a autorização SAP é a última barreira.
@@ -67,7 +67,7 @@ node scripts/setup.mjs
 O assistente faz as etapas 4 e 5 por você:
 
 1. Confere o Node e, no macOS/Linux, gera os arquivos de MCP sem o `cmd /c`.
-2. Para o **DEV** (e, se você quiser, **QAS** e **PRD**), pede só URL, mandante, usuário e senha. A senha não aparece na tela.
+2. Para o **DEV** (e, se você quiser, o **QAS**; o PRD não é configurado), pede só URL, mandante, usuário e senha. A senha não aparece na tela.
 3. Conecta no SAP e mostra o que detectou: SID, release e ambiente. Você não precisa saber o release antes: se for S/4HANA 2025+, ele avisa que o caminho é o `abap-adt` (5A); se for 2023 ou inferior, o `vsp` (5B). Se a URL do DEV apontar para um QAS, ele avisa antes de gravar.
 4. Grava o `.env`, com o SID detectado como conferência.
 5. Pede os parâmetros do cliente (etapa 4). O `sistemaDesenvolvimento` vem do SID detectado no DEV, sem digitar.
@@ -76,7 +76,7 @@ O assistente faz as etapas 4 e 5 por você:
 
 Senhas e token ficam só na sua máquina: o assistente é um script local e não passa nada pela ferramenta de IA. Nada é gravado sem a sua confirmação.
 
-Para refazer uma etapa: `node scripts/setup.mjs --apenas=dev` (ou `qas`, `prd`, `cliente`, `token`, separados por vírgula). Para só conferir, a qualquer momento: `node scripts/doctor.mjs`.
+Para refazer uma etapa: `node scripts/setup.mjs --apenas=dev` (ou `qas`, `cliente`, `token`, separados por vírgula). Para só conferir, a qualquer momento: `node scripts/doctor.mjs`.
 
 As etapas 4 e 5 abaixo descrevem o que o assistente faz, para quem preferir configurar à mão ou precisar entender um erro.
 
@@ -114,7 +114,7 @@ Escolha o caminho pelo release do sistema DEV (informado pelo Basis na etapa 1).
 | Release | Servidor MCP | Caminho |
 |---|---|---|
 | S/4HANA 2025 ou superior (SAP_BASIS ≥ 816) | `abap-adt` (MCP oficial SAP) | 5A |
-| S/4HANA 2023 ou inferior (SAP_BASIS 750 a 815) | `vsp` no DEV, `arc-1` em QAS/PRD | 5B |
+| S/4HANA 2023 ou inferior (SAP_BASIS 750 a 815) | `vsp` no DEV, `arc-1` no QAS | 5B |
 | Anterior ao NetWeaver 7.50 | — | Fora do escopo do projeto |
 
 O release que vale é o **detectado no SAP**, não o declarado. Se o launcher recusar, a mensagem diz o motivo.
@@ -145,7 +145,7 @@ Siga os passos 1 a 7 de [docs/setup-mcp-abap.md](setup-mcp-abap.md). Em resumo:
 
 1. Nada a instalar para o `vsp`: o launcher baixa a última versão estável na primeira execução (e quando sai uma nova) e confere o SHA-256. Se a rede bloquear o GitHub, veja o passo 2 do guia.
 2. Se o SAP usar CA interna, aponte `NODE_EXTRA_CA_CERTS` para o `.pem`.
-3. Preencha no `.env` as variáveis `VSP_*` (DEV) e, se for usar, `ARC1_QAS_*` (QAS) e `ARC1_PRD_*` (PRD).
+3. Preencha no `.env` as variáveis `VSP_*` (DEV) e, se for usar, `ARC1_QAS_*` (QAS). Não há conexão com o PRD.
 4. Teste:
 
    ```powershell
@@ -168,7 +168,7 @@ Siga os passos 1 a 7 de [docs/setup-mcp-abap.md](setup-mcp-abap.md). Em resumo:
 2. No Claude Code, digite `/mcp`. Devem aparecer conectados:
    - `fiori-mcp`, sempre;
    - `abap-adt` (caminho 5A) **ou** `vsp` (caminho 5B);
-   - `arc-1-qas` e `arc-1-prd`, se você configurou QAS e PRD.
+   - `arc-1-qas`, se você configurou o QAS.
 
    Um servidor que você não configurou aparece como falho. Isso é esperado (ex.: `abap-adt` falho num cliente só com S/4HANA 2023).
 
@@ -220,7 +220,7 @@ Regras que valem sempre e que você vai notar:
 |---|---|
 | Plano antes de alterar | Nada é criado ou alterado no SAP sem a sua aprovação |
 | Só no DEV | Se o SID conectado não for o DEV do bloco `cliente`, o agente para e avisa |
-| QAS e PRD são somente leitura | Com qualquer servidor. ABAP Unit também só roda em DEV/SANDBOX |
+| QAS é somente leitura e o PRD não é acessado | Com qualquer servidor, nem para leitura no PRD (ADR-0014). ABAP Unit também só roda em DEV/SANDBOX |
 | ATC sem erros | Uma entrega só é concluída quando o ATC não tem erros |
 | Relato fiel | O agente informa o sistema e o servidor usados, e o que foi recusado pela política |
 
@@ -233,7 +233,7 @@ Regras que valem sempre e que você vai notar:
 | Qualquer problema de configuração | Rode `node scripts/doctor.mjs`: ele mostra o que falhou e o que fazer |
 | Servidor falho no `/mcp`, mas o `--diagnostico` passa | Abra a ferramenta na raiz do projeto e reinicie-a depois de mudar o `.env` |
 | `abap-adt` com `ECONNREFUSED` | O servidor `abap-adt` não está rodando em `localhost:2236` (etapa 5A) |
-| `vsp` recusado por ser QAS/PRD | A URL aponta para outro sistema, ou o usuário não tem data preview na T000 |
+| `vsp` recusado por ser QAS ou PRD | A URL aponta para outro sistema, ou o usuário não tem data preview na T000 |
 | O agente pergunta sigla, pacote ou variante toda hora | Há placeholders `<...>` no bloco `cliente` (etapa 4) |
 | O agente se recusa a criar objetos | Confira na mensagem o SID encontrado. Ele só cria no `sistemaDesenvolvimento` |
 | Qualquer mensagem `mcp-launch:` | Consulte [Problemas comuns](setup-mcp-abap.md#problemas-comuns) |
