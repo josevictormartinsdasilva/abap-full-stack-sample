@@ -13,11 +13,9 @@ Esta skill orienta os procedimentos de garantia de qualidade e conformidade de c
 
 ## Escopo e parâmetros do projeto
 
-Não há pacote nem pasta fixos nesta skill. Determine o escopo nesta ordem:
+Não há pacote padrão para o ATC. O escopo (pacote, objetos ou request) vem do orquestrador; sem ele, siga a seção "Pacote do ATC" do agente e pergunte. Nunca rode ATC num pacote suposto.
 
-1. Pacote, objetos ou request informados pelo orquestrador.
-2. Bloco `cliente` de [naming-conventions.json](../../../standards/naming-conventions.json): `pacotePadraoATC`, `varianteATC` e `pastaAppsFiori`.
-3. Se o valor ainda estiver como placeholder (`<...>`), **pare e pergunte** — nunca rode ATC num pacote suposto.
+Do bloco `cliente` de [naming-conventions.json](../../../standards/naming-conventions.json) vêm `varianteATC` e `pastaAppsFiori`. Se algum ainda estiver como placeholder (`<...>`), **pare e pergunte**.
 
 ## Servidor MCP
 

@@ -3,7 +3,8 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import {
-  atualizarCliente, atualizarDotEnv, camposPendentes, formatarValorEnv, lerDiagnostico, lerDotEnv,
+  NAO_SE_APLICA_CTS, atualizarCliente, atualizarDotEnv, atualizarProjetoCTS, camposPendentes, formatarValorEnv,
+  lerDiagnostico, lerDotEnv, situacaoProjetoCTS,
   placeholdersPadrao, preencherPadrao, prefixoDoServidor, recusaEsperada2025, situacaoConexao,
 } from "../config-local.mjs";
 
@@ -114,6 +115,42 @@ describe("bloco cliente", () => {
   });
   test("campo inexistente é erro", () => {
     assert.throws(() => atualizarCliente(json, { inventado: "x" }), /não existe/);
+  });
+});
+
+describe("projeto CTS (requests.projetoCTS)", () => {
+  const json = `{
+  "cliente": { "empresa": "X" },
+  "requests": {
+    "escopo": "texto",
+    "projetoCTS": {
+      "projeto": "<PROJETO_CTS>",
+      "identificador": "<ID_PROJETO_CTS>",
+      "descricao": "<DESCRICAO_PROJETO_CTS>"
+    }
+  },
+  "depois": [1, 2]
+}`;
+  test("três estados: pendente, definido, não se aplica", () => {
+    assert.equal(situacaoProjetoCTS(JSON.parse(json).requests), "pendente");
+    const definido = atualizarProjetoCTS(json, { projeto: "ZS4", identificador: "S4", descricao: 'Rollout "1"' });
+    assert.equal(situacaoProjetoCTS(JSON.parse(definido).requests), "definido");
+    assert.equal(JSON.parse(definido).requests.projetoCTS.descricao, 'Rollout "1"');
+    const sem = atualizarProjetoCTS(definido, null);
+    assert.equal(situacaoProjetoCTS(JSON.parse(sem).requests), "nao-se-aplica");
+    assert.equal(JSON.parse(sem).requests.projetoCTS, NAO_SE_APLICA_CTS);
+  });
+  test("ida e volta preserva o resto do arquivo e a indentação", () => {
+    const valor = { projeto: "<PROJETO_CTS>", identificador: "<ID_PROJETO_CTS>", descricao: "<DESCRICAO_PROJETO_CTS>" };
+    const volta = atualizarProjetoCTS(atualizarProjetoCTS(json, null), valor);
+    assert.equal(volta, json);
+  });
+  test("sem projeto CTS, a linha da tabela vira 'não se aplica'", () => {
+    const md = "| Projeto CTS | Id | Desc |\n|---|---|---|\n| <PROJETO_CTS> | <ID_PROJETO_CTS> | <DESCRICAO_PROJETO_CTS> |\nfim";
+    const out = preencherPadrao(md, { semProjetoCTS: true });
+    assert.deepEqual(placeholdersPadrao(out), []);
+    assert.match(out, /^\| Não se aplica: .* \| — \| — \|$/m);
+    assert.ok(out.endsWith("\nfim"));
   });
 });
 

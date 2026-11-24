@@ -107,8 +107,36 @@ export function atualizarCliente(texto, valores) {
   return novo;
 }
 
+// ---------------------------------------------------------------- projeto CTS (requests.projetoCTS)
+// O projeto CTS é atribuído à request, não ao pacote, e nem todo cliente usa. Três estados:
+//   - pendente: o objeto do template, ainda com <...>;
+//   - não se aplica: a string NAO_SE_APLICA_CTS (o cliente não atribui projeto às requests);
+//   - definido: { projeto, identificador, descricao }.
+export const NAO_SE_APLICA_CTS = "não se aplica: este cliente não atribui projeto CTS às requests";
+export function situacaoProjetoCTS(requests) {
+  const p = requests?.projetoCTS;
+  if (typeof p === "string") return ehPlaceholder(p) ? "pendente" : "nao-se-aplica";
+  if (!p || typeof p !== "object" || ["projeto", "identificador", "descricao"].some((k) => ehPlaceholder(p[k]))) return "pendente";
+  return "definido";
+}
+
+// Troca o valor de requests.projetoCTS (objeto sem aninhamento ou string) preservando o resto do
+// arquivo. valor: { projeto, identificador, descricao } ou null (não se aplica).
+export function atualizarProjetoCTS(texto, valor) {
+  const re = /^([ \t]*)("projetoCTS"\s*:\s*)(\{[^{}]*\}|"(?:[^"\\]|\\.)*")/m;
+  const m = texto.match(re);
+  if (!m) throw new Error('campo "projetoCTS" não encontrado em "requests"');
+  const [, recuo, chave] = m;
+  const eol = texto.includes("\r\n") ? "\r\n" : "\n";
+  const campos = ["projeto", "identificador", "descricao"].map((k) => `${recuo}  "${k}": ${JSON.stringify(String(valor?.[k] ?? ""))}`);
+  const novo = valor === null ? JSON.stringify(NAO_SE_APLICA_CTS) : `{${eol}${campos.join(`,${eol}`)}${eol}${recuo}}`;
+  const out = texto.replace(re, `${recuo}${chave}${novo}`);
+  JSON.parse(out); // garante que o arquivo continua válido
+  return out;
+}
+
 // ---------------------------------------------------------------- padrao-desenvolvimento.md
-// Placeholders do documento mestre que vêm dos parâmetros do cliente.
+// Placeholders do documento mestre que vêm dos parâmetros do cliente e do projeto CTS.
 export const PLACEHOLDERS_PADRAO = {
   "<VARIANTE_ATC>": "varianteATC",
   "<PROJETO_CTS>": "projetoCTS",
@@ -116,11 +144,17 @@ export const PLACEHOLDERS_PADRAO = {
   "<DESCRICAO_PROJETO_CTS>": "descricaoProjetoCTS",
   "[EMPRESA]": "empresa",
 };
+// valores: campos do bloco cliente + projetoCTS/idProjetoCTS/descricaoProjetoCTS, ou
+// semProjetoCTS: true, que troca a linha da tabela do projeto CTS por "não se aplica".
 export const placeholdersPadrao = (texto) => Object.keys(PLACEHOLDERS_PADRAO).filter((p) => texto.includes(p));
 // Numa caixa de comentário ABAP ("***   © [EMPRESA]      ***"), compensa a diferença de tamanho
 // nos espaços antes do "***" final, para a caixa não desalinhar.
 export function preencherPadrao(texto, valores) {
   let out = texto;
+  if (valores.semProjetoCTS)
+    out = out.split("\n").map((l) => (l.includes("<PROJETO_CTS>")
+      ? `| Não se aplica: este cliente não atribui projeto CTS às requests | — | — |${l.endsWith("\r") ? "\r" : ""}`
+      : l)).join("\n");
   for (const [marca, campo] of Object.entries(PLACEHOLDERS_PADRAO)) {
     const valor = valores[campo];
     if (!valor || ehPlaceholder(valor)) continue;

@@ -18,7 +18,7 @@ Estes itens não dependem de você. Peça logo no início, porque costumam demor
 
 | Pedir a | O quê | Para quê |
 |---|---|---|
-| Gestor do projeto / cliente | SID e mandante do **DEV**, sigla do cliente, pacote, variante ATC, projeto CTS, namespace Fiori | Preencher o bloco `cliente` (etapa 4) |
+| Gestor do projeto / cliente | SID e mandante do **DEV**, sigla do cliente, variante ATC, projeto CTS (se o cliente atribuir projeto às requests), namespace Fiori | Preencher o bloco `cliente` (etapa 4) |
 | Gestor do projeto / cliente | **Aceite formal** para usar `vsp`/`arc-1`, se o sistema for S/4HANA 2023 ou inferior | A SAP classifica as APIs ADT como internas ([política, seção 7](../standards/politica-mcp-abap.md)) |
 | Basis | Release do sistema (S/4HANA 2025+ ou ≤ 2023) e URL **HTTPS** do ICM (ex.: `https://host:44300`) | Escolher o caminho da etapa 5 |
 | Basis | Serviço ICF `/sap/bc/adt` ativo | Sem ele, nenhum MCP conecta |
@@ -100,7 +100,7 @@ O assistente pergunta e grava estes valores (`node scripts/setup.mjs --apenas=cl
 
 Se outra pessoa já adotou o template para este cliente, pule esta etapa e só confira se não há valores `<...>` no bloco `cliente`.
 
-1. Preencha o bloco `cliente` de [standards/naming-conventions.json](../standards/naming-conventions.json) com os dados da etapa 1: empresa, sigla, pacote e variante ATC, projeto CTS, namespace Fiori, pasta dos apps e `sistemaDesenvolvimento` (SID do DEV).
+1. Preencha o bloco `cliente` de [standards/naming-conventions.json](../standards/naming-conventions.json) com os dados da etapa 1: empresa, sigla, variante ATC, namespace Fiori, pasta dos apps e `sistemaDesenvolvimento` (SID do DEV). O projeto CTS fica em `requests.projetoCTS`; se o cliente não atribui projeto às requests, use a string `"não se aplica: este cliente não atribui projeto CTS às requests"`.
 2. Preencha os placeholders de [standards/padrao-desenvolvimento.md](../standards/padrao-desenvolvimento.md): `<VARIANTE_ATC>`, `<PROJETO_CTS>`, `<ID_PROJETO_CTS>`, `<DESCRICAO_PROJETO_CTS>` e `[EMPRESA]`.
 
 Enquanto houver `<...>`, os agentes perguntam em vez de supor. O projeto funciona, mas você vai responder às mesmas perguntas várias vezes.

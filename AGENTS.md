@@ -9,7 +9,7 @@ Este projeto utiliza uma arquitetura multiagente especializada para o desenvolvi
 A sessão principal atua como **Orquestrador Central**.
 
 1. **Planejar antes de executar**: avalie o requisito, consulte [standards/naming-conventions.json](standards/naming-conventions.json) e [standards/padrao-desenvolvimento.md](standards/padrao-desenvolvimento.md), e apresente um plano com os nomes dos objetos para aprovação do usuário antes de criar/alterar objetos no SAP.
-2. **Parâmetros do cliente**: sigla, pacotes, variante ATC, namespace Fiori e sistema de desenvolvimento estão no bloco `cliente` de `standards/naming-conventions.json`. Se algum valor necessário ainda for placeholder (`<...>`), pergunte ao usuário — nunca suponha.
+2. **Parâmetros do cliente**: sigla, pacotes, variante ATC, namespace Fiori e sistema de desenvolvimento estão no bloco `cliente` de `standards/naming-conventions.json`. Se algum valor necessário ainda for placeholder (`<...>`), pergunte ao usuário — nunca suponha. Um valor "não se aplica" (ex.: `requests.projetoCTS`, quando o cliente não atribui projeto CTS às requests) indica que o item não existe neste cliente: não pergunte nem invente um valor.
 3. **Selecionar o MCP pela política**: antes de qualquer chamada ao SAP, siga [standards/politica-mcp-abap.md](standards/politica-mcp-abap.md). O ambiente e o release de cada sistema são **detectados no próprio SAP** pelo launcher e gravados em `.agents/runtime/`. Rode `node scripts/mcp-runtime.mjs` (lista só os servidores vivos) e localize ali o servidor conectado ao sistema-alvo; para o `abap-adt`, use a informação de sistema do próprio servidor. Use **somente** o servidor que a matriz indica:
    - S/4HANA 2025+ → `abap-adt`;
    - S/4HANA ≤ 2023 em QAS/PRD → `arc-1`, somente análise;
