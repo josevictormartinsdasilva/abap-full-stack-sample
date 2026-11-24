@@ -36,7 +36,7 @@ Estes itens não dependem de você. Peça logo no início, porque costumam demor
 
 1. **Git** — para clonar o repositório. Confira com `git --version`.
 2. **Node.js 22.19 ou superior** — usado pelo launcher dos MCPs e pelo `fiori-mcp`. Confira com `node -v`. Se precisar, instale a versão LTS de [nodejs.org](https://nodejs.org).
-3. **Só para S/4HANA 2025+: ADT for Eclipse ou VS Code com a extensão ADT for Visual Studio Code**, que traz o servidor `abap-adt` (etapa 4).
+3. **Só para S/4HANA 2025+: o ADT**, no Eclipse (ADT for Eclipse) ou no VS Code (extensão ADT for Visual Studio Code). É ele que traz o servidor `abap-adt` (etapa 4).
 4. **A ferramenta de IA.** Para o Claude Code, siga a [documentação oficial de instalação](https://docs.claude.com/en/docs/claude-code/setup). Para as outras, veja [Suporte a Ferramentas](../README.md#-suporte-a-ferramentas) no README.
 5. **Clonar o repositório:**
 

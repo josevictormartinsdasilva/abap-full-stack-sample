@@ -1,6 +1,6 @@
 # ADR-0013: Certificado fixado por conexão e opt-in de TLS sem verificação no vsp
 
-- **Status:** Proposto
+- **Status:** Aceito (2026-11-24, PRs #20 e #22)
 - **Data:** 2026-11-24
 
 ## Contexto

@@ -219,9 +219,18 @@ async function oferecerConfianca(servidor, url) {
   return { rel, pem, semSan: !cert.san };
 }
 
+// Windows: a variável existe nas variáveis do usuário (HKCU\Environment), mesmo que o terminal
+// atual tenha sido aberto antes de ela ser gravada. Mesma consulta do scripts/doctor.mjs.
+function variavelDoUsuarioWindows(nome) {
+  if (process.platform !== "win32") return false;
+  const r = spawnSync("reg", ["query", "HKCU\\Environment", "/v", nome], { encoding: "utf8", windowsHide: true });
+  return r.status === 0;
+}
+
 // Grava uma variável de ambiente permanente do usuário. No Windows, pelo registro do usuário
 // (sem passar o valor na linha de comando); no macOS/Linux, mostra a linha para o perfil do shell.
-function gravarVariavelUsuario(nome, valor, { secreto = false } = {}) {
+// rotuloValor: o que mostrar no lugar de um valor secreto na instrução de macOS/Linux.
+function gravarVariavelUsuario(nome, valor, { secreto = false, rotuloValor = "o valor que você digitou" } = {}) {
   if (process.platform === "win32") {
     const r = spawnSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command",
       `[Environment]::SetEnvironmentVariable('${nome}', [Console]::In.ReadToEnd().TrimEnd(), 'User')`],
@@ -235,7 +244,7 @@ function gravarVariavelUsuario(nome, valor, { secreto = false } = {}) {
     return false;
   }
   aviso(`acrescente ao seu ~/.bashrc ou ~/.zshrc e abra um terminal novo:`);
-  console.log(`\n    export ${nome}=${secreto ? "'<o valor que você digitou>'" : `'${valor}'`}\n`);
+  console.log(`\n    export ${nome}=${secreto ? `'<${rotuloValor}>'` : `'${valor}'`}\n`);
   return false;
 }
 
@@ -477,7 +486,10 @@ function preencherDocumentoPadrao(valores) {
 async function configurarToken(resultados) {
   const detectados = Object.values(resultados).filter(Boolean);
   const algum2025 = detectados.some((r) => r.oficial);
-  const tem = Boolean(process.env.ABAP_ADT_TOKEN && !ehPlaceholder(process.env.ABAP_ADT_TOKEN));
+  const noTerminal = Boolean(process.env.ABAP_ADT_TOKEN && !ehPlaceholder(process.env.ABAP_ADT_TOKEN));
+  // Gravado agora há pouco nas variáveis do usuário (Windows), mas o terminal ainda não o vê.
+  const soNoUsuario = !noTerminal && variavelDoUsuarioWindows("ABAP_ADT_TOKEN");
+  const tem = noTerminal || soNoUsuario;
   const noEnv = valorDeVariavel("ABAP_ADT_TOKEN", lerDotEnv(lerEnvTexto()).ABAP_ADT_TOKEN).valor;
 
   if (!algum2025 && !argApenas && !noEnv) {
@@ -494,15 +506,18 @@ async function configurarToken(resultados) {
   if (noEnv) {
     aviso("o .env tem um ABAP_ADT_TOKEN, que as ferramentas de IA não leem (e é um segredo num arquivo a mais).");
     if (await confirmar("Mover esse token para as variáveis do usuário e apagá-lo do .env?", true)) {
-      if (gravarVariavelUsuario("ABAP_ADT_TOKEN", noEnv, { secreto: true })) {
+      if (gravarVariavelUsuario("ABAP_ADT_TOKEN", noEnv, { secreto: true, rotuloValor: "o valor de ABAP_ADT_TOKEN que está no .env" })) {
         gravarEnv({ ABAP_ADT_TOKEN: null });
         ok("ABAP_ADT_TOKEN apagado do .env");
       } else if (process.platform !== "win32") {
-        info("Use o valor que está hoje no .env nessa linha e, depois de abrir o terminal novo, apague ABAP_ADT_TOKEN do .env.");
+        // Fora do Windows o setup não grava no perfil do shell: a linha do .env fica até o usuário
+        // copiar o valor para o perfil, senão o token se perderia.
+        info("O .env não foi alterado. Depois de acrescentar a linha acima ao perfil e abrir um terminal novo, apague a linha ABAP_ADT_TOKEN do .env.");
       }
       return;
     }
   }
+  if (soNoUsuario) info("ABAP_ADT_TOKEN já está nas variáveis do usuário, mas este terminal ainda não o vê: feche e abra o terminal e a ferramenta de IA.");
   if (tem && !(await confirmar("ABAP_ADT_TOKEN já está definido. Trocar?", false))) return;
   if (!tem && !(await confirmar("Gravar o ABAP_ADT_TOKEN agora?", true))) return;
   info("O token aparece ao habilitar o servidor MCP do ADT, no Eclipse ou no VS Code (docs/primeiros-passos.md, etapa 4).");

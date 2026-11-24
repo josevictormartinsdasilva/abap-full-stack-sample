@@ -1,6 +1,6 @@
 # ADR-0010: Material de referência de terceiros nas skills
 
-- **Status:** Proposto
+- **Status:** Aceito (2026-11-24, PR #14)
 - **Data:** 2026-11-23
 
 ## Contexto

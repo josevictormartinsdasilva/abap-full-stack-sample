@@ -1,6 +1,6 @@
 # ADR-0014: Ambiente produtivo fora do alcance dos agentes
 
-- **Status:** Proposto
+- **Status:** Aceito (2026-11-24, PR #21)
 - **Data:** 2026-11-24
 
 ## Contexto

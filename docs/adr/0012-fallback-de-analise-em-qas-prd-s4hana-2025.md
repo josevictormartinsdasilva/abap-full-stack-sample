@@ -1,6 +1,6 @@
 # ADR-0012: Fallback de análise em QAS/PRD S/4HANA 2025+
 
-- **Status:** Aceito (2026-11-24, PR #19)
+- **Status:** Aceito (2026-11-24, PR #19; alterado pelo [ADR-0014](0014-ambiente-produtivo-fora-do-alcance-dos-agentes.md): o fallback de análise vale só no QAS, e a entrada `arc-1-prd` deixou de existir)
 - **Data:** 2026-11-24
 
 ## Contexto
