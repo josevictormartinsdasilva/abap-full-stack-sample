@@ -23,6 +23,13 @@ Em todo Pull Request (ou commit direto), adicione **uma linha** na tabela de [Hi
 
 | Data | Contribuidor | Área | Atividade |
 |---|---|---|---|
+| 2026-11-24 | José Victor Martins da Silva | Documentação | Pontas soltas da revisão: status dos ADRs 0009 a 0014, token do `abap-adt` fora do `.env` no ADR-0007, Eclipse no README, mensagens do `setup.mjs` ao mover o token e histórico do CONTRIBUTORS |
+| 2026-11-24 | José Victor Martins da Silva | Documentação | Guia do `abap-adt` no Eclipse e no VS Code (habilitar o servidor, obter e gravar o token, restrições de acesso), com capturas do SAP-samples/abap-platform-rap130; setup move para as variáveis do usuário um token esquecido no `.env` (PR #23) |
+| 2026-11-24 | José Victor Martins da Silva | MCP | Ambiente produtivo fora do alcance dos agentes: sem entrada `arc-1-prd` e sem leitura em PRD em qualquer release (ADR-0014, PR #21) |
+| 2026-11-24 | José Victor Martins da Silva | MCP | Certificado HTTPS fixado por conexão, com SHA-256 conferido pelo usuário, e opt-in de TLS sem verificação no `vsp` (ADR-0013, PRs #20 e #22) |
+| 2026-11-24 | José Victor Martins da Silva | Orquestrador | Fallback de análise em QAS S/4HANA 2025+: `arc-1` somente leitura quando o `abap-adt` não oferece a operação (ADR-0012, PR #19) |
+| 2026-11-24 | José Victor Martins da Silva | Orquestrador | Fallback de desenvolvimento em S/4HANA 2025+ (`abap-adt` → `vsp` → `arc-1` → manual), com evidência, tabela de sinais e uma conexão por sistema (ADR-0011, PRs #15 e #16) |
+| 2026-11-24 | José Victor Martins da Silva | Skills | Material de referência adaptado do likweitan/abap-skills nas skills ABAP (ADR-0010, PR #14) |
 | 2026-11-24 | José Victor Martins da Silva | Ferramenta | Assistente de configuração (`scripts/setup.mjs`) e verificação única (`scripts/doctor.mjs`): conexão com detecção no SAP, parâmetros do cliente, projeto CTS opcional das requests e token do abap-adt |
 | 2026-11-19 | José Victor Martins da Silva | Documentação | Revisão geral da documentação (README, guias, ADRs e CONTRIBUTORS) para refletir o estado atual do código |
 | 2026-11-19 | José Victor Martins da Silva | MCP | ARC-1 sempre na última versão estável do npm, instalado num cache do usuário, com conferência das variáveis de segurança e do Node (`scripts/arc1-pacote.mjs`, PR #12) |

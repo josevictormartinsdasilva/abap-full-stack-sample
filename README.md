@@ -208,7 +208,7 @@ O token do servidor `abap-adt` **não é versionado** e **não fica no `.env`**:
 3. **Antigravity**: substitua `<SEU_TOKEN>` em `.agents/mcp_config.json` apenas na sua cópia local, **sem fazer commit** desse valor.
 4. Feche e abra a ferramenta de IA e confirme a conexão com `/mcp` (ou `node scripts/doctor.mjs`).
 
-> O servidor `abap-adt` (HTTP em `localhost:2236`) só responde com o VS Code aberto e uma destination do SAP no workspace. Os arquivos de MCP do projeto já o declaram com o header `Authorization: Bearer ${ABAP_ADT_TOKEN}`: não é preciso `claude mcp add`. Nunca grave o token real em arquivos versionados.
+> O servidor `abap-adt` (HTTP em `localhost:2236`) só responde com a IDE do ADT aberta e conectada ao DEV: no VS Code, com a destination do SAP no workspace; no Eclipse, com o projeto ABAP logado. Os arquivos de MCP do projeto já o declaram com o header `Authorization: Bearer ${ABAP_ADT_TOKEN}`: não é preciso `claude mcp add`. Nunca grave o token real em arquivos versionados.
 
 ## 🧩 Servidores `arc-1` e `vsp` (S/4HANA ≤ 2023)
 
