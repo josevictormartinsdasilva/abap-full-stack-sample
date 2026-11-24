@@ -8,11 +8,14 @@
     "objetosLocais": "Prefixo Y (em vez de $TMP)"
   },
   "cliente": {
-    "_instrucao": "Preencha ao adotar o template. Os agentes leem estes valores; enquanto houver <...>, devem perguntar ao usuário em vez de supor.",
+    "_instrucao": "Preencha com `node scripts/setup.mjs` ao adotar o template. Os agentes leem estes valores; enquanto houver <...>, devem perguntar ao usuário em vez de supor.",
     "empresa": "<EMPRESA>",
     "sigla": "<SIGLA>",
     "pacotePadraoATC": "<PACOTE_ATC>",
     "varianteATC": "<VARIANTE_ATC>",
+    "projetoCTS": "<PROJETO_CTS>",
+    "idProjetoCTS": "<ID_PROJETO_CTS>",
+    "descricaoProjetoCTS": "<DESCRICAO_PROJETO_CTS>",
     "namespaceFiori": "br.com.<cliente>",
     "pastaAppsFiori": "<PASTA_APPS_FIORI>",
     "sistemaDesenvolvimento": "<SID_DEV> (agentes só criam/ativam objetos neste sistema)"

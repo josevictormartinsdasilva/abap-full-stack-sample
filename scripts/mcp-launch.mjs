@@ -57,6 +57,7 @@ import { Recusa, valorDeVariavel, aplicarRegistro, comandoParaSpawn, decidir, le
 import { FalhaVsp, flagsAusentes, garantirVsp } from "./vsp-binario.mjs";
 import { FalhaArc1, garantirArc1 } from "./arc1-pacote.mjs";
 import { RUNTIME_DIR, gravarEstado, listarAtivos, removerEstado } from "./mcp-runtime.mjs";
+import { lerDotEnv, prefixoDoServidor } from "./config-local.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const REGISTRO = "standards/sistemas-sap.json";
@@ -80,9 +81,7 @@ const politica = (fn) => {
 const server = process.argv[2];
 const DIAGNOSTICO = process.argv.includes("--diagnostico");
 if (!server || server.startsWith("--")) fail("informe o servidor (ex.: node scripts/mcp-launch.mjs vsp)");
-const tool = server.startsWith("arc-1") ? "arc-1" : server.startsWith("vsp") ? "vsp" : null;
-if (!tool) fail(`servidor "${server}" não é arc-1* nem vsp*`);
-const prefix = (tool === "arc-1" ? "ARC1" : "VSP") + server.slice(tool.length).toUpperCase().replace(/[^A-Z0-9]+/g, "_");
+const { tool, prefix } = prefixoDoServidor(server) ?? fail(`servidor "${server}" não é arc-1* nem vsp*`);
 
 // ---------------------------------------------------------------- estado para o orquestrador
 // Descarta os arquivos de sessões anteriores deste servidor cujo processo já terminou. Os de
@@ -94,20 +93,9 @@ const limparRuntime = () => removerEstado(RUNTIME_DIR, server, process.pid);
 politica(() => verificarTls(process.env));
 
 // ---------------------------------------------------------------- variáveis
-// .env: uma variável por linha (NOME=valor), linhas iniciadas por # são comentário. Não há
-// comentário no fim da linha: o # faz parte do valor (senhas podem conter #). Aspas simples ou
-// duplas envolvendo o valor inteiro são removidas.
-function readDotEnv(file) {
-  if (!fs.existsSync(file)) return {};
-  const out = {};
-  for (const line of fs.readFileSync(file, "utf8").split(/\r?\n/)) {
-    if (line.trim().startsWith("#")) continue;
-    const m = line.match(/^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$/);
-    if (m) out[m[1]] = m[2].replace(/^(['"])(.*)\1$/, "$2");
-  }
-  return out;
-}
-const dotenv = readDotEnv(path.join(ROOT, ".env"));
+// .env: formato e regras de leitura em scripts/config-local.mjs (lerDotEnv).
+const arquivoEnv = path.join(ROOT, ".env");
+const dotenv = fs.existsSync(arquivoEnv) ? lerDotEnv(fs.readFileSync(arquivoEnv, "utf8")) : {};
 // VSP_BIN/VSP_VERSION/ARC1_BIN/ARC1_VERSION: ambiente do sistema ou, como fallback, o .env (docs/setup-mcp-abap.md, passo 4).
 for (const k of ["VSP_BIN", "VSP_VERSION", "ARC1_BIN", "ARC1_VERSION"]) if (!process.env[k] && dotenv[k]) process.env[k] = dotenv[k];
 const lerVar = (name) => valorDeVariavel(`${prefix}_${name}`, process.env[`${prefix}_${name}`] ?? dotenv[`${prefix}_${name}`]);

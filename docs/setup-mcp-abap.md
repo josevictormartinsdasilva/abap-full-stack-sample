@@ -62,6 +62,8 @@ A primeira instalação leva cerca de 30 s. Rode o diagnóstico (passo 7) antes 
 
 ### Uma vez por projeto / cliente
 
+> **Atalho:** `node scripts/setup.mjs` faz os passos 4 a 7 (pede a conexão, detecta o sistema e grava o `.env`) e, no fim, roda `node scripts/doctor.mjs`. Os passos abaixo valem para a configuração manual e para entender o que o assistente grava.
+
 **4. Criar o `.env`** na raiz do projeto, a partir do modelo:
 
 ```powershell
