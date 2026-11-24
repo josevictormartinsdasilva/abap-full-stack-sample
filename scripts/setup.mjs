@@ -16,7 +16,9 @@
 //   3. Pede os parâmetros do cliente e grava no bloco "cliente" de
 //      standards/naming-conventions.json (o sistemaDesenvolvimento vem do SID detectado no DEV)
 //      e nos placeholders de standards/padrao-desenvolvimento.md.
-//   4. Se algum sistema for S/4HANA 2025+, oferece gravar o ABAP_ADT_TOKEN nas variáveis do usuário.
+//   4. Se algum sistema for S/4HANA 2025+ (ou, sem nenhum sistema detectado nesta execução, se
+//      você disser que o cliente tem 2025+), oferece gravar o ABAP_ADT_TOKEN nas variáveis do
+//      usuário. Um token esquecido no .env é movido para lá e apagado do .env.
 //   5. Roda o scripts/doctor.mjs.
 //
 // Senhas e token só passam por este processo local: nunca vão para a ferramenta de IA. A senha
@@ -464,14 +466,46 @@ function preencherDocumentoPadrao(valores) {
 }
 
 // ---------------------------------------------------------------- 4. token do abap-adt
+// Quando oferecer:
+//   - algum sistema detectado nesta execução é 2025+;
+//   - --apenas=token;
+//   - nenhum sistema foi detectado nesta execução (pulado, já configurado e não retestado,
+//     ou falha) e o token não está definido: pergunta se o cliente tem 2025+, em vez de sumir.
+// Sistemas detectados nesta execução e todos ≤ 2023: não pergunta.
+// Token esquecido no .env (versões antigas do template mandavam gravá-lo lá): oferece mover
+// para as variáveis do usuário e apagar do .env, porque as ferramentas de IA não leem o .env.
 async function configurarToken(resultados) {
-  const algum2025 = Object.values(resultados).some((r) => r?.oficial);
+  const detectados = Object.values(resultados).filter(Boolean);
+  const algum2025 = detectados.some((r) => r.oficial);
   const tem = Boolean(process.env.ABAP_ADT_TOKEN && !ehPlaceholder(process.env.ABAP_ADT_TOKEN));
-  if (!algum2025 && !argApenas) return; // sem 2025+, só com --apenas=token
-  titulo("Servidor abap-adt (S/4HANA 2025+)");
+  const noEnv = valorDeVariavel("ABAP_ADT_TOKEN", lerDotEnv(lerEnvTexto()).ABAP_ADT_TOKEN).valor;
+
+  if (!algum2025 && !argApenas && !noEnv) {
+    if (detectados.length || tem) return;
+    titulo("Servidor abap-adt (S/4HANA 2025+)");
+    info("Nenhum sistema foi detectado nesta execução, então o setup não sabe o release do cliente.");
+    if (!(await confirmar("O cliente tem S/4HANA 2025+ (servidor abap-adt)?", false))) {
+      info("ok. Se precisar depois: node scripts/setup.mjs --apenas=token");
+      return;
+    }
+  } else titulo("Servidor abap-adt (S/4HANA 2025+)");
+
   info("O token não fica no .env: as ferramentas de IA o leem das variáveis do usuário.");
+  if (noEnv) {
+    aviso("o .env tem um ABAP_ADT_TOKEN, que as ferramentas de IA não leem (e é um segredo num arquivo a mais).");
+    if (await confirmar("Mover esse token para as variáveis do usuário e apagá-lo do .env?", true)) {
+      if (gravarVariavelUsuario("ABAP_ADT_TOKEN", noEnv, { secreto: true })) {
+        gravarEnv({ ABAP_ADT_TOKEN: null });
+        ok("ABAP_ADT_TOKEN apagado do .env");
+      } else if (process.platform !== "win32") {
+        info("Use o valor que está hoje no .env nessa linha e, depois de abrir o terminal novo, apague ABAP_ADT_TOKEN do .env.");
+      }
+      return;
+    }
+  }
   if (tem && !(await confirmar("ABAP_ADT_TOKEN já está definido. Trocar?", false))) return;
   if (!tem && !(await confirmar("Gravar o ABAP_ADT_TOKEN agora?", true))) return;
+  info("O token aparece ao habilitar o servidor MCP do ADT, no Eclipse ou no VS Code (docs/primeiros-passos.md, etapa 4).");
   const token = await perguntar("Token do abap-adt (não aparece ao digitar)", { oculto: true });
   gravarVariavelUsuario("ABAP_ADT_TOKEN", token, { secreto: true });
 }

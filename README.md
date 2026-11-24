@@ -196,19 +196,19 @@ No Codex, abra o projeto na raiz e marque-o como confiável (o `.codex/config.to
 
 ## 🔑 Configuração do Token MCP (`abap-adt`)
 
-O token do servidor `abap-adt` **não é versionado**. Cada desenvolvedor configura o seu:
+O token do servidor `abap-adt` **não é versionado** e **não fica no `.env`**: Claude Code, Codex e Kimi o leem das variáveis de ambiente do sistema, e não carregam o `.env`. Cada desenvolvedor configura o seu:
 
-1. Copie `.env.example` para `.env` e preencha `ABAP_ADT_TOKEN` (o `.env` está no `.gitignore`).
-2. **Claude Code, Codex e Kimi** leem `ABAP_ADT_TOKEN` das variáveis de ambiente do sistema — eles **não carregam o `.env` sozinhos**. Defina a variável antes de abrir a ferramenta:
+1. **Obtenha o token** ao habilitar o servidor MCP do ADT, no Eclipse ou no VS Code. O passo a passo está em [docs/primeiros-passos.md, etapa 4](docs/primeiros-passos.md#4-s4hana-2025-habilitar-o-abap-adt).
+2. **Grave nas variáveis do usuário** com `node scripts/setup.mjs --apenas=token`. O setup oferece essa etapa sozinho quando detecta um S/4HANA 2025+ e pergunta se o cliente tem 2025+ quando não detecta nenhum sistema. Também move para lá um token esquecido no `.env` e o apaga do arquivo. Para fazer à mão:
    - **Windows (PowerShell, permanente)**: `[Environment]::SetEnvironmentVariable('ABAP_ADT_TOKEN','<SEU_TOKEN>','User')` e reinicie o terminal.
    - **Windows (sessão atual)**: `$env:ABAP_ADT_TOKEN = '<SEU_TOKEN>'`.
    - **macOS / Linux (zsh, permanente)**: `echo "export ABAP_ADT_TOKEN='<SEU_TOKEN>'" >> ~/.zshrc` e abra um terminal novo (no bash, use `~/.bashrc`).
    - **macOS / Linux (sessão atual)**: `export ABAP_ADT_TOKEN='<SEU_TOKEN>'`.
    - No macOS, inicie a ferramenta **pelo terminal**. Apps abertos pelo ícone não enxergam o `~/.zshrc`.
 3. **Antigravity**: substitua `<SEU_TOKEN>` em `.agents/mcp_config.json` apenas na sua cópia local, **sem fazer commit** desse valor.
-4. Confirme a conexão com `/mcp`.
+4. Feche e abra a ferramenta de IA e confirme a conexão com `/mcp` (ou `node scripts/doctor.mjs`).
 
-> O servidor `abap-adt` (HTTP em `localhost:2236`) precisa estar rodando na sua máquina. Nunca grave o token real em arquivos versionados.
+> O servidor `abap-adt` (HTTP em `localhost:2236`) só responde com o VS Code aberto e uma destination do SAP no workspace. Os arquivos de MCP do projeto já o declaram com o header `Authorization: Bearer ${ABAP_ADT_TOKEN}`: não é preciso `claude mcp add`. Nunca grave o token real em arquivos versionados.
 
 ## 🧩 Servidores `arc-1` e `vsp` (S/4HANA ≤ 2023)
 
