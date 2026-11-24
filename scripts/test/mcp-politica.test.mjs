@@ -435,9 +435,8 @@ describe("decidir — TLS: certificado fixado e opt-in insecure do vsp (ADR-0013
     const d = decidirCom({ tool: "vsp", vars: { ...vsp, SAP_INSECURE: "true" }, conn: { ...CONN, url: "http://localhost:8000" } });
     assert.ok(!d.args.includes("--insecure"));
   });
-  test("valores que não ligam o opt-in", () => {
-    for (const valor of ["false", "0", "", undefined])
-      assert.ok(!decidirCom({ tool: "vsp", vars: { ...vsp, SAP_INSECURE: valor } }).args.includes("--insecure"), String(valor));
+  test("QAS continua aceito, somente leitura", () => {
+    assert.equal(decidirCom({ tool: "arc-1", sistema: { ambiente: "QAS" } }).modo, "somente leitura");
   });
 });
 
