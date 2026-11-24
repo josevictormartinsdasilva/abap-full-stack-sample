@@ -12,14 +12,15 @@ A sessão principal atua como **Orquestrador Central**.
 2. **Parâmetros do cliente**: sigla, pacotes, variante ATC, namespace Fiori e sistema de desenvolvimento estão no bloco `cliente` de `standards/naming-conventions.json`. Se algum valor necessário ainda for placeholder (`<...>`), pergunte ao usuário — nunca suponha. Um valor "não se aplica" (ex.: `requests.projetoCTS`, quando o cliente não atribui projeto CTS às requests) indica que o item não existe neste cliente: não pergunte nem invente um valor.
 3. **Selecionar o MCP pela política**: antes de qualquer chamada ao SAP, siga [standards/politica-mcp-abap.md](standards/politica-mcp-abap.md). O ambiente e o release de cada sistema são **detectados no próprio SAP** pelo launcher e gravados em `.agents/runtime/`. Rode `node scripts/mcp-runtime.mjs` (lista só os servidores vivos) e localize ali o servidor conectado ao sistema-alvo; para o `abap-adt`, use a informação de sistema do próprio servidor. Use **somente** o servidor que a matriz indica:
    - S/4HANA 2025+ → `abap-adt`;
-   - S/4HANA ≤ 2023 em QAS/PRD → `arc-1`, somente análise;
-   - S/4HANA ≤ 2023 em DEV/SANDBOX → `vsp`.
+   - S/4HANA ≤ 2023 em QAS → `arc-1`, somente análise;
+   - S/4HANA ≤ 2023 em DEV/SANDBOX → `vsp`;
+   - **PRD, em qualquer versão → nenhum servidor.** Não acesse o ambiente produtivo, nem para leitura (regra absoluta 6, [ADR-0014](docs/adr/0014-ambiente-produtivo-fora-do-alcance-dos-agentes.md)). No `abap-adt`, confira o sistema antes de qualquer outra chamada e pare se for PRD. Para incidente em produção, trabalhe sobre o que o usuário trouxer (dump, log, código) ou reproduza no QAS/DEV.
 
    Em S/4HANA 2025+ DEV/SANDBOX, se o `abap-adt` **não oferecer** uma operação de desenvolvimento, siga a cadeia de fallback da seção 4.4 da política: `vsp` → `arc-1` → execução manual (código e passos para o ADT, só com autorização do usuário). Só conta como operação ausente o sinal previsto na tabela da seção 4.4; erro do objeto ou do sistema não é motivo para trocar de servidor. A cada passo da cadeia, mostre ao usuário a evidência (ferramenta consultada ou mensagem de erro literal) e só siga com a confirmação dele.
 
-   Em S/4HANA 2025+ QAS/PRD, se o `abap-adt` estiver no ar mas **não oferecer** uma operação de análise, siga o fallback da seção 4.5 da política: `arc-1` somente leitura no mesmo sistema (`arc-1-qas`/`arc-1-prd`, SID e mandante iguais aos do `abap-adt`); se ele também não atender, pare e informe. Mesmo critério de sinais, evidência e confirmação do fallback de desenvolvimento. O `vsp` nunca entra.
+   Em S/4HANA 2025+ QAS, se o `abap-adt` estiver no ar mas **não oferecer** uma operação de análise, siga o fallback da seção 4.5 da política: `arc-1` somente leitura no mesmo sistema (`arc-1-qas`, SID e mandante iguais aos do `abap-adt`); se ele também não atender, pare e informe. Mesmo critério de sinais, evidência e confirmação do fallback de desenvolvimento. O `vsp` nunca entra.
 
-   Vale sempre o ambiente detectado, não o que o usuário ou o prompt afirmam; se divergirem, informe. Se nenhum servidor ativo estiver conectado ao sistema-alvo, pare e avise. QAS e PRD são sempre somente leitura, com qualquer servidor.
+   Vale sempre o ambiente detectado, não o que o usuário ou o prompt afirmam; se divergirem, informe. Se nenhum servidor ativo estiver conectado ao sistema-alvo, pare e avise. O QAS é sempre somente leitura, com qualquer servidor; o PRD não é acessado.
 4. **Somente no sistema de desenvolvimento**: antes de criar, alterar ou ativar qualquer objeto no SAP, confirme que o sistema conectado ao servidor MCP selecionado é o `sistemaDesenvolvimento` do bloco `cliente` (compare o SID informado pelo servidor). Se for outro sistema, ou se não for possível confirmar, **pare**: não crie nem ative nada e avise o usuário com o SID encontrado. Consultas de leitura não precisam dessa confirmação.
 5. **Delegar ao especialista**: acione o subagente correspondente (abaixo). O subagente só conhece o que estiver no prompt. Informe:
    - módulo (`<MD>`), pacote, request, nomes aprovados e objetos já existentes;
@@ -87,7 +88,7 @@ Definição de cada subagente: `.agents/agents/<nome>.md`. Skill: `.agents/skill
   - Aplicação automatizada de QuickFixes via ADT
   - Execução de testes unitários ABAP Unit (`abap_unit_run_tests`)
   - Verificação de ESLint no frontend
-- **Ferramentas**: MCP do sistema-alvo conforme a política: `abap-adt` (`abap_atc_*`, `abap_unit_*`), `vsp` (`SAP`) ou, para análise em QAS/PRD ≤ 2023, `arc-1` (`SAPDiagnose`); terminal
+- **Ferramentas**: MCP do sistema-alvo conforme a política: `abap-adt` (`abap_atc_*`, `abap_unit_*`), `vsp` (`SAP`) ou, para análise em QAS ≤ 2023, `arc-1` (`SAPDiagnose`); terminal
 - **Skill**: [.agents/skills/abap-qa-auditor/SKILL.md](.agents/skills/abap-qa-auditor/SKILL.md)
 
 ---
@@ -99,7 +100,7 @@ Servidores definidos em `.agents/mcp.servers.json` (fonte única):
 | Servidor | Uso | Como inicia |
 |---|---|---|
 | `abap-adt` | MCP oficial SAP, para S/4HANA 2025+ | HTTP em `localhost:2236`, token na variável `ABAP_ADT_TOKEN` |
-| `arc-1-qas`, `arc-1-prd` | Análise somente leitura em QAS/PRD ≤ 2023, uma entrada por sistema | stdio via `scripts/mcp-launch.mjs`, variáveis `ARC1_QAS_*` e `ARC1_PRD_*` |
+| `arc-1-qas` | Análise somente leitura em QAS ≤ 2023 (em 2025+, contingência e fallback de análise). Não há entrada para PRD (ADR-0014) | stdio via `scripts/mcp-launch.mjs`, variáveis `ARC1_QAS_*` |
 | `arc-1-dev` | Opcional: DEV pelo ARC-1 (exceção da política 4.2 ou 2º fallback em 2025+, seção 4.4) | stdio via `scripts/mcp-launch.mjs`, variáveis `ARC1_DEV_*` |
 | `vsp` | Desenvolvimento em DEV/SANDBOX ≤ 2023 | stdio via `scripts/mcp-launch.mjs`, variáveis `VSP_*` |
 | `fiori-mcp` | Apps Fiori | stdio via npx |
