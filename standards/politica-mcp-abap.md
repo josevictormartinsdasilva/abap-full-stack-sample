@@ -144,6 +144,15 @@ Outras regras desta seção já são garantidas pelo modo somente leitura e pela
 
 **Exceção controlada:** se um cliente não autorizar o `vsp` no DEV, o `arc-1` pode ser apontado para o DEV com escrita. A escrita usa a entrada `arc-1-dev` (variáveis `ARC1_DEV_*`) e exige opt-in explícito: `<P>_ALLOW_DEV_WRITES=true` e `<P>_ALLOWED_PACKAGES` (ex.: `ARC1_DEV_ALLOW_DEV_WRITES`). Sem a flag, o `arc-1` no DEV inicia somente leitura (uso só para análise) e não pede pacotes. A flag é ignorada fora de DEV/SANDBOX, com SID não confirmado e em SAP_BASIS ≥ 816 sem `<P>_FALLBACK_2025=true` (seção 4.4).
 
+**Complemento do `vsp` para tipos não suportados** ([ADR-0015](../docs/adr/0015-arc-1-complemento-do-vsp-para-tipos-nao-suportados.md)): em DEV/SANDBOX S/4HANA ≤ 2023, quando o `vsp` não oferecer a criação ou a edição de um tipo de objeto, o `arc-1` pode executar **só essa operação**, pela entrada `arc-1-dev`, no mesmo sistema. O restante da entrega, inclusive ativação, ATC e ABAP Unit, continua no `vsp`.
+
+- **Tipos conhecidos:** DCLS (`unsupported object type: DCLS/DL`) e DDLX (`unsupported object type: DDLX/EX`). Um tipo novo entra nesta lista só com a mensagem literal do `vsp` e confirmação do usuário.
+- **Sinal de operação ausente:** o mesmo da tabela da seção 4.4. Erro do objeto ou do sistema não conta.
+- **Confirmação:** o orquestrador mostra o tipo, o objeto e a evidência. Para tipos já listados, a confirmação vale para a entrega (GAP).
+- **Opt-in:** `ARC1_DEV_ALLOW_DEV_WRITES=true` e `ARC1_DEV_ALLOWED_PACKAGES` com o pacote do GAP, nunca `Z*`, além de `ARC1_DEV_SAP_SID` preenchido. As travas fixas desta seção continuam. Ao terminar a entrega, comente as duas flags e reinicie a sessão.
+- **Restrição procedural:** o ARC-1 nega por ação, não por tipo. Com a escrita ligada, ele aceita qualquer tipo do `SAPWrite` no pacote permitido, e cabe ao orquestrador usá-lo só para os tipos listados.
+- **Não se aplica** a SU20/SU21 (nenhum servidor suporta) nem à publicação de service binding em mandante de customizing (recusa do SAP).
+
 ### 4.3 `vsp` — vibing-steampunk (S/4HANA ≤ 2023, DEV/SANDBOX)
 
 > ⚠️ O `vsp` puro inicia **sem restrições**. Por isso ele só pode ser iniciado pelo launcher, nunca diretamente no `.mcp.json` de uma ferramenta.

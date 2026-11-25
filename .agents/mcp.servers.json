@@ -28,7 +28,8 @@
       "transport": "stdio",
       "command": "npx",
       "args": ["--yes", "@sap-ux/fiori-mcp-server@1.15.19", "fiori-mcp"],
-      "timeoutSec": 600
+      "timeoutSec": 600,
+      "env": {}
     }
   }
 }
