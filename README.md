@@ -155,7 +155,10 @@ Quando uma nova funcionalidade completa precisa ser entregue, o **Orquestrador C
 - **[standards/politica-mcp-abap.md](standards/politica-mcp-abap.md)**: Qual servidor MCP acessa cada sistema SAP (por versão e ambiente) e o que cada um pode fazer.
 - **[docs/primeiros-passos.md](docs/primeiros-passos.md)**: Guia de início para o desenvolvedor: liberações a pedir, instalação, conexão ao SAP e primeiro teste de ponta a ponta.
 - **[docs/setup-mcp-abap.md](docs/setup-mcp-abap.md)**: Passo a passo para configurar o `vsp` e o `arc-1` na máquina do desenvolvedor, com a tabela de problemas comuns.
-- **[docs/adr/](docs/adr/README.md)**: Registros de decisão de arquitetura (ADR-0001 a ADR-0009).
+- **[docs/glossario.md](docs/glossario.md)**: Os termos do projeto (MCP, orquestrador, SID, ATC, RAP...) em linguagem simples, para quem está começando.
+- **[docs/parece-erro-mas-e-normal.md](docs/parece-erro-mas-e-normal.md)**: Recusas e mensagens que parecem defeito, mas são travas de propósito, com o que fazer em cada uma.
+- **[docs/revisar-o-plano.md](docs/revisar-o-plano.md)**: Checklist de 8 perguntas para revisar o plano da IA antes de aprovar, e o que conferir depois da entrega.
+- **[docs/adr/](docs/adr/README.md)**: Registros de decisão de arquitetura (ADR-0001 a ADR-0014).
 - **[standards/sistemas-sap.json](standards/sistemas-sap.json)**: Opcional. Restrições adicionais por sistema; o ambiente é detectado no próprio SAP e esta lista só pode torná-lo mais restritivo.
 - **[AGENTS.md](AGENTS.md)**: Regras do orquestrador e papéis dos subagentes — fonte única para todas as ferramentas.
 - **[CLAUDE.md](CLAUDE.md)**: Importa o `AGENTS.md` e adiciona só o que é específico do Claude Code.

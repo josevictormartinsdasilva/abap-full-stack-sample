@@ -23,6 +23,7 @@ Em todo Pull Request (ou commit direto), adicione **uma linha** na tabela de [Hi
 
 | Data | Contribuidor | Área | Atividade |
 |---|---|---|---|
+| 2026-11-25 | José Victor Martins da Silva | Documentação | Material para iniciantes: glossário, "parece erro, mas é normal" e checklist de revisão do plano, ligados ao guia de primeiros passos e ao README |
 | 2026-11-24 | José Victor Martins da Silva | Documentação | Pontas soltas da revisão: status dos ADRs 0009 a 0014, token do `abap-adt` fora do `.env` no ADR-0007, Eclipse no README, mensagens do `setup.mjs` ao mover o token e histórico do CONTRIBUTORS |
 | 2026-11-24 | José Victor Martins da Silva | Documentação | Guia do `abap-adt` no Eclipse e no VS Code (habilitar o servidor, obter e gravar o token, restrições de acesso), com capturas do SAP-samples/abap-platform-rap130; setup move para as variáveis do usuário um token esquecido no `.env` (PR #23) |
 | 2026-11-24 | José Victor Martins da Silva | MCP | Ambiente produtivo fora do alcance dos agentes: sem entrada `arc-1-prd` e sem leitura em PRD em qualquer release (ADR-0014, PR #21) |

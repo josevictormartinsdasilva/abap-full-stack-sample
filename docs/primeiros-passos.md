@@ -2,6 +2,11 @@
 
 Guia para quem vai **usar** o projeto no dia a dia: um desenvolvedor ABAP que recebeu o repositório e quer sair do zero até o primeiro objeto criado pelos agentes. Se você vai **manter o template** (editar agentes, skills e MCPs), leia depois a seção [Estrutura](../README.md#-estrutura-fonte-única--adaptadores-gerados) do README.
 
+> **Começando agora com ABAP e IA?** Três páginas curtas ajudam:
+> - [Glossário](glossario.md): os termos do projeto (MCP, orquestrador, SID, ATC, RAP...) em linguagem simples.
+> - [Parece erro, mas é normal](parece-erro-mas-e-normal.md): as recusas e mensagens que assustam, mas são de propósito.
+> - [Como revisar o plano antes de aprovar](revisar-o-plano.md): as 8 perguntas para fazer antes de deixar a IA criar objetos.
+
 Tempo estimado: uns 15 minutos com o assistente (etapa 3), sem contar a espera pelas liberações da etapa 1.
 
 ---
@@ -291,7 +296,7 @@ Crie uma classe local de teste YCL_TESTE_AGENTE no pacote $TMP, com um método q
 
 Esperado, nesta ordem:
 
-1. O orquestrador apresenta um **plano** com o nome do objeto e **pede sua aprovação**. Nada é criado antes disso.
+1. O orquestrador apresenta um **plano** com o nome do objeto e **pede sua aprovação**. Nada é criado antes disso. Aproveite para treinar o [checklist de revisão do plano](revisar-o-plano.md).
 2. Ele confirma que o SID conectado é o `sistemaDesenvolvimento` do bloco `cliente`.
 3. A classe é criada e **ativada**.
 4. O `abap-qa-auditor` roda o ATC e relata o resultado.
@@ -306,7 +311,7 @@ Se os três passos funcionaram, a instalação está completa.
 
 - **Peça em linguagem natural.** Exemplos por agente em [Como Utilizar no Dia a Dia](../README.md#-como-utilizar-no-dia-a-dia-exemplos-de-prompts).
 - **Informe o contexto da demanda:** módulo (`SD`, `MM`...), GAP, pacote e request. O que você não informar, o orquestrador pergunta.
-- **Leia o plano antes de aprovar.** Os nomes seguem o [padrão de nomenclatura](../standards/naming-conventions.json), mas a decisão é sua.
+- **Leia o plano antes de aprovar.** Os nomes seguem o [padrão de nomenclatura](../standards/naming-conventions.json), mas a decisão é sua. Use o [checklist de revisão do plano](revisar-o-plano.md).
 - **Tarefas pequenas** (uma ou duas linhas, consultas) podem ser feitas direto, sem subagente. Para forçar um especialista, cite o nome: "Peça ao `abap-rap-dev`...".
 
 Regras que valem sempre e que você vai notar:
@@ -332,5 +337,7 @@ Regras que valem sempre e que você vai notar:
 | O agente pergunta sigla, pacote ou variante toda hora | Há placeholders `<...>` no bloco `cliente`: rode `node scripts/setup.mjs --apenas=cliente` |
 | O agente se recusa a criar objetos | Confira na mensagem o SID encontrado. Ele só cria no `sistemaDesenvolvimento` |
 | Qualquer mensagem `mcp-launch:` | Consulte [Problemas comuns](setup-mcp-abap.md#problemas-comuns) |
+
+Recusas da IA ou do launcher que parecem defeito, mas são de propósito, estão explicadas em [Parece erro, mas é normal](parece-erro-mas-e-normal.md).
 
 Se nada resolver, rode `node scripts/mcp-launch.mjs <servidor> --diagnostico` e envie a saída a quem mantém o projeto, **sem** senhas ou tokens.
