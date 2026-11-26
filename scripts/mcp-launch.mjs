@@ -63,7 +63,7 @@ import { IDIOMA_PADRAO, Recusa, valorDeVariavel, aplicarRegistro, comandoParaSpa
 import { FalhaVsp, flagsAusentes, garantirVsp } from "./vsp-binario.mjs";
 import { FalhaArc1, garantirArc1 } from "./arc1-pacote.mjs";
 import { RUNTIME_DIR, gravarEstado, listarAtivos, removerEstado } from "./mcp-runtime.mjs";
-import { lerDotEnv, prefixoDoServidor } from "./config-local.mjs";
+import { lerDotEnv, prefixoDoServidor, valoresComComentario } from "./config-local.mjs";
 import { ehErroCertificado, lerCertificado } from "./sap-tls.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -105,6 +105,8 @@ const arquivoEnv = path.join(ROOT, ".env");
 const dotenv = fs.existsSync(arquivoEnv) ? lerDotEnv(fs.readFileSync(arquivoEnv, "utf8")) : {};
 // VSP_BIN/VSP_VERSION/ARC1_BIN/ARC1_VERSION: ambiente do sistema ou, como fallback, o .env (docs/setup-mcp-abap.md, passo 4).
 for (const k of ["VSP_BIN", "VSP_VERSION", "ARC1_BIN", "ARC1_VERSION"]) if (!process.env[k] && dotenv[k]) process.env[k] = dotenv[k];
+for (const k of valoresComComentario(dotenv, prefix).filter((k) => process.env[k] === undefined))
+  log(`aviso: ${k} no .env parece ter comentário no fim da linha; o # faz parte do valor ("${dotenv[k]}"). Ponha o comentário numa linha própria.`);
 const lerVar = (name) => valorDeVariavel(`${prefix}_${name}`, process.env[`${prefix}_${name}`] ?? dotenv[`${prefix}_${name}`]);
 const v = (name) => lerVar(name).valor;
 const req = (name) => {

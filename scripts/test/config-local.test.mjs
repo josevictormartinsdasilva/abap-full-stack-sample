@@ -4,7 +4,7 @@ import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import {
   NAO_SE_APLICA_CTS, atualizarCliente, atualizarDotEnv, atualizarProjetoCTS, camposPendentes, formatarValorEnv,
-  lerDiagnostico, lerDotEnv, situacaoProjetoCTS,
+  lerDiagnostico, lerDotEnv, situacaoProjetoCTS, valoresComComentario,
   placeholdersPadrao, preencherPadrao, prefixoDoServidor, recusaEsperada2025, situacaoConexao,
 } from "../config-local.mjs";
 
@@ -197,4 +197,22 @@ describe("lerDiagnostico", () => {
     assert.ok(recusaEsperada2025(r.erro));
     assert.ok(!recusaEsperada2025("vsp recusado: DS4/100 é QAS"));
   });
+});
+
+describe("valoresComComentario", () => {
+  const dotenv = lerDotEnv([
+    "ARC1_DEV_FALLBACK_2025=true   #(só em 2025+)",
+    "ARC1_DEV_SAP_PASSWORD=abc #123",
+    "ARC1_DEV_ALLOWED_PACKAGES=ZSD_X",
+    "ARC1_DEV_ALLOW_DEV_WRITES=true   (exemplo do .env.example descomentado)",
+    "VSP_READ_ONLY=true # outro prefixo",
+    "ARC1_DEV_SAP_URL=https://h:44300/#x",
+  ].join("\n"));
+  test("aponta valor com espaço seguido de # ou ( só no prefixo da conexão", () => {
+    assert.deepEqual(valoresComComentario(dotenv, "ARC1_DEV"), ["ARC1_DEV_ALLOW_DEV_WRITES", "ARC1_DEV_FALLBACK_2025"]);
+  });
+  test("senha fica de fora: pode conter \" #\" de verdade", () => {
+    assert.ok(!valoresComComentario(dotenv, "ARC1_DEV").includes("ARC1_DEV_SAP_PASSWORD"));
+  });
+  test("prefixo é exato", () => assert.deepEqual(valoresComComentario(dotenv, "VSP"), ["VSP_READ_ONLY"]));
 });
