@@ -76,4 +76,4 @@ Após qualquer modificação no descritor de aplicação ou código-fonte:
    ```bash
    npm run lint
    ```
-3. Se necessário, validar a execução dos testes de integração/QUnit ou preview local (`npm start` ou `ui5 serve`).
+3. Se necessário, validar a execução dos testes de integração/QUnit ou preview local (`npm start` ou `ui5 serve`). Se o SAP usar certificado fixado, rode o preview pelo wrapper, na pasta do app: `node <caminho-até-a-raiz>/scripts/com-certificados.mjs npm start` (ADR-0016). Nunca use `ignoreCertErrors: true` no `ui5.yaml`.

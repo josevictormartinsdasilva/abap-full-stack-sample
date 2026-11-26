@@ -105,7 +105,7 @@ Servidores definidos em `.agents/mcp.servers.json` (fonte única):
 | `arc-1-qas` | Análise somente leitura em QAS ≤ 2023 (em 2025+, contingência e fallback de análise). Não há entrada para PRD (ADR-0014) | stdio via `scripts/mcp-launch.mjs`, variáveis `ARC1_QAS_*` |
 | `arc-1-dev` | Opcional: DEV pelo ARC-1 (exceção da política 4.2, complemento do `vsp` para tipos não suportados em ≤ 2023 pelo ADR-0015, ou 2º fallback em 2025+, seção 4.4) | stdio via `scripts/mcp-launch.mjs`, variáveis `ARC1_DEV_*` |
 | `vsp` | Desenvolvimento em DEV/SANDBOX ≤ 2023 | stdio via `scripts/mcp-launch.mjs`, variáveis `VSP_*` |
-| `fiori-mcp` | Apps Fiori | stdio via npx |
+| `fiori-mcp` | Apps Fiori | stdio via npx, por `scripts/com-certificados.mjs` (certificados fixados, ADR-0016) |
 
 `arc-1` e `vsp` só podem ser iniciados pelo launcher, que aplica as travas técnicas da política (ver [ADR-0009](docs/adr/0009-selecao-de-mcp-abap-por-versao-e-ambiente.md)). Se ele recusar iniciar, repasse a mensagem ao usuário e não troque de servidor. Os nomes das ferramentas citados acima são os nomes MCP originais. Cada ferramenta de IA pode exibi-los com um prefixo próprio (ex.: `mcp__abap-adt__abap_object_check`, `mcp__vsp__SAP` no Claude Code). As equivalências de operações entre servidores estão na seção 5 da política.
 

@@ -1,5 +1,5 @@
 {
-  "_comentario": "FONTE ÚNICA dos servidores MCP. Edite aqui e rode `node scripts/sync-agents.mjs`. O token nunca é versionado: vem da variável de ambiente indicada em tokenEnvVar. arc-1 e vsp são iniciados por scripts/mcp-launch.mjs, que aplica as travas de standards/politica-mcp-abap.md (ADR-0009). Não há entrada para PRD: nenhum servidor acessa o ambiente produtivo (ADR-0014); cada entrada é uma conexão, e o sufixo do nome define o prefixo das variáveis (vsp -> VSP_*, arc-1-qas -> ARC1_QAS_*, arc-1-dev -> ARC1_DEV_*). Para mais sistemas, copie uma entrada com outro sufixo (ex.: vsp-sandbox -> VSP_SANDBOX_*).",
+  "_comentario": "FONTE ÚNICA dos servidores MCP. Edite aqui e rode `node scripts/sync-agents.mjs`. O token nunca é versionado: vem da variável de ambiente indicada em tokenEnvVar. arc-1 e vsp são iniciados por scripts/mcp-launch.mjs, que aplica as travas de standards/politica-mcp-abap.md (ADR-0009). Não há entrada para PRD: nenhum servidor acessa o ambiente produtivo (ADR-0014); cada entrada é uma conexão, e o sufixo do nome define o prefixo das variáveis (vsp -> VSP_*, arc-1-qas -> ARC1_QAS_*, arc-1-dev -> ARC1_DEV_*). Para mais sistemas, copie uma entrada com outro sufixo (ex.: vsp-sandbox -> VSP_SANDBOX_*). O fiori-mcp roda via scripts/com-certificados.mjs, que confia nos certificados fixados das conexões (<P>_SAP_CA_CERT) por NODE_EXTRA_CA_CERTS (ADR-0016); nunca use caminho de .pem de uma conexão aqui.",
   "servers": {
     "abap-adt": {
       "transport": "http",
@@ -26,10 +26,9 @@
     },
     "fiori-mcp": {
       "transport": "stdio",
-      "command": "npx",
-      "args": ["--yes", "@sap-ux/fiori-mcp-server@1.15.19", "fiori-mcp"],
-      "timeoutSec": 600,
-      "env": {}
+      "command": "node",
+      "args": ["scripts/com-certificados.mjs", "npx", "--yes", "@sap-ux/fiori-mcp-server@1.15.19", "fiori-mcp"],
+      "timeoutSec": 600
     }
   }
 }

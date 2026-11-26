@@ -54,7 +54,15 @@ Rode o diagnóstico (passo 7) antes de abrir a ferramenta de IA. Assim o primeir
 
 **`vsp` com certificado fixado:** o `vsp` é um binário Go. Ele não lê o certificado fixado nem o `NODE_EXTRA_CA_CERTS`, e recusa certificado sem SAN mesmo que confiável. O setup oferece `VSP_SAP_INSECURE=true`: o launcher confere o certificado fixado ao iniciar e só então passa `--insecure` ao `vsp`. Durante a sessão, o `vsp` não verifica o TLS. Use isso até o Basis emitir um certificado com SAN (`DNS:<host>`). Depois, importe a CA em "Autoridades de Certificação Raiz Confiáveis" do usuário no Windows e remova a variável.
 
-**CA corporativa para todos os sistemas:** o `NODE_EXTRA_CA_CERTS` global continua valendo, para o probe e o `arc-1`:
+**`fiori-mcp` e preview do app com certificado fixado** ([ADR-0016](adr/0016-certificado-fixado-no-fiori-mcp-e-no-preview.md)): o `fiori-mcp` já inicia por `scripts/com-certificados.mjs`, que junta os `.pem` de todas as variáveis `<P>_SAP_CA_CERT` num só arquivo (`.agents/certs/node-extra-ca.pem`) e o passa por `NODE_EXTRA_CA_CERTS`. Sem isso, ele falha com `self-signed certificate`. O preview do app (`npm start`, `fiori run`) também é um processo Node e precisa do mesmo wrapper. Rode-o na pasta do app, com o caminho até a raiz do projeto:
+
+```powershell
+node ../../scripts/com-certificados.mjs npm start
+```
+
+Nunca use `ignoreCertErrors: true` no `ui5.yaml` nem `NODE_TLS_REJECT_UNAUTHORIZED=0`: os dois desligam a verificação TLS, e o wrapper recusa iniciar com a segunda.
+
+**CA corporativa para todos os sistemas:** o `NODE_EXTRA_CA_CERTS` global continua valendo, para o probe e o `arc-1` (o `com-certificados.mjs` também o inclui no arquivo que monta):
 
 ```powershell
 [Environment]::SetEnvironmentVariable('NODE_EXTRA_CA_CERTS', 'C:\certs\ca-cliente.pem', 'User')
