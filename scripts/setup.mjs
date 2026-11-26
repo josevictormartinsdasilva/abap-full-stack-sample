@@ -4,6 +4,7 @@
 //   node scripts/setup.mjs                       configura tudo, passo a passo
 //   node scripts/setup.mjs --apenas=dev          refaz só uma etapa: dev, qas, cliente, token
 //   node scripts/setup.mjs --apenas=dev,qas      (várias, separadas por vírgula)
+//   node scripts/setup.mjs --apenas=dev-arc1     conexão do arc-1-dev (opcional, só quando pedida)
 //
 // O que faz:
 //   1. Confere o Node e a plataforma; cria o .env a partir do .env.example.
@@ -13,6 +14,8 @@
 //      launcher usa como conferência. Certificado autoassinado ou de CA interna: baixa o
 //      certificado, mostra o SHA-256 para conferir e o fixa na conexão (<P>_SAP_CA_CERT); no
 //      vsp, oferece <P>_SAP_INSECURE=true (ADR-0013).
+//      O arc-1-dev (mesmo DEV pelo ARC-1) só é configurado com --apenas=dev-arc1: reaproveita a
+//      conexão do vsp como padrão, exige o mesmo SID e nunca grava as flags de escrita.
 //   3. Pede os parâmetros do cliente e grava no bloco "cliente" de
 //      standards/naming-conventions.json (o sistemaDesenvolvimento vem do SID detectado no DEV)
 //      e nos placeholders de standards/padrao-desenvolvimento.md.
@@ -36,7 +39,7 @@ import { BASIS_MCP_OFICIAL, BASIS_MINIMO, valorDeVariavel } from "./mcp-politica
 import { nodeAtende } from "./arc1-pacote.mjs";
 import { ehErroCertificado, gravarCertificado, lerCertificado, obterCertificado } from "./sap-tls.mjs";
 import {
-  atualizarCliente, atualizarDotEnv, atualizarProjetoCTS, camposPendentes, ehPlaceholder, lerDotEnv,
+  atualizarCliente, atualizarDotEnv, atualizarProjetoCTS, camposPendentes, ehPlaceholder, leitorComHeranca, lerDotEnv,
   placeholdersPadrao, preencherPadrao, prefixoDoServidor, situacaoConexao, situacaoProjetoCTS,
 } from "./config-local.mjs";
 
@@ -50,18 +53,22 @@ const ARQ = {
 };
 const NODE_MINIMO = ">=22.19";
 
-const ETAPAS = ["dev", "qas", "cliente", "token"];
+// dev-arc1 só roda quando pedida (--apenas=dev-arc1): é opcional e avançada, e o setup completo
+// não deve perguntar por ela a quem está começando.
+const ETAPAS = ["dev", "qas", "cliente", "token", "dev-arc1"];
+const ETAPAS_PADRAO = ["dev", "qas", "cliente", "token"];
 const argApenas = process.argv.find((a) => a.startsWith("--apenas="));
-const apenas = argApenas ? argApenas.split("=")[1].split(",").map((s) => s.trim().toLowerCase()).filter(Boolean) : ETAPAS;
+const apenas = argApenas ? argApenas.split("=")[1].split(",").map((s) => s.trim().toLowerCase()).filter(Boolean) : ETAPAS_PADRAO;
 if (apenas.includes("prd")) sair("o PRD não é configurado: nenhum servidor acessa o ambiente produtivo, nem para leitura (ADR-0014)");
 for (const e of apenas) if (!ETAPAS.includes(e)) sair(`etapa desconhecida em --apenas: "${e}" (use ${ETAPAS.join(", ")})`);
 const faz = (etapa) => apenas.includes(etapa);
 
 // Um sistema por entrada de .agents/mcp.servers.json (projeto = um cliente). O DEV vai pelo vsp;
-// QAS, pelo arc-1, somente leitura. O arc-1-dev é opcional e avançado: fica de fora.
-// PRD não tem entrada: nenhum servidor acessa o ambiente produtivo (ADR-0014).
+// QAS, pelo arc-1, somente leitura. O arc-1-dev (o mesmo DEV pelo ARC-1) herda a conexão do vsp
+// como padrão. PRD não tem entrada: nenhum servidor acessa o ambiente produtivo (ADR-0014).
 const SISTEMAS = [
   { etapa: "dev", servidor: "vsp", rotulo: "DEV (desenvolvimento)", esperado: ["DEV", "SANDBOX"], padrao: true },
+  { etapa: "dev-arc1", servidor: "arc-1-dev", rotulo: "DEV pelo ARC-1 (arc-1-dev, opcional)", esperado: ["DEV", "SANDBOX"], padrao: true, herdaDe: "vsp" },
   { etapa: "qas", servidor: "arc-1-qas", rotulo: "QAS (somente leitura)", esperado: ["QAS"], padrao: false },
 ];
 
@@ -254,16 +261,25 @@ async function configurarSistema(s, servidores, resultados) {
   titulo(`Sistema ${s.rotulo} — servidor ${s.servidor}`);
   let dotenv = lerDotEnv(lerEnvTexto());
   const { situacao } = situacaoConexao(prefix, (n) => process.env[n] ?? dotenv[n]);
-  const atual = (n) => valorAtual(`${prefix}_${n}`, dotenv);
+  const origem = s.herdaDe ? prefixoDoServidor(s.herdaDe).prefix : null;
+  const atual = leitorComHeranca(prefix, origem, (n) => process.env[n] ?? dotenv[n]);
 
   if (situacao === "completa") {
     info(`já configurado: ${atual("SAP_URL")}, mandante ${atual("SAP_CLIENT")}, usuário ${atual("SAP_USER")}`);
-    if (!(await confirmar("Reconfigurar ou testar de novo?", false))) return;
+    if (!(await confirmar("Reconfigurar ou testar de novo?", false))) {
+      if (s.herdaDe) explicarEscritaArc1Dev(prefix, false);
+      return;
+    }
   } else if (!(await confirmar(`Configurar o ${s.rotulo.split(" ")[0]} agora?`, s.padrao))) {
     info("pulado. O servidor vai aparecer como falho no /mcp, o que é esperado se você não usa esse sistema.");
     return;
   }
-  if (s.etapa !== "dev") info("Use um usuário só de leitura: o ARC-1 roda somente leitura em QAS.");
+  if (s.etapa === "qas") info("Use um usuário só de leitura: o ARC-1 roda somente leitura em QAS.");
+  if (origem) {
+    info(`Aponte para o mesmo DEV do ${s.herdaDe}. Enter reaproveita os valores de ${origem}_* (o usuário pode ser outro).`);
+    info("Este passo grava só a conexão. As flags de escrita (ARC1_DEV_ALLOW_DEV_WRITES e ARC1_DEV_ALLOWED_PACKAGES) ficam à mão.");
+    if (!valorAtual(`${origem}_SAP_URL`, dotenv)) aviso(`o ${s.herdaDe} ainda não está configurado: o arc-1-dev deve apontar para o mesmo DEV dele (rode antes --apenas=dev)`);
+  }
 
   for (;;) {
     const conn = {
@@ -308,6 +324,7 @@ async function configurarSistema(s, servidores, resultados) {
       if (await confirmar("Gravar a conexão no .env mesmo assim (sem detectar)?", false)) {
         gravarEnv(conexaoParaEnv(prefix, conn, s, null, { certConn }));
         aviso("gravado sem detecção; rode o doctor depois para conferir");
+        if (origem) explicarEscritaArc1Dev(prefix, false);
       }
       return;
     }
@@ -323,13 +340,18 @@ async function configurarSistema(s, servidores, resultados) {
       problemas.push(`você configurou como ${s.rotulo.split(" ")[0]}, mas o sistema foi detectado como ${det.ambiente}${s.etapa === "dev" ? "; o vsp vai recusar iniciar" : ""}`);
     if (det.client && det.client !== conn.client) problemas.push(`o mandante conectado é ${det.client}, não ${conn.client}`);
     if (!det.sid) problemas.push("o SID não foi detectado; o launcher vai exigir que você informe <P>_SAP_SID");
+    const sidEsperado = origem ? valorAtual(`${origem}_SAP_SID`, dotenv)?.toUpperCase() : undefined;
+    if (sidEsperado && det.sid && det.sid !== sidEsperado)
+      problemas.push(`o ${s.servidor} precisa apontar para o mesmo DEV do ${s.herdaDe} (${sidEsperado}), mas conectou em ${det.sid}`);
     problemas.forEach((p) => erro(p));
 
     const oficial = det.sapBasis >= BASIS_MCP_OFICIAL;
     if (oficial && s.etapa === "dev")
       aviso(`${det.produto}: o servidor de desenvolvimento é o abap-adt. O vsp fica configurado só como fallback (política 4.4), desligado até você precisar.`);
-    if (oficial && s.etapa !== "dev")
+    if (oficial && s.etapa === "qas")
       info(`${det.produto}: a análise é pelo abap-adt; o arc-1 fica como contingência de análise.`);
+    if (oficial && origem)
+      info(`${det.produto}: o arc-1-dev só grava como 2º fallback do abap-adt (política 4.4), com ARC1_DEV_FALLBACK_2025=true além das flags de escrita.`);
 
     if (problemas.length && (await confirmar("Corrigir e tentar de novo?", true))) continue;
 
@@ -345,9 +367,34 @@ async function configurarSistema(s, servidores, resultados) {
     if (!(await confirmar("Gravar esta conexão no .env?", !problemas.length))) return;
     gravarEnv(conexaoParaEnv(prefix, conn, s, det.sid, { certConn, inseguro }));
     ok(`gravado no .env (${prefix}_*)`);
+    if (origem) explicarEscritaArc1Dev(prefix, oficial);
     resultados[s.etapa] = { sid: det.sid, produto: det.produto, ambiente: det.ambiente, oficial };
     return;
   }
+}
+
+// O setup nunca liga a escrita do arc-1-dev: ela é por entrega, com o pacote dela, e precisa ser
+// desligada ao terminar (ADR-0015). Mostra o estado atual e como ligar.
+function explicarEscritaArc1Dev(prefix, oficial) {
+  const dotenv = lerDotEnv(lerEnvTexto());
+  const escrita = /^(true|1|yes)$/i.test(valorAtual(`${prefix}_ALLOW_DEV_WRITES`, dotenv) ?? "");
+  if (escrita) {
+    aviso(`a escrita do arc-1-dev está ligada (${prefix}_ALLOW_DEV_WRITES=true, pacotes ${valorAtual(`${prefix}_ALLOWED_PACKAGES`, dotenv) ?? "?"}).`);
+    if (/(^|,)\s*Z\*\s*(,|$)/i.test(valorAtual(`${prefix}_ALLOWED_PACKAGES`, dotenv) ?? ""))
+      aviso(`${prefix}_ALLOWED_PACKAGES tem Z*: no complemento do vsp (ADR-0015), use só o pacote da entrega.`);
+    info("  Ao terminar a entrega, comente as flags de escrita no .env e reinicie a sessão da ferramenta de IA.");
+    return;
+  }
+  info("Sem as flags de escrita, o arc-1-dev inicia somente leitura. Para gravar DCLS/DDLX numa entrega (ADR-0015),");
+  info("ponha no .env as linhas abaixo, trocando o pacote pelo da entrega (nunca Z*) e sem comentário na mesma linha:");
+  info(`  ${prefix}_ALLOW_DEV_WRITES=true`);
+  info(`  ${prefix}_ALLOWED_PACKAGES=<PACOTE_DA_ENTREGA>`);
+  if (oficial) {
+    info("Em 2025+, o arc-1-dev só grava como 2º fallback do abap-adt (política 4.4), e precisa também de:");
+    info(`  ${prefix}_FALLBACK_2025=true`);
+  }
+  info("Depois, reinicie a sessão da ferramenta de IA. Ao terminar a entrega, comente as flags e reinicie de novo.");
+  info("Detalhes: docs/setup-mcp-abap.md, \"Complemento do vsp para DCLS e DDLX\".");
 }
 
 function conexaoParaEnv(prefix, conn, s, sid, { certConn = null, inseguro = false } = {}) {
