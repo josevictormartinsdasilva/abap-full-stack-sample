@@ -494,7 +494,7 @@ describe("decidir — idioma de logon", () => {
     const d = decidirCom({ tool: "arc-1", env: { PATH: "/bin", SAP_LANGUAGE: "DE" } });
     assert.equal(d.childEnv.SAP_LANGUAGE, "PT");
   });
-  test("idioma do projeto (project.idiomaPadrao) substitui o PT fixo", () => {
+  test("idioma do projeto (project.idiomaLogon) substitui o PT fixo", () => {
     const d = decidirCom({ tool: "vsp", vars: { ALLOWED_PACKAGES: "Z*" }, idiomaProjeto: "ES" });
     assert.equal(d.idioma, "ES");
     assert.equal(d.args[d.args.indexOf("--language") + 1], "ES");
@@ -505,13 +505,24 @@ describe("decidir — idioma de logon", () => {
   });
 });
 
-describe("idiomaDoProjeto", () => {
-  test("extrai o código entre parênteses do texto livre", () => {
-    assert.equal(idiomaDoProjeto("Português (PT) - Códigos, objetos e descrições"), "PT");
-    assert.equal(idiomaDoProjeto("Español (es)"), "ES");
+describe("idiomaDoProjeto (project.idiomaLogon)", () => {
+  test("usa o campo, normalizado, sem aviso", () => {
+    assert.deepEqual(idiomaDoProjeto({ idiomaLogon: " es " }), { idioma: "ES", avisos: [] });
   });
-  test("aceita o código sozinho", () => assert.equal(idiomaDoProjeto(" en "), "EN"));
-  test("sem código reconhecível devolve undefined", () => {
-    for (const t of [undefined, null, 42, "", "Português", "Português (POR)"]) assert.equal(idiomaDoProjeto(t), undefined, String(t));
+  test("não lê o texto livre de idiomaPadrao", () => {
+    const r = idiomaDoProjeto({ idiomaPadrao: "Español (ES) - Códigos" });
+    assert.equal(r.idioma, "PT");
+    assert.match(r.avisos[0], /project\.idiomaLogon não definido/);
+  });
+  test("campo ausente (clone antigo): PT com aviso", () => {
+    for (const p of [{}, { idiomaLogon: null }]) {
+      const r = idiomaDoProjeto(p);
+      assert.equal(r.idioma, "PT");
+      assert.equal(r.avisos.length, 1);
+    }
+  });
+  test("valor inválido recusa, em vez de cair em PT", () => {
+    for (const v of ["", "Português", "POR", 42])
+      assert.throws(() => idiomaDoProjeto({ idiomaLogon: v }), recusa(/project\.idiomaLogon.*duas letras/), String(v));
   });
 });

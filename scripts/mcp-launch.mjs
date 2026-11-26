@@ -218,17 +218,18 @@ if (fs.existsSync(arquivoRegistro)) {
 }
 
 // ---------------------------------------------------------------- idioma do projeto
-// project.idiomaPadrao de standards/naming-conventions.json é o idioma de logon quando a conexão
-// não define <P>_SAP_LANGUAGE. Sem o arquivo ou sem código reconhecível, vale IDIOMA_PADRAO.
-let idiomaProjeto;
+// project.idiomaLogon de standards/naming-conventions.json é o idioma de logon quando a conexão
+// não define <P>_SAP_LANGUAGE. Valor inválido recusa; campo ausente ou arquivo ilegível usa
+// IDIOMA_PADRAO, com aviso.
+let projeto;
 try {
-  const texto = JSON.parse(fs.readFileSync(path.join(ROOT, "standards", "naming-conventions.json"), "utf8"))?.project?.idiomaPadrao;
-  idiomaProjeto = idiomaDoProjeto(texto);
-  if (texto !== undefined && !idiomaProjeto)
-    log(`aviso: project.idiomaPadrao ${JSON.stringify(texto)} sem código ISO de duas letras (ex.: "Português (PT)"); usando ${IDIOMA_PADRAO}`);
+  projeto = JSON.parse(fs.readFileSync(path.join(ROOT, "standards", "naming-conventions.json"), "utf8"))?.project;
 } catch (e) {
-  log(`aviso: não foi possível ler project.idiomaPadrao de standards/naming-conventions.json (${e.message}); usando ${IDIOMA_PADRAO}`);
+  log(`aviso: não foi possível ler standards/naming-conventions.json (${e.message}); idioma de logon ${IDIOMA_PADRAO}`);
 }
+const idiomaInfo = projeto ? politica(() => idiomaDoProjeto(projeto)) : { idioma: IDIOMA_PADRAO, avisos: [] };
+idiomaInfo.avisos.forEach((a) => log(`aviso: ${a}`));
+const idiomaProjeto = idiomaInfo.idioma;
 
 // ---------------------------------------------------------------- decisão por ferramenta
 const sistema = { sid, sidPendente: sidInfo.sidPendente, mandante, ambiente, motivo, sapBasis: det.sapBasis, produto: det.produto };

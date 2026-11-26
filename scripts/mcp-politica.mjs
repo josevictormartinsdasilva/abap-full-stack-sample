@@ -163,17 +163,21 @@ export function resolverSid({ sid, sidOrigem }, sidDeclarado, prefix) {
 // ---------------------------------------------------------------- idioma de logon
 // Idioma de logon no SAP, que também vira o idioma original dos objetos criados. Sem ele, o vsp
 // (--language) e o ARC-1 (SAP_LANGUAGE) assumem EN. Ordem: <P>_SAP_LANGUAGE (por conexão), depois
-// o idioma do projeto (standards/naming-conventions.json, project.idiomaPadrao) e, se nenhum dos
-// dois existir, IDIOMA_PADRAO. O valor é o código ISO de duas letras (PT, EN, ES...).
+// o idioma do projeto (standards/naming-conventions.json, project.idiomaLogon) e, se o campo não
+// existir, IDIOMA_PADRAO. O valor é o código ISO de duas letras (PT, EN, ES...).
 export const IDIOMA_PADRAO = "PT";
 
-// Extrai o código ISO de project.idiomaPadrao, texto livre como "Português (PT) - Códigos...".
-// Aceita o código sozinho ("PT") ou entre parênteses. Sem código reconhecível, devolve undefined.
-export function idiomaDoProjeto(texto) {
-  if (typeof texto !== "string") return undefined;
-  const t = texto.trim();
-  const m = /^([A-Za-z]{2})$/.exec(t) ?? /\(([A-Za-z]{2})\)/.exec(t);
-  return m ? m[1].toUpperCase() : undefined;
+// Idioma do projeto: project.idiomaLogon. Valor inválido recusa, para o projeto não cair em PT
+// sem querer. Campo ausente (clone anterior ao campo) usa IDIOMA_PADRAO, com aviso.
+// Entrada: o bloco "project" do JSON. Saída: { idioma, avisos } ou Recusa.
+export function idiomaDoProjeto(project) {
+  const campo = project?.idiomaLogon;
+  if (campo === undefined || campo === null)
+    return { idioma: IDIOMA_PADRAO, avisos: [`project.idiomaLogon não definido em standards/naming-conventions.json; usando ${IDIOMA_PADRAO}. Defina o código ISO do idioma do projeto (ex.: "PT")`] };
+  const idioma = String(campo).trim().toUpperCase();
+  if (!/^[A-Z]{2}$/.test(idioma))
+    recusar(`project.idiomaLogon=${JSON.stringify(campo)} inválido em standards/naming-conventions.json: use o código ISO de duas letras do idioma (ex.: PT, EN, ES)`);
+  return { idioma, avisos: [] };
 }
 
 export function idiomaLogon(valor, variavel, padrao = IDIOMA_PADRAO) {
@@ -195,7 +199,7 @@ export function idiomaLogon(valor, variavel, padrao = IDIOMA_PADRAO) {
 //   arc1        { command, args } do ARC-1 gerenciado (scripts/arc1-pacote.mjs); ignorado com ARC1_BIN
 //   platform    process.platform
 //   caCert      caminho absoluto do .pem fixado para a conexão (<P>_SAP_CA_CERT), se houver
-//   idiomaProjeto  código ISO de project.idiomaPadrao (idiomaDoProjeto), se houver
+//   idiomaProjeto  código ISO de project.idiomaLogon (idiomaDoProjeto), se houver
 // Saída: { command, args, shell, modo, tls, idioma, acoesNegadas, childEnv, avisos } ou Recusa.
 //
 // TLS (política seção 2, ADR-0013): o probe sempre verifica o certificado, com a cadeia do
