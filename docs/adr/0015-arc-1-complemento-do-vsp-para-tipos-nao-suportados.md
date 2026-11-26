@@ -7,7 +7,7 @@
 
 O [ADR-0009](0009-selecao-de-mcp-abap-por-versao-e-ambiente.md) define o `vsp` como o servidor de desenvolvimento de um DEV/SANDBOX S/4HANA ≤ 2023. Pela seção 4.2 da política, o `arc-1` só grava nesse DEV quando o cliente **não autoriza o `vsp`**. A cadeia de fallback `vsp` → `arc-1` do [ADR-0011](0011-fallback-de-desenvolvimento-em-s4hana-2025.md) vale só para 2025+.
 
-No SD-CRED-02 (SF4, S/4HANA 2023, SAP_BASIS 758, `vsp` v2.62.1) o `vsp` recusou dois tipos de objeto RAP comuns:
+Numa POC de app RAP + Fiori Elements (S/4HANA 2023, SAP_BASIS 758, `vsp` v2.62.1), o `vsp` recusou dois tipos de objeto RAP comuns:
 
 | Tipo | Mensagem literal do `vsp` |
 |---|---|
@@ -45,13 +45,14 @@ Nenhum dos dois servidores cria objeto de autorização (SU20/SU21: `vsp` "unsup
 - (+) O app RAP sai completo pelos agentes, com DCL ativo desde o desenvolvimento, sem colar fontes à mão.
 - (+) O uso fica rastreável: tipo, evidência e servidor aparecem no relatório do orquestrador.
 - (−) **A restrição a DCLS/DDLX é procedural.** O `SAP_DENY_ACTIONS` do ARC-1 nega por ação (`SAPWrite.create`, `SAPWrite.delete`…), não por tipo de objeto, então com a escrita ligada o ARC-1 consegue gravar qualquer tipo do `SAPWrite` no pacote permitido. As travas técnicas são o pacote único e o opt-in desligado por padrão.
-- (−) Usar o ARC-1 com escrita num sistema de cliente reabre as questões de compliance do ADR-0009 (APIs ADT internas, aceite formal do cliente). Neste projeto o ambiente é interno da GFX, sem QAS nem PRD.
-- (−) O launcher passa `SAP_ALLOW_TRANSPORT_WRITES=false`. **Precisa ser verificado no primeiro uso** se o ARC-1 consegue gravar o objeto numa request já existente (`corrNr`) com essa flag. Se não conseguir, a decisão não se aplica a pacote transportável até ajuste no launcher, que exigiria novo ADR.
+- (−) Usar o ARC-1 com escrita num sistema de cliente reabre as questões de compliance do ADR-0009 (APIs ADT internas, aceite formal do cliente). Registre o aceite do cliente antes de ligar o opt-in num sistema dele.
+- (+) **Gravação em request existente confirmada.** O launcher passa `SAP_ALLOW_TRANSPORT_WRITES=false`, e havia o risco de o ARC-1 não conseguir gravar num pacote transportável. Na POC, o ARC-1 1.11.0 gravou o objeto na request já existente (`corrNr`) com `SAP_ALLOW_TRANSPORT_WRITES=false`, então a decisão vale para pacote transportável sem ajuste no launcher.
 - (−) Ligar e desligar o opt-in exige reiniciar a sessão da ferramenta de IA.
 
 ## Evidências
 
-- Mensagens literais do `vsp` no SD-CRED-02 (SF4/200, request SF4K902004, 25/11/2026), na tabela do Contexto.
+- Mensagens literais do `vsp` na POC (S/4HANA 2023, SAP_BASIS 758, DEV, 25/11/2026), na tabela do Contexto.
+- Mesma POC: o `arc-1-dev` (ARC-1 1.11.0) gravou na request existente com `SAP_ALLOW_TRANSPORT_WRITES=false` (risco da gravação em request, fechado na seção Consequências).
 - `arc-1@1.11.0`, README: `SAPWrite` "(PROG, CLAS, INTF, FUNC, FUGR, INCL, DDLS, DCLS, DDLX, BDEF, SRVD, SRVB, SKTD/KTD, TABL, DOMA, DTEL, MSAG …)"; `AUTH` só no `SAPRead`.
 - `arc-1@1.11.0`, `dist/server/config.js`: `SAP_DENY_ACTIONS` por ação; `SAP_ALLOWED_OPS` removido.
 - `scripts/mcp-politica.mjs`: `ALLOW_DEV_WRITES` já é aceito em DEV/SANDBOX ≤ 2023 (seção 4.2). Não é preciso mudar o launcher.

@@ -18,6 +18,8 @@ A sessão principal atua como **Orquestrador Central**.
 
    Em S/4HANA 2025+ DEV/SANDBOX, se o `abap-adt` **não oferecer** uma operação de desenvolvimento, siga a cadeia de fallback da seção 4.4 da política: `vsp` → `arc-1` → execução manual (código e passos para o ADT, só com autorização do usuário). Só conta como operação ausente o sinal previsto na tabela da seção 4.4; erro do objeto ou do sistema não é motivo para trocar de servidor. A cada passo da cadeia, mostre ao usuário a evidência (ferramenta consultada ou mensagem de erro literal) e só siga com a confirmação dele.
 
+   Em S/4HANA ≤ 2023 DEV/SANDBOX, se o `vsp` **não oferecer** criar ou editar um tipo de objeto, o `arc-1-dev` executa **só essa operação**, no mesmo sistema (seção 4.2 da política, [ADR-0015](docs/adr/0015-arc-1-complemento-do-vsp-para-tipos-nao-suportados.md)). Tipos conhecidos: DCLS e DDLX. Ativação do restante, ATC e ABAP Unit continuam no `vsp`. Exige o opt-in do `arc-1-dev` com o pacote da entrega (nunca `Z*`) e a confirmação do usuário, que vale para a entrega inteira nos tipos já listados. Um tipo novo entra na lista só com a mensagem literal do `vsp`. Não afirme que um servidor suporta um tipo de objeto sem que a ferramenta tenha confirmado.
+
    Em S/4HANA 2025+ QAS, se o `abap-adt` estiver no ar mas **não oferecer** uma operação de análise, siga o fallback da seção 4.5 da política: `arc-1` somente leitura no mesmo sistema (`arc-1-qas`, SID e mandante iguais aos do `abap-adt`); se ele também não atender, pare e informe. Mesmo critério de sinais, evidência e confirmação do fallback de desenvolvimento. O `vsp` nunca entra.
 
    Vale sempre o ambiente detectado, não o que o usuário ou o prompt afirmam; se divergirem, informe. Se nenhum servidor ativo estiver conectado ao sistema-alvo, pare e avise. O QAS é sempre somente leitura, com qualquer servidor; o PRD não é acessado.
@@ -101,7 +103,7 @@ Servidores definidos em `.agents/mcp.servers.json` (fonte única):
 |---|---|---|
 | `abap-adt` | MCP oficial SAP, para S/4HANA 2025+ | HTTP em `localhost:2236`, token na variável `ABAP_ADT_TOKEN` |
 | `arc-1-qas` | Análise somente leitura em QAS ≤ 2023 (em 2025+, contingência e fallback de análise). Não há entrada para PRD (ADR-0014) | stdio via `scripts/mcp-launch.mjs`, variáveis `ARC1_QAS_*` |
-| `arc-1-dev` | Opcional: DEV pelo ARC-1 (exceção da política 4.2 ou 2º fallback em 2025+, seção 4.4) | stdio via `scripts/mcp-launch.mjs`, variáveis `ARC1_DEV_*` |
+| `arc-1-dev` | Opcional: DEV pelo ARC-1 (exceção da política 4.2, complemento do `vsp` para tipos não suportados em ≤ 2023 pelo ADR-0015, ou 2º fallback em 2025+, seção 4.4) | stdio via `scripts/mcp-launch.mjs`, variáveis `ARC1_DEV_*` |
 | `vsp` | Desenvolvimento em DEV/SANDBOX ≤ 2023 | stdio via `scripts/mcp-launch.mjs`, variáveis `VSP_*` |
 | `fiori-mcp` | Apps Fiori | stdio via npx |
 

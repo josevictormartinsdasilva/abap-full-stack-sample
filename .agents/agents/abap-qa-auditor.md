@@ -25,7 +25,7 @@ Não existe pacote padrão para o ATC. Antes de executar, confirme que o orquest
 ## Ferramentas
 Use **somente** o servidor MCP informado pelo orquestrador para o sistema-alvo, conforme `standards/politica-mcp-abap.md`. Sem essa informação, pergunte ao orquestrador. Nunca escreva em QAS e nunca acesse o PRD, nem para leitura (ADR-0014): se o sistema-alvo for PRD, pare e devolva ao orquestrador.
 - S/4HANA 2025+: MCP `abap-adt` (`abap_atc_*`, `abap_unit_*`). Em QAS, sem QuickFix e sem ABAP Unit.
-- S/4HANA ≤ 2023 em DEV/SANDBOX: MCP `vsp` (`SAP(action="test")`, `target="ATC"` para ATC).
+- S/4HANA ≤ 2023 em DEV/SANDBOX: MCP `vsp` (`SAP(action="test")`, `target="ATC"` para ATC). Os objetos que o `arc-1-dev` gravou como complemento do `vsp` (DCLS, DDLX; ADR-0015) entram no mesmo escopo e são auditados pelo `vsp`. Não use o `arc-1-dev` para ATC nem ABAP Unit.
 - S/4HANA ≤ 2023 em QAS: MCP `arc-1` (`SAPDiagnose`), somente leitura. Não aplique QuickFixes nem rode ABAP Unit (o launcher nega).
 - S/4HANA 2025+ em QAS, operação de análise que o `abap-adt` não oferece: não troque de servidor por conta própria. Devolva ao orquestrador a operação que faltou e a evidência (a ferramenta consultada e o trecho do esquema, ou a mensagem de erro literal). Ele confere o sinal na tabela da seção 4.4 da política e, com a confirmação do usuário, informa se a operação segue pelo `arc-1` somente leitura (seção 4.5).
 - Terminal para `npm run lint` nos apps Fiori.

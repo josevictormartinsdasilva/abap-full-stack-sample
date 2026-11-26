@@ -19,7 +19,7 @@ Do bloco `cliente` de [naming-conventions.json](../../../standards/naming-conven
 
 ## Servidor MCP
 
-Os nomes de ferramentas abaixo são os do `abap-adt` (MCP oficial, S/4HANA 2025+). Em sistemas ≤ 2023, use o servidor informado pelo orquestrador (`vsp` em DEV/SANDBOX, `arc-1` em QAS; PRD não é acessado) e as equivalências da seção 5 de [politica-mcp-abap.md](../../../standards/politica-mcp-abap.md). No QAS, a auditoria é somente leitura: não aplique QuickFixes e não rode ABAP Unit, que só é executado em DEV/SANDBOX.
+Os nomes de ferramentas abaixo são os do `abap-adt` (MCP oficial, S/4HANA 2025+). Em sistemas ≤ 2023, use o servidor informado pelo orquestrador (`vsp` em DEV/SANDBOX, `arc-1` em QAS; PRD não é acessado) e as equivalências da seção 5 de [politica-mcp-abap.md](../../../standards/politica-mcp-abap.md). No QAS, a auditoria é somente leitura: não aplique QuickFixes e não rode ABAP Unit, que só é executado em DEV/SANDBOX. Em DEV/SANDBOX ≤ 2023, os objetos gravados pelo `arc-1-dev` como complemento do `vsp` (DCLS, DDLX; ADR-0015) são auditados pelo `vsp`, no mesmo escopo dos demais.
 
 ## Tarefas Principais
 
