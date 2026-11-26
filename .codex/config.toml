@@ -27,5 +27,5 @@ startup_timeout_sec = 120
 
 [mcp_servers.fiori-mcp]
 command = "cmd"
-args = ["/c", "npx", "--yes", "@sap-ux/fiori-mcp-server@1.15.19", "fiori-mcp"]
+args = ["/c", "node", "scripts/com-certificados.mjs", "npx", "--yes", "@sap-ux/fiori-mcp-server@1.15.19", "fiori-mcp"]
 startup_timeout_sec = 600

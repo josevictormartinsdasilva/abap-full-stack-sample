@@ -3,7 +3,7 @@ import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import {
   Recusa, valorDeVariavel, verificarTls, filtrarEnvFilho, lerRegistro, aplicarRegistro, resolverSid, decidir, comandoParaSpawn,
-  ARC1_NEGADAS_FORA_DEV,
+  ARC1_NEGADAS_FORA_DEV, idiomaDoProjeto,
 } from "../mcp-politica.mjs";
 
 const REG = "standards/sistemas-sap.json";
@@ -171,8 +171,8 @@ const CONN = { url: "https://sap.exemplo.com", client: "100", user: "DEV", passw
 const variaveis = (mapa) => (nome) => mapa[nome];
 const base = { sid: "DS4", sidPendente: false, mandante: "100", ambiente: "DEV", motivo: "teste", sapBasis: 758, produto: "S/4HANA 2023" };
 const ARC1 = { command: "/usr/bin/node", args: ["/cache/arc-1/1.10.1/node_modules/arc-1/bin/arc1.js"] };
-const decidirCom = ({ tool, sistema = {}, vars = {}, env = { PATH: "/bin" }, platform = "linux", arc1 = ARC1, caCert, conn = CONN }) =>
-  decidir({ tool, prefix: tool === "vsp" ? "VSP" : "ARC1", sistema: { ...base, ...sistema }, conn, v: variaveis(vars), env, platform, arc1, caCert });
+const decidirCom = ({ tool, sistema = {}, vars = {}, env = { PATH: "/bin" }, platform = "linux", arc1 = ARC1, caCert, conn = CONN, idiomaProjeto }) =>
+  decidir({ tool, prefix: tool === "vsp" ? "VSP" : "ARC1", sistema: { ...base, ...sistema }, conn, v: variaveis(vars), env, platform, arc1, caCert, idiomaProjeto });
 
 describe("decidir — SAP_BASIS mínimo (1.5)", () => {
   for (const tool of ["arc-1", "vsp"])
@@ -288,7 +288,7 @@ describe("decidir — vsp", () => {
   test("DEV ≤ 2023: argumentos endurecidos", () => {
     const d = decidirCom({ tool: "vsp", vars });
     assert.equal(d.modo, "desenvolvimento");
-    assert.deepEqual(d.args, ["--mode", "hyperfocused", "--expect", "DS4.100/DEV", "--allowed-packages", "ZMM*", "--block-free-sql"]);
+    assert.deepEqual(d.args, ["--mode", "hyperfocused", "--expect", "DS4.100/DEV", "--allowed-packages", "ZMM*", "--block-free-sql", "--language", "PT"]);
     assert.ok(!d.args.includes("--insecure"));
   });
   for (const ambiente of ["QAS"])
@@ -310,7 +310,7 @@ describe("decidir — vsp", () => {
   test("transportes e somente leitura", () => {
     const d = decidirCom({ tool: "vsp", vars: { ...vars, ALLOWED_TRANSPORTS: "DS4K*", ENABLE_TRANSPORTS: "true", READ_ONLY: "1" } });
     assert.equal(d.modo, "somente leitura");
-    assert.deepEqual(d.args.slice(7), ["--allow-transportable-edits", "--allowed-transports", "DS4K*", "--enable-transports", "--read-only"]);
+    assert.deepEqual(d.args.slice(9), ["--allow-transportable-edits", "--allowed-transports", "DS4K*", "--enable-transports", "--read-only"]);
   });
   test("VSP_BIN substitui o comando", () => {
     const d = decidirCom({ tool: "vsp", vars, env: { VSP_BIN: "C:/tools/vsp.exe" }, platform: "win32" });
@@ -345,7 +345,7 @@ describe("decidir — fallback do abap-adt em 2025+ (política 4.4)", () => {
     for (const ambiente of ["DEV", "SANDBOX"]) {
       const d = decidirCom({ tool: "vsp", sistema: { ...s2025, ambiente }, vars: { ...vsp, FALLBACK_2025: "true" } });
       assert.equal(d.modo, "desenvolvimento (fallback do abap-adt)", ambiente);
-      assert.deepEqual(d.args, ["--mode", "hyperfocused", "--expect", "DS4.100/DEV", "--allowed-packages", "ZMM*", "--block-free-sql"], ambiente);
+      assert.deepEqual(d.args, ["--mode", "hyperfocused", "--expect", "DS4.100/DEV", "--allowed-packages", "ZMM*", "--block-free-sql", "--language", "PT"], ambiente);
       assert.ok(d.avisos.some((a) => /fallback do abap-adt/.test(a)), ambiente);
     }
   });
@@ -464,5 +464,65 @@ describe("decidir — PRD recusado para qualquer servidor (ADR-0014)", () => {
   });
   test("QAS continua aceito, somente leitura", () => {
     assert.equal(decidirCom({ tool: "arc-1", sistema: { ambiente: "QAS" } }).modo, "somente leitura");
+  });
+});
+
+describe("decidir — idioma de logon", () => {
+  for (const tool of ["arc-1", "vsp"]) {
+    const vars = { ALLOWED_PACKAGES: "Z*" };
+    test(`${tool}: sem <P>_SAP_LANGUAGE usa PT (padrão do projeto), não o EN do servidor`, () => {
+      const d = decidirCom({ tool, vars });
+      assert.equal(d.idioma, "PT");
+      assert.equal(d.childEnv.SAP_LANGUAGE, "PT");
+    });
+    test(`${tool}: <P>_SAP_LANGUAGE troca o idioma e é normalizado`, () => {
+      const d = decidirCom({ tool, vars: { ...vars, SAP_LANGUAGE: " en " } });
+      assert.equal(d.idioma, "EN");
+      assert.equal(d.childEnv.SAP_LANGUAGE, "EN");
+    });
+    test(`${tool}: idioma inválido recusa`, () => {
+      assert.throws(() => decidirCom({ tool, vars: { ...vars, SAP_LANGUAGE: "Português" } }), recusa(/SAP_LANGUAGE.*duas letras/));
+    });
+  }
+  test("vsp recebe --language", () => {
+    const d = decidirCom({ tool: "vsp", vars: { ALLOWED_PACKAGES: "Z*" } });
+    const i = d.args.indexOf("--language");
+    assert.ok(i >= 0);
+    assert.equal(d.args[i + 1], "PT");
+  });
+  test("SAP_LANGUAGE do ambiente do usuário não vaza para o filho", () => {
+    const d = decidirCom({ tool: "arc-1", env: { PATH: "/bin", SAP_LANGUAGE: "DE" } });
+    assert.equal(d.childEnv.SAP_LANGUAGE, "PT");
+  });
+  test("idioma do projeto (project.idiomaLogon) substitui o PT fixo", () => {
+    const d = decidirCom({ tool: "vsp", vars: { ALLOWED_PACKAGES: "Z*" }, idiomaProjeto: "ES" });
+    assert.equal(d.idioma, "ES");
+    assert.equal(d.args[d.args.indexOf("--language") + 1], "ES");
+  });
+  test("<P>_SAP_LANGUAGE prevalece sobre o idioma do projeto", () => {
+    const d = decidirCom({ tool: "arc-1", vars: { SAP_LANGUAGE: "EN" }, idiomaProjeto: "ES" });
+    assert.equal(d.childEnv.SAP_LANGUAGE, "EN");
+  });
+});
+
+describe("idiomaDoProjeto (project.idiomaLogon)", () => {
+  test("usa o campo, normalizado, sem aviso", () => {
+    assert.deepEqual(idiomaDoProjeto({ idiomaLogon: " es " }), { idioma: "ES", avisos: [] });
+  });
+  test("não lê o texto livre de idiomaPadrao", () => {
+    const r = idiomaDoProjeto({ idiomaPadrao: "Español (ES) - Códigos" });
+    assert.equal(r.idioma, "PT");
+    assert.match(r.avisos[0], /project\.idiomaLogon não definido/);
+  });
+  test("campo ausente (clone antigo): PT com aviso", () => {
+    for (const p of [{}, { idiomaLogon: null }]) {
+      const r = idiomaDoProjeto(p);
+      assert.equal(r.idioma, "PT");
+      assert.equal(r.avisos.length, 1);
+    }
+  });
+  test("valor inválido recusa, em vez de cair em PT", () => {
+    for (const v of ["", "Português", "POR", 42])
+      assert.throws(() => idiomaDoProjeto({ idiomaLogon: v }), recusa(/project\.idiomaLogon.*duas letras/), String(v));
   });
 });

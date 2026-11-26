@@ -5,6 +5,7 @@
     "description": "Convenções oficiais de nomenclatura baseadas no documento padrao-desenvolvimento.md para ABAP Cloud / RAP, ABAP Clássico / RICEFW e SAP Fiori",
     "referencia": "standards/padrao-desenvolvimento.md",
     "idiomaPadrao": "Português (PT) - Códigos, objetos e descrições",
+    "idiomaLogon": "PT",
     "objetosLocais": "Prefixo Y (em vez de $TMP)"
   },
   "cliente": {

@@ -7,7 +7,7 @@ Guia para preparar a máquina de cada desenvolvedor para os servidores `vsp` e `
 | `vsp` | DEV / Sandbox ≤ 2023 (em 2025+, só como [fallback](#fallback-do-abap-adt-em-s4hana-2025)) | Desenvolvimento |
 | `arc-1-qas` | QAS ≤ 2023 (em 2025+, só contingência e [fallback de análise](#fallback-de-análise-em-qas-2025)) | Somente leitura |
 | — | PRD: **nenhum servidor**, nem para leitura ([ADR-0014](adr/0014-ambiente-produtivo-fora-do-alcance-dos-agentes.md)) | Recusado pelo launcher |
-| `arc-1-dev` (opcional) | DEV, o mesmo do `vsp`: exceção da política 4.2 em ≤ 2023 ou 2º fallback em 2025+ | Somente leitura, salvo opt-in |
+| `arc-1-dev` (opcional) | DEV, o mesmo do `vsp`: exceção da política 4.2 ou complemento do `vsp` para DCLS/DDLX (ADR-0015) em ≤ 2023, ou 2º fallback em 2025+ | Somente leitura, salvo opt-in |
 | `abap-adt` | S/4HANA 2025+ | Ver [Configuração do Token MCP](../README.md#-configuração-do-token-mcp-abap-adt) |
 
 Você **não edita** nenhum arquivo de MCP (`.mcp.json`, `.codex/config.toml` etc.). Eles já vêm gerados com uma entrada por sistema do cliente: `vsp` (DEV), `arc-1-qas` (QAS) e `arc-1-dev` (DEV pelo ARC-1, opcional), todas apontando para `scripts/mcp-launch.mjs`. O projeto é usado com um clone por cliente, e o nome de cada entrada define o prefixo das variáveis no `.env` (`vsp` → `VSP_*`, `arc-1-qas` → `ARC1_QAS_*`, `arc-1-dev` → `ARC1_DEV_*`). Preparar a máquina é só instalar os executáveis, preencher o `.env` e conferir a detecção.
@@ -54,7 +54,15 @@ Rode o diagnóstico (passo 7) antes de abrir a ferramenta de IA. Assim o primeir
 
 **`vsp` com certificado fixado:** o `vsp` é um binário Go. Ele não lê o certificado fixado nem o `NODE_EXTRA_CA_CERTS`, e recusa certificado sem SAN mesmo que confiável. O setup oferece `VSP_SAP_INSECURE=true`: o launcher confere o certificado fixado ao iniciar e só então passa `--insecure` ao `vsp`. Durante a sessão, o `vsp` não verifica o TLS. Use isso até o Basis emitir um certificado com SAN (`DNS:<host>`). Depois, importe a CA em "Autoridades de Certificação Raiz Confiáveis" do usuário no Windows e remova a variável.
 
-**CA corporativa para todos os sistemas:** o `NODE_EXTRA_CA_CERTS` global continua valendo, para o probe e o `arc-1`:
+**`fiori-mcp` e preview do app com certificado fixado** ([ADR-0016](adr/0016-certificado-fixado-no-fiori-mcp-e-no-preview.md)): o `fiori-mcp` já inicia por `scripts/com-certificados.mjs`, que junta os `.pem` de todas as variáveis `<P>_SAP_CA_CERT` num só arquivo (`.agents/certs/node-extra-ca.pem`) e o passa por `NODE_EXTRA_CA_CERTS`. Sem isso, ele falha com `self-signed certificate`. O preview do app (`npm start`, `fiori run`) também é um processo Node e precisa do mesmo wrapper. Rode-o na pasta do app, com o caminho até a raiz do projeto:
+
+```powershell
+node ../../scripts/com-certificados.mjs npm start
+```
+
+Nunca use `ignoreCertErrors: true` no `ui5.yaml` nem `NODE_TLS_REJECT_UNAUTHORIZED=0`: os dois desligam a verificação TLS, e o wrapper recusa iniciar com a segunda.
+
+**CA corporativa para todos os sistemas:** o `NODE_EXTRA_CA_CERTS` global continua valendo, para o probe e o `arc-1` (o `com-certificados.mjs` também o inclui no arquivo que monta):
 
 ```powershell
 [Environment]::SetEnvironmentVariable('NODE_EXTRA_CA_CERTS', 'C:\certs\ca-cliente.pem', 'User')
@@ -100,7 +108,9 @@ ARC1_QAS_SAP_USER=USUARIO_LEITURA
 ARC1_QAS_SAP_PASSWORD=...
 ```
 
-Informe só a conexão. SID, release e ambiente são **detectados no próprio SAP**: o nome da entrada é só um rótulo, e se a URL de `arc-1-qas` apontar para um DEV, vale o DEV. **Não configure o PRD:** nenhum servidor acessa o ambiente produtivo, e o launcher recusa qualquer conexão detectada como PRD, qualquer que seja o nome da entrada ([ADR-0014](adr/0014-ambiente-produtivo-fora-do-alcance-dos-agentes.md)). A conexão `ARC1_DEV_*` (`arc-1-dev`) é opcional e só precisa ser preenchida para a exceção da política 4.2 ou para o 2º fallback em 2025+ (ver [Fallback](#fallback-do-abap-adt-em-s4hana-2025)). Se o cliente não tiver um dos sistemas, ou você não for usar o `arc-1` nele, deixe as variáveis dele com o placeholder: o servidor aparece como falho no `/mcp`, o que é esperado.
+Informe só a conexão. SID, release e ambiente são **detectados no próprio SAP**: o nome da entrada é só um rótulo, e se a URL de `arc-1-qas` apontar para um DEV, vale o DEV. **Não configure o PRD:** nenhum servidor acessa o ambiente produtivo, e o launcher recusa qualquer conexão detectada como PRD, qualquer que seja o nome da entrada ([ADR-0014](adr/0014-ambiente-produtivo-fora-do-alcance-dos-agentes.md)). A conexão `ARC1_DEV_*` (`arc-1-dev`) é opcional e só precisa ser preenchida para a exceção da política 4.2, para o complemento do `vsp` em ≤ 2023 (ver [Complemento](#complemento-do-vsp-para-dcls-e-ddlx-s4hana--2023)) ou para o 2º fallback em 2025+ (ver [Fallback](#fallback-do-abap-adt-em-s4hana-2025)). Se o cliente não tiver um dos sistemas, ou você não for usar o `arc-1` nele, deixe as variáveis dele com o placeholder: o servidor aparece como falho no `/mcp`, o que é esperado.
+
+**Idioma de logon:** o launcher conecta o `vsp` (`--language`) e o `arc-1` (`SAP_LANGUAGE`) no idioma do projeto: o código ISO de duas letras de `project.idiomaLogon` em `standards/naming-conventions.json` (no template, **PT**). Ao adotar o template num cliente de outro idioma, troque esse campo (e o texto de `project.idiomaPadrao`, que é a descrição para as pessoas). Esse idioma vira o idioma original dos objetos que os agentes criam; sem ele, os dois servidores assumiriam EN e os objetos ficariam com idioma original EN. Para outro idioma numa conexão, defina `<P>_SAP_LANGUAGE` com o código ISO de duas letras (ex.: `VSP_SAP_LANGUAGE=EN`), que prevalece sobre o do projeto. Um valor inválido faz o launcher recusar iniciar. Um `project.idiomaLogon` inválido também faz o launcher recusar iniciar. Sem o campo (clone anterior a ele), o launcher avisa no log e usa PT. O idioma usado aparece no log do launcher e no campo `idioma` do runtime (`node scripts/mcp-runtime.mjs`).
 
 **7. Testar a detecção:**
 
@@ -148,7 +158,7 @@ As variáveis de conexão e de comportamento usam o prefixo da entrada: `VSP`, `
 | `VSP_VERSION` | Fixa uma versão do `vsp` (ex.: `2.62.1`) em vez da última estável. Use para voltar atrás quando uma release nova quebrar algo. Um `.cmd`/`.bat` também é aceito, desde que o caminho e os valores das variáveis `VSP_*` não tenham `%`, `!`, `^` ou aspas. |
 | `ARC1_BIN` | Caminho de um ARC-1 já instalado, para redes que bloqueiam o npm. Instale com `npm install -g arc-1`. No Windows, o `npm` instala um `arc-1.cmd`, que pode ser usado aqui. Com ela, o launcher não instala nem confere o pacote. |
 | `ARC1_VERSION` | Fixa uma versão do ARC-1 (ex.: `1.10.1`) em vez da última estável. Use para voltar atrás quando uma versão nova quebrar algo. |
-| `ARC1_DEV_ALLOW_DEV_WRITES=true` + `ARC1_DEV_ALLOWED_PACKAGES=Z*` | Exceção controlada da política (4.2): habilita a escrita do `arc-1` num DEV/SANDBOX ≤ 2023, restrita aos pacotes informados. Vale na entrada `arc-1-dev`, que já vem no template. Sem a flag, o `arc-1` no DEV fica somente leitura e não pede pacotes. |
+| `ARC1_DEV_ALLOW_DEV_WRITES=true` + `ARC1_DEV_ALLOWED_PACKAGES=Z*` | Exceção controlada da política (4.2): habilita a escrita do `arc-1` num DEV/SANDBOX ≤ 2023, restrita aos pacotes informados. No complemento do `vsp` (ADR-0015), use o pacote da entrega, nunca `Z*`. Vale na entrada `arc-1-dev`, que já vem no template. Sem a flag, o `arc-1` no DEV fica somente leitura e não pede pacotes. |
 | `VSP_FALLBACK_2025=true` / `ARC1_DEV_FALLBACK_2025=true` | Fallback do `abap-adt` num DEV/SANDBOX S/4HANA 2025+ (política 4.4), quando ele não oferecer uma operação de desenvolvimento. No `arc-1`, vale na entrada `arc-1-dev` e exige também `ARC1_DEV_ALLOW_DEV_WRITES=true` e `ARC1_DEV_ALLOWED_PACKAGES`. Ignorada fora de DEV/SANDBOX. Ligue só quando necessário e reinicie a sessão da ferramenta de IA. |
 | `ARC1_BLOCKED_DATA_SOURCES` | Tabelas a bloquear na leitura (experimental). Ex.: `USR02,PA0002`. |
 
@@ -194,6 +204,44 @@ Falta, antes de levar a `develop` para a `main`:
 | Ambos | Data preview na `T000`, usado na detecção do ambiente. Sem ela, o sistema é tratado como **PRD**, e o launcher recusa os dois servidores. |
 | `vsp` (DEV) | Autorizações de desenvolvimento, restritas aos pacotes do projeto. |
 | `arc-1-qas` | Somente leitura. O launcher já força leitura, mas a autorização SAP é a segunda barreira. |
+
+---
+
+## Complemento do `vsp` para DCLS e DDLX (S/4HANA ≤ 2023)
+
+O `vsp` não cria nem edita controle de acesso (DCLS: `unsupported object type: DCLS/DL`) nem metadata extension (DDLX: `unsupported object type: DDLX/EX`). Pela [política, seção 4.2](../standards/politica-mcp-abap.md), e pelo [ADR-0015](adr/0015-arc-1-complemento-do-vsp-para-tipos-nao-suportados.md), o `arc-1-dev` grava **só esses objetos**, no mesmo DEV. Ativação do restante, ATC e ABAP Unit continuam no `vsp`.
+
+1. **Preencha a conexão `ARC1_DEV_*` à mão** no `.env`, com o **mesmo DEV** do `vsp` e o SID dele. O `setup.mjs` não configura essa entrada.
+2. **Ligue o opt-in só durante a entrega**, com o pacote dela:
+
+   ```
+   ARC1_DEV_SAP_SID=<SID_DO_DEV>
+   ARC1_DEV_ALLOW_DEV_WRITES=true
+   ARC1_DEV_ALLOWED_PACKAGES=<PACOTE_DA_ENTREGA>
+   ```
+
+   Nunca use `Z*` aqui. Não ponha comentário na mesma linha do valor: no `.env`, o comentário vira parte do valor (ver [Problemas comuns](#problemas-comuns)).
+3. **Reinicie a sessão da ferramenta de IA** (ver [Problemas comuns](#problemas-comuns)) e confira em `node scripts/mcp-runtime.mjs` que o `arc-1-dev` está em `escrita restrita a pacotes`, no mesmo SID e mandante do `vsp`.
+4. **Ao terminar a entrega, comente as duas flags** e reinicie a sessão.
+
+Validado numa POC em S/4HANA 2023 (SAP_BASIS 758): o ARC-1 1.11.0 gravou na request existente com `SAP_ALLOW_TRANSPORT_WRITES=false`. Objeto e campo de autorização (SU20/SU21), descrição de SRVD/MSAG e publicação de service binding em mandante de customizing seguem manuais. Detalhes em [Parece erro, mas é normal](parece-erro-mas-e-normal.md).
+
+### Limitações conhecidas do `vsp`
+
+Encontradas com o `vsp` v2.62.1 num DEV S/4HANA 2023 (SAP_BASIS 758). Uma versão nova pode resolver alguma delas: confira a mensagem antes de seguir o caminho da tabela.
+
+| Operação | Resultado (mensagem literal) | Caminho |
+|---|---|---|
+| Criar DCL | `unsupported object type: DCLS/DL` | `arc-1-dev` (ADR-0015) |
+| Criar ou editar DDLX | `unsupported object type: DDLX/EX` | `arc-1-dev` (ADR-0015) |
+| Objeto ou campo de autorização (SU21/SU20) | `unsupported object type: SUSO/B` / `AUTH` | Manual: ADT (Authorization Object/Field) ou SU20/SU21. O ARC-1 só lê `AUTH` |
+| Descrição de SRVD ou MSAG | `SetDescription failed: no description handling for object type "SRVD"` | Manual: ADT ou SE91 |
+| Publicar SRVB em mandante de customizing | `(Un-)Publishing of SRVB … in Customizing Client not allowed` | Recusa do próprio SAP: `/IWFND/V4_ADMIN` ou Basis |
+| ATC de pacote | Só devolve classes, BDEF e TABL. CDS, DCL, DDLX, SRVD e DDIC voltam com `totalObjects: 0` | Cobertura parcial: relate quais tipos não foram verificados. O ATC do ARC-1 também voltou `processedObjectCount: 0`; confira a variante ATC no sistema |
+| Ativação de pacote | `Activated 0 objects`, com objetos ainda inativos | Confira sempre com `analyze type=inactive_objects` e ative os objetos um a um |
+| Leitura de TADIR ou do idioma original | `RunQuery … blocked by safety configuration` | Esperado: o SQL livre fica bloqueado (`--block-free-sql`) |
+| Criar objeto a partir de arquivo | Descrição gravada como `Generated from <arquivo>` | Passe a descrição na criação ou corrija com `set_description` |
+| `edit` com `activate: false` | O objeto é ativado mesmo assim | Conte com o objeto ativo num estado intermediário; grave versões que ativem |
 
 ---
 
@@ -308,6 +356,11 @@ Todas as mensagens do launcher começam com `mcp-launch:`. Para vê-las, rode o 
 | `o T000-LOGSYS indica o SID QS4, mas VSP_SAP_SID diz DS4` | A URL está trocada, ou o LOGSYS ficou errado depois de uma cópia de mandante. Confira a URL; se for o LOGSYS, peça a correção ao Basis. |
 | `a URL do SAP precisa ser https://` | Use a porta HTTPS do ICM (ex.: `https://host:44300`). `http://` só é aceito para `localhost`. |
 | `NODE_TLS_REJECT_UNAUTHORIZED=0 desliga a verificação TLS` | Remova a variável do ambiente. Para certificado autoassinado ou de CA interna, fixe o certificado pelo setup (passo 3). |
+| `aviso: <VARIÁVEL> no .env parece ter comentário no fim da linha` | O `.env` não tem comentário no fim da linha: o texto depois do valor entrou no valor, e uma flag como `true   # ...` fica desligada. Ponha o comentário numa linha própria. |
+| `ENOTFOUND` em **todos** os servidores ao mesmo tempo | Queda de VPN ou de DNS, não configuração. Reconecte a VPN e reconecte os servidores no `/mcp`. |
+| `fiori-mcp`: `self-signed certificate` | O certificado do SAP não está fixado, ou o `fiori-mcp` não foi iniciado pelo `scripts/com-certificados.mjs`. Fixe pelo setup (passo 3) e rode `node scripts/sync-agents.mjs` se o `.mcp.json` estiver antigo. No preview, use o wrapper (passo 3). |
+| `fiori-mcp` não lista o sistema, ou devolve uma página HTML de login | No SAP Fiori tools, o sistema foi salvo como "OData Service URL" (`odata_service`), e não como **ABAP On-Premise** (`abap_catalog`). Salve-o de novo como ABAP On-Premise. O `list_sap_systems` só relê a lista quando o servidor reinicia: reconecte o `fiori-mcp` no `/mcp`. |
+| Variável de ambiente nova não chega ao servidor depois de reconectar no `/mcp` (Windows) | O reconnect reinicia o servidor com o ambiente do processo da ferramenta de IA, que é o do terminal em que ela abriu. Abra a ferramenta num terminal novo (no VS Code, reinicie o VS Code). Já uma mudança no `.mcp.json` ou no `.env` vale com o reconnect. |
 | `standards/sistemas-sap.json ...` | O registro de restrições tem JSON inválido ou uma entrada sem `sid`/`ambiente` válidos. A mensagem aponta a entrada (`restricoes[n]`). |
 | `não foi possível baixar .../vsp-...` | A rede bloqueou o GitHub ou exige proxy (o download do launcher não usa proxy). Baixe o arquivo manualmente e defina `VSP_BIN` (passo 2). |
 | `não foi possível consultar a última versão do vsp ... e não há versão no cache` | Primeiro uso sem acesso ao GitHub. Baixe o arquivo manualmente e defina `VSP_BIN` (passo 2). |

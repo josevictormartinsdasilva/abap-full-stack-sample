@@ -17,7 +17,7 @@ Do bloco `cliente` de [naming-conventions.json](../../../standards/naming-conven
 
 ## Servidor MCP
 
-Os nomes de ferramentas abaixo são os do `abap-adt` (MCP oficial, S/4HANA 2025+). Em sistemas ≤ 2023, use o servidor informado pelo orquestrador (`vsp` em DEV/SANDBOX, `arc-1` em QAS; PRD não é acessado) e as equivalências da seção 5 de [politica-mcp-abap.md](../../../standards/politica-mcp-abap.md). No QAS, a auditoria é somente leitura: não aplique QuickFixes e não rode ABAP Unit, que só é executado em DEV/SANDBOX.
+Os nomes de ferramentas abaixo são os do `abap-adt` (MCP oficial, S/4HANA 2025+). Em sistemas ≤ 2023, use o servidor informado pelo orquestrador (`vsp` em DEV/SANDBOX, `arc-1` em QAS; PRD não é acessado) e as equivalências da seção 5 de [politica-mcp-abap.md](../../../standards/politica-mcp-abap.md). No QAS, a auditoria é somente leitura: não aplique QuickFixes e não rode ABAP Unit, que só é executado em DEV/SANDBOX. Em DEV/SANDBOX ≤ 2023, os objetos gravados pelo `arc-1-dev` como complemento do `vsp` (DCLS, DDLX; ADR-0015) são auditados pelo `vsp`, no mesmo escopo dos demais.
 
 ## Tarefas Principais
 
@@ -26,6 +26,7 @@ Os nomes de ferramentas abaixo são os do `abap-adt` (MCP oficial, S/4HANA 2025+
    - Obter resultados e apontamentos via `abap_atc_run_get_result`.
    - Aplicar QuickFixes automatizados com `abap_atc_quickfixes_apply` quando houver suporte; reexecutar o ATC para confirmar.
    - Tolerância zero: qualquer erro de ATC reprova a entrega.
+   - **Cobertura:** compare os objetos do escopo com os que o ATC processou. No `vsp` (≤ 2023), o ATC de pacote devolve só classes, BDEF e tabelas; CDS, DCL, DDLX, SRVD e DDIC voltam com `totalObjects: 0`. "0 achados" nesses tipos não é aprovação: relate-os como não verificados.
 
 2. **Testes Unitários ABAP Unit**:
    - Executar suítes de teste unitário via `abap_unit_run_tests` no escopo definido acima, **somente em DEV/SANDBOX**. Teste unitário executa código e pode ter efeito colateral (gravação, RFC, bloqueio); em QAS, não execute e registre no relatório que não foi executado.

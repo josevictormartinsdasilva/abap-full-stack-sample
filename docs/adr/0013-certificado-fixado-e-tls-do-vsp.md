@@ -1,6 +1,6 @@
 # ADR-0013: Certificado fixado por conexão e opt-in de TLS sem verificação no vsp
 
-- **Status:** Aceito (2026-11-24, PRs #20 e #22)
+- **Status:** Aceito (2026-11-24, PRs #20 e #22; estendido pelo [ADR-0016](0016-certificado-fixado-no-fiori-mcp-e-no-preview.md): o certificado fixado vale também para o `fiori-mcp` e o preview dos apps)
 - **Data:** 2026-11-24
 
 ## Contexto

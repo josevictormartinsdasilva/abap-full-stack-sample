@@ -33,6 +33,17 @@ export function lerDotEnv(texto) {
   return out;
 }
 
+// Variáveis do .env que parecem ter comentário no fim da linha: espaço seguido de "#" ou de "(",
+// como nos exemplos comentados do .env.example. O comentário faz parte do valor, então
+// "ARC1_DEV_FALLBACK_2025=true   # ..." não liga a flag, sem erro nenhum. Senhas ficam de fora:
+// podem conter " #" de verdade. Devolve os nomes, para o launcher avisar.
+export function valoresComComentario(dotenv, prefix) {
+  return Object.entries(dotenv)
+    .filter(([k, v]) => k.startsWith(`${prefix}_`) && !/PASSWORD$/.test(k) && /\s[#(]/.test(v))
+    .map(([k]) => k)
+    .sort();
+}
+
 // Escreve o valor de forma que lerDotEnv o leia de volta igual: aspas envolvem o valor quando
 // ele tem espaço nas pontas (que a leitura apararia) ou já começa e termina com a mesma aspa.
 export function formatarValorEnv(valor) {
