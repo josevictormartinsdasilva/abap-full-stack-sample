@@ -21,7 +21,7 @@ const VERSAO = /^v?(\d+\.\d+\.\d+)$/;
 // Flags que o launcher passa ao vsp (scripts/mcp-politica.mjs). Se uma versão nova não tiver
 // alguma delas, o launcher recusa iniciar em vez de rodar sem a trava.
 export const FLAGS_EXIGIDAS = ["--mode", "--expect", "--allowed-packages", "--block-free-sql",
-  "--read-only", "--allow-transportable-edits", "--allowed-transports", "--enable-transports"];
+  "--read-only", "--allow-transportable-edits", "--allowed-transports", "--enable-transports", "--language"];
 
 export function flagsAusentes(textoAjuda) {
   return FLAGS_EXIGIDAS.filter((f) => !new RegExp(`(^|\\s)${f}(\\s|=|$)`, "m").test(textoAjuda));

@@ -59,7 +59,7 @@ import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { detectar, validarUrlSap } from "./sap-probe.mjs";
-import { Recusa, valorDeVariavel, aplicarRegistro, comandoParaSpawn, decidir, lerRegistro, resolverSid, verificarTls } from "./mcp-politica.mjs";
+import { IDIOMA_PADRAO, Recusa, valorDeVariavel, aplicarRegistro, comandoParaSpawn, decidir, idiomaDoProjeto, lerRegistro, resolverSid, verificarTls } from "./mcp-politica.mjs";
 import { FalhaVsp, flagsAusentes, garantirVsp } from "./vsp-binario.mjs";
 import { FalhaArc1, garantirArc1 } from "./arc1-pacote.mjs";
 import { RUNTIME_DIR, gravarEstado, listarAtivos, removerEstado } from "./mcp-runtime.mjs";
@@ -215,20 +215,33 @@ if (fs.existsSync(arquivoRegistro)) {
   ({ ambiente, motivo } = aplicado);
 }
 
+// ---------------------------------------------------------------- idioma do projeto
+// project.idiomaPadrao de standards/naming-conventions.json é o idioma de logon quando a conexão
+// não define <P>_SAP_LANGUAGE. Sem o arquivo ou sem código reconhecível, vale IDIOMA_PADRAO.
+let idiomaProjeto;
+try {
+  const texto = JSON.parse(fs.readFileSync(path.join(ROOT, "standards", "naming-conventions.json"), "utf8"))?.project?.idiomaPadrao;
+  idiomaProjeto = idiomaDoProjeto(texto);
+  if (texto !== undefined && !idiomaProjeto)
+    log(`aviso: project.idiomaPadrao ${JSON.stringify(texto)} sem código ISO de duas letras (ex.: "Português (PT)"); usando ${IDIOMA_PADRAO}`);
+} catch (e) {
+  log(`aviso: não foi possível ler project.idiomaPadrao de standards/naming-conventions.json (${e.message}); usando ${IDIOMA_PADRAO}`);
+}
+
 // ---------------------------------------------------------------- decisão por ferramenta
 const sistema = { sid, sidPendente: sidInfo.sidPendente, mandante, ambiente, motivo, sapBasis: det.sapBasis, produto: det.produto };
-const { command, args, shell, modo, tls, acoesNegadas, childEnv, avisos } = politica(() =>
-  decidir({ tool, prefix, sistema, conn, v, env: process.env, platform: process.platform, arc1, caCert }));
+const { command, args, shell, modo, tls, idioma, acoesNegadas, childEnv, avisos } = politica(() =>
+  decidir({ tool, prefix, sistema, conn, v, env: process.env, platform: process.platform, arc1, caCert, idiomaProjeto }));
 avisos.forEach((a) => log(`aviso: ${a}`));
 
 const estado = {
   servidor: server, ferramenta: tool, sid, mandante, usuario: conn.user,
-  sapBasis: det.sapBasis, produto: det.produto, ambiente, motivo, modo, tls,
+  sapBasis: det.sapBasis, produto: det.produto, ambiente, motivo, modo, tls, idioma,
   ...(acoesNegadas ? { acoesNegadas } : {}),
   sidConfirmado: sidInfo.sidConfirmado, sidOrigem: sidInfo.sidOrigem,
   detectadoEm: new Date().toISOString(), pid: process.pid,
 };
-log(`${server} -> ${sid}/${mandante} · ${det.produto} · ${ambiente} (${motivo}) · ${modo} · TLS: ${tls}`);
+log(`${server} -> ${sid}/${mandante} · ${det.produto} · ${ambiente} (${motivo}) · ${modo} · idioma ${idioma} · TLS: ${tls}`);
 
 if (DIAGNOSTICO) {
   console.error(JSON.stringify({ ...estado, t000: det.t000, args: tool === "vsp" ? args : undefined }, null, 2));

@@ -160,6 +160,30 @@ export function resolverSid({ sid, sidOrigem }, sidDeclarado, prefix) {
   return { sid: sidDeclarado, sidOrigem: "declarado", sidConfirmado: false, sidPendente: false, avisos: [`SID não confirmado pelo sistema; usando o declarado ${sidDeclarado}`] };
 }
 
+// ---------------------------------------------------------------- idioma de logon
+// Idioma de logon no SAP, que também vira o idioma original dos objetos criados. Sem ele, o vsp
+// (--language) e o ARC-1 (SAP_LANGUAGE) assumem EN. Ordem: <P>_SAP_LANGUAGE (por conexão), depois
+// o idioma do projeto (standards/naming-conventions.json, project.idiomaPadrao) e, se nenhum dos
+// dois existir, IDIOMA_PADRAO. O valor é o código ISO de duas letras (PT, EN, ES...).
+export const IDIOMA_PADRAO = "PT";
+
+// Extrai o código ISO de project.idiomaPadrao, texto livre como "Português (PT) - Códigos...".
+// Aceita o código sozinho ("PT") ou entre parênteses. Sem código reconhecível, devolve undefined.
+export function idiomaDoProjeto(texto) {
+  if (typeof texto !== "string") return undefined;
+  const t = texto.trim();
+  const m = /^([A-Za-z]{2})$/.exec(t) ?? /\(([A-Za-z]{2})\)/.exec(t);
+  return m ? m[1].toUpperCase() : undefined;
+}
+
+export function idiomaLogon(valor, variavel, padrao = IDIOMA_PADRAO) {
+  if (valor === undefined) return padrao;
+  const idioma = String(valor).trim().toUpperCase();
+  if (!/^[A-Z]{2}$/.test(idioma))
+    recusar(`${variavel}=${JSON.stringify(valor)} inválido: use o código ISO de duas letras do idioma (ex.: PT, EN)`);
+  return idioma;
+}
+
 // ---------------------------------------------------------------- decisão por ferramenta (1.5 e travas)
 // Entrada:
 //   tool        "arc-1" | "vsp"
@@ -171,13 +195,14 @@ export function resolverSid({ sid, sidOrigem }, sidDeclarado, prefix) {
 //   arc1        { command, args } do ARC-1 gerenciado (scripts/arc1-pacote.mjs); ignorado com ARC1_BIN
 //   platform    process.platform
 //   caCert      caminho absoluto do .pem fixado para a conexão (<P>_SAP_CA_CERT), se houver
-// Saída: { command, args, shell, modo, tls, acoesNegadas, childEnv, avisos } ou Recusa.
+//   idiomaProjeto  código ISO de project.idiomaPadrao (idiomaDoProjeto), se houver
+// Saída: { command, args, shell, modo, tls, idioma, acoesNegadas, childEnv, avisos } ou Recusa.
 //
 // TLS (política seção 2, ADR-0013): o probe sempre verifica o certificado, com a cadeia do
 // sistema ou com o .pem fixado. O ARC-1 (Node) recebe o .pem por NODE_EXTRA_CA_CERTS. O vsp (Go)
 // não aceita CA própria nem certificado sem SAN; para ele, e só para ele, <P>_SAP_INSECURE=true
 // passa --insecure. A identidade do servidor já foi conferida pelo probe ao iniciar.
-export function decidir({ tool, prefix, sistema, conn, v, env, platform, arc1, caCert }) {
+export function decidir({ tool, prefix, sistema, conn, v, env, platform, arc1, caCert, idiomaProjeto }) {
   const { sid, sidPendente, mandante, ambiente, motivo, sapBasis, produto } = sistema;
   const req = (nome) => v(nome) ?? recusar(`variável ${prefix}_${nome} não definida ou ainda com placeholder <...> (ambiente ou .env)`);
   const flag = (nome) => /^(true|1|yes)$/i.test(v(nome) ?? "");
@@ -198,7 +223,8 @@ export function decidir({ tool, prefix, sistema, conn, v, env, platform, arc1, c
 
   const isDev = ambiente === "DEV" || ambiente === "SANDBOX";
   const childEnv = filtrarEnvFilho(env);
-  Object.assign(childEnv, { SAP_URL: conn.url, SAP_CLIENT: conn.client, SAP_USER: conn.user, SAP_PASSWORD: conn.password });
+  const idioma = idiomaLogon(v("SAP_LANGUAGE"), `${prefix}_SAP_LANGUAGE`, idiomaProjeto ?? IDIOMA_PADRAO);
+  Object.assign(childEnv, { SAP_URL: conn.url, SAP_CLIENT: conn.client, SAP_USER: conn.user, SAP_PASSWORD: conn.password, SAP_LANGUAGE: idioma });
 
   let command, args, modo, acoesNegadas;
   let tls = caCert ? `certificado fixado (${prefix}_SAP_CA_CERT)` : "cadeia confiável do sistema";
@@ -262,7 +288,7 @@ export function decidir({ tool, prefix, sistema, conn, v, env, platform, arc1, c
     modo = flag("READ_ONLY") ? "somente leitura" : `desenvolvimento${fallback ? " (fallback do abap-adt)" : ""}`;
     command = env.VSP_BIN || "vsp";
     args = ["--mode", "hyperfocused", "--expect", `${sid}.${mandante}/${conn.user}`,
-      "--allowed-packages", req("ALLOWED_PACKAGES"), "--block-free-sql"];
+      "--allowed-packages", req("ALLOWED_PACKAGES"), "--block-free-sql", "--language", idioma];
     if (v("ALLOWED_TRANSPORTS")) args.push("--allow-transportable-edits", "--allowed-transports", v("ALLOWED_TRANSPORTS"));
     if (flag("ENABLE_TRANSPORTS")) args.push("--enable-transports");
     if (flag("READ_ONLY")) args.push("--read-only");
@@ -275,5 +301,5 @@ export function decidir({ tool, prefix, sistema, conn, v, env, platform, arc1, c
     recusar(`ferramenta desconhecida: ${tool}`);
   }
 
-  return { ...comandoParaSpawn(command, args, platform), modo, tls, acoesNegadas, childEnv, avisos };
+  return { ...comandoParaSpawn(command, args, platform), modo, tls, idioma, acoesNegadas, childEnv, avisos };
 }
