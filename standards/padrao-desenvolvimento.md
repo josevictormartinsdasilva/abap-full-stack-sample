@@ -97,7 +97,7 @@ Os pacotes de cada processo serão criados dentro do pacote superior corresponde
 |---|---|---|---|
 | Z | [MD] | _ | Descrição abreviada do processo |
 
-> **Os pacotes criados são salvos na request do desenvolvimento que os originou** (tópico 6), atribuída ao projeto CTS. Não há uma request separada para pacotes.
+> **Os pacotes criados são salvos na request do desenvolvimento que os originou** (tópico 6), atribuída ao projeto CTS quando o cliente usa. Não há uma request separada para pacotes.
 
 **Exemplo da estruturação dos níveis dos pacotes:**
 
@@ -171,7 +171,7 @@ Exemplo:
 
 Exemplo: Descrição da Request: `FIAA-01-Inclusão de denominação no material`
 
-Antes de finalizar a criação da Request, precisamos atribuir o projeto abaixo:
+Antes de finalizar a criação da Request, atribua o projeto CTS abaixo, quando o cliente usar projeto CTS (a atribuição é feita na request, não no pacote):
 
 ![Projeto no Change and Transport System](../imagens/06-projeto-cts.png)
 
@@ -196,7 +196,7 @@ Ao criar objetos que podem ser reutilizáveis (Exemplo: CDS de Value Help/Help S
 1. Se o objeto pode ser reaproveitado por demais desenvolvimentos do seu módulo, salve o mesmo diretamente no pacote do módulo.
 2. Se o objeto pode ser reaproveitado por N módulos, sendo Cross Application, salve o objeto no pacote `ZCA_UTILITARIO`.
     1. Considere o prefixo CA para a criação destes objetos, conforme consta neste documento.
-3. Os objetos reaproveitáveis são salvos na request do desenvolvimento que os criou (tópico 6), atribuída ao projeto CTS.
+3. Os objetos reaproveitáveis são salvos na request do desenvolvimento que os criou (tópico 6), atribuída ao projeto CTS quando o cliente usa.
 
 **Observação:**
 

@@ -8,11 +8,43 @@
       },
       "disabled": false
     },
+    "arc-1-qas": {
+      "type": "stdio",
+      "timeoutSeconds": 300,
+      "command": "node",
+      "args": [
+        "scripts/mcp-launch.mjs",
+        "arc-1-qas"
+      ],
+      "disabled": false
+    },
+    "arc-1-dev": {
+      "type": "stdio",
+      "timeoutSeconds": 300,
+      "command": "node",
+      "args": [
+        "scripts/mcp-launch.mjs",
+        "arc-1-dev"
+      ],
+      "disabled": false
+    },
+    "vsp": {
+      "type": "stdio",
+      "timeoutSeconds": 120,
+      "command": "node",
+      "args": [
+        "scripts/mcp-launch.mjs",
+        "vsp"
+      ],
+      "disabled": false
+    },
     "fiori-mcp": {
       "type": "stdio",
-      "timeout": 600,
-      "command": "npx",
+      "timeoutSeconds": 600,
+      "command": "node",
       "args": [
+        "scripts/com-certificados.mjs",
+        "npx",
         "--yes",
         "@sap-ux/fiori-mcp-server@1.15.19",
         "fiori-mcp"

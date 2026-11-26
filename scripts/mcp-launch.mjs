@@ -1,0 +1,259 @@
+#!/usr/bin/env node
+// Inicia os servidores MCP ARC-1 e vibing-steampunk (vsp) aplicando as travas técnicas da
+// política standards/politica-mcp-abap.md (ADR-0009).
+//
+//   node scripts/mcp-launch.mjs <servidor>                 inicia o servidor (uso pelas ferramentas de IA)
+//   node scripts/mcp-launch.mjs <servidor> --diagnostico   só detecta o sistema e mostra a decisão
+//
+// <servidor> é a chave do servidor em .agents/mcp.servers.json e define a ferramenta e o
+// prefixo das variáveis de ambiente:
+//   arc-1          -> ARC1_*            vsp          -> VSP_*
+//   arc-1-qas-xxx  -> ARC1_QAS_XXX_*    vsp-sandbox  -> VSP_SANDBOX_*
+//
+// Variáveis (do ambiente do sistema ou, como fallback, do .env da raiz do projeto):
+//   <P>_SAP_URL, <P>_SAP_CLIENT, <P>_SAP_USER, <P>_SAP_PASSWORD   obrigatórias
+//   <P>_SAP_SID   opcional: se informado, precisa bater com o SID detectado; obrigatório quando
+//                 o SID só puder ser inferido do T000-LOGSYS (senão vsp recusa e ARC-1 só lê)
+//   <P>_SAP_CA_CERT  opcional: .pem fixado para a conexão (certificado autoassinado ou de CA
+//                 interna), gravado pelo setup em .agents/certs/<servidor>.pem
+//   <P>_SAP_INSECURE=true  só vsp: passa --insecure (Go não aceita CA própria nem cert sem SAN)
+//   ARC-1: <P>_ALLOW_DEV_WRITES=true + <P>_ALLOWED_PACKAGES (escrita, só em DEV/SANDBOX ≤ 2023),
+//          <P>_BLOCKED_DATA_SOURCES, ARC1_BIN (sem ele, o launcher instala a última versão estável
+//          do npm; ver scripts/arc1-pacote.mjs), ARC1_VERSION (fixa uma versão)
+//   vsp:   <P>_ALLOWED_PACKAGES (obrigatória), <P>_ALLOWED_TRANSPORTS, <P>_ENABLE_TRANSPORTS,
+//          <P>_READ_ONLY, VSP_BIN (sem ele, o launcher baixa a última release estável do vsp e
+//          confere o SHA-256; ver scripts/vsp-binario.mjs), VSP_VERSION (fixa uma versão)
+//   ambos: <P>_FALLBACK_2025=true libera o servidor como fallback de desenvolvimento do abap-adt
+//          em DEV/SANDBOX S/4HANA 2025+ (política 4.4); no ARC-1, junto com <P>_ALLOW_DEV_WRITES
+//
+// O launcher NÃO confia no que foi declarado: lê do próprio SAP (scripts/sap-probe.mjs) o SID,
+// o mandante, o release (SAP_BASIS) e o papel do mandante (T000/SCC4). O registro opcional
+// standards/sistemas-sap.json só pode tornar a classificação MAIS restritiva.
+//
+// Travas aplicadas (não dependem do agente; as decisões ficam em scripts/mcp-politica.mjs):
+//   - SAP_BASIS < 750: recusa, para os dois servidores.
+//   - URL só https:// (http:// apenas para localhost); NODE_TLS_REJECT_UNAUTHORIZED=0 recusa.
+//     O probe sempre verifica o certificado; com <P>_SAP_CA_CERT, só confia no .pem fixado
+//     (que também vai para o ARC-1 por NODE_EXTRA_CA_CERTS). ADR-0013.
+//   - vsp: só em DEV/SANDBOX detectado e SAP_BASIS 750–815 (≥ 816 só com <P>_FALLBACK_2025=true);
+//     sempre com --expect (SID detectado), --allowed-packages e --block-free-sql; --insecure só
+//     com o opt-in <P>_SAP_INSECURE=true, depois de o probe conferir o certificado.
+//   - ARC-1: somente leitura, exceto em DEV/SANDBOX com SID confirmado e opt-in
+//     <P>_ALLOW_DEV_WRITES=true (em ≥ 816, também <P>_FALLBACK_2025=true); prévia de dados, SQL livre, escrita em transporte/Git e plugins
+//     sempre desligados; SAPWrite.delete sempre negado e ABAP Unit negado fora de DEV/SANDBOX.
+//   - O que não puder ser detectado é tratado como o caso mais restritivo.
+//   - Nenhuma variável SAP_*, NODE_OPTIONS ou NODE_TLS_REJECT_UNAUTHORIZED do ambiente do
+//     usuário é herdada; o processo filho roda num diretório neutro para não carregar o .env.
+//
+// Para o orquestrador rotear, o resultado da detecção é gravado em
+// .agents/runtime/<servidor>.<pid>.json (não versionado) e apagado ao encerrar. O orquestrador
+// lista os servidores vivos com `node scripts/mcp-runtime.mjs`, que descarta arquivos de
+// processos já terminados.
+//
+// IMPORTANTE: stdout é o canal MCP. Este script só escreve em stderr.
+// Sem dependências: só Node.js >= 18.
+
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { spawn, spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import { detectar, validarUrlSap } from "./sap-probe.mjs";
+import { IDIOMA_PADRAO, Recusa, valorDeVariavel, aplicarRegistro, comandoParaSpawn, decidir, idiomaDoProjeto, lerRegistro, resolverSid, verificarTls } from "./mcp-politica.mjs";
+import { FalhaVsp, flagsAusentes, garantirVsp } from "./vsp-binario.mjs";
+import { FalhaArc1, garantirArc1 } from "./arc1-pacote.mjs";
+import { RUNTIME_DIR, gravarEstado, listarAtivos, removerEstado } from "./mcp-runtime.mjs";
+import { lerDotEnv, prefixoDoServidor, valoresComComentario } from "./config-local.mjs";
+import { ehErroCertificado, lerCertificado } from "./sap-tls.mjs";
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const REGISTRO = "standards/sistemas-sap.json";
+
+function fail(msg) {
+  console.error(`mcp-launch: ${msg}`);
+  process.exit(2);
+}
+const log = (msg) => console.error(`mcp-launch: ${msg}`);
+// Executa uma decisão da política; Recusa vira mensagem e saída 2, sem stack trace.
+const politica = (fn) => {
+  try {
+    return fn();
+  } catch (e) {
+    if (e instanceof Recusa) fail(e.message);
+    throw e;
+  }
+};
+
+// ---------------------------------------------------------------- servidor e prefixo
+const server = process.argv[2];
+const DIAGNOSTICO = process.argv.includes("--diagnostico");
+if (!server || server.startsWith("--")) fail("informe o servidor (ex.: node scripts/mcp-launch.mjs vsp)");
+const { tool, prefix } = prefixoDoServidor(server) ?? fail(`servidor "${server}" não é arc-1* nem vsp*`);
+
+// ---------------------------------------------------------------- estado para o orquestrador
+// Descarta os arquivos de sessões anteriores deste servidor cujo processo já terminou. Os de
+// sessões vivas (outra ferramenta no mesmo servidor) ficam.
+if (!DIAGNOSTICO) listarAtivos(RUNTIME_DIR, { servidor: server });
+const limparRuntime = () => removerEstado(RUNTIME_DIR, server, process.pid);
+
+// ---------------------------------------------------------------- TLS (antes de qualquer conexão)
+politica(() => verificarTls(process.env));
+
+// ---------------------------------------------------------------- variáveis
+// .env: formato e regras de leitura em scripts/config-local.mjs (lerDotEnv).
+const arquivoEnv = path.join(ROOT, ".env");
+const dotenv = fs.existsSync(arquivoEnv) ? lerDotEnv(fs.readFileSync(arquivoEnv, "utf8")) : {};
+// VSP_BIN/VSP_VERSION/ARC1_BIN/ARC1_VERSION: ambiente do sistema ou, como fallback, o .env (docs/setup-mcp-abap.md, passo 4).
+for (const k of ["VSP_BIN", "VSP_VERSION", "ARC1_BIN", "ARC1_VERSION"]) if (!process.env[k] && dotenv[k]) process.env[k] = dotenv[k];
+for (const k of valoresComComentario(dotenv, prefix).filter((k) => process.env[k] === undefined))
+  log(`aviso: ${k} no .env parece ter comentário no fim da linha; o # faz parte do valor ("${dotenv[k]}"). Ponha o comentário numa linha própria.`);
+const lerVar = (name) => valorDeVariavel(`${prefix}_${name}`, process.env[`${prefix}_${name}`] ?? dotenv[`${prefix}_${name}`]);
+const v = (name) => lerVar(name).valor;
+const req = (name) => {
+  const { valor, placeholder } = lerVar(name);
+  if (placeholder) fail(`variável ${prefix}_${name} ainda tem o placeholder do .env.example (<...>); preencha o valor real`);
+  return valor ?? fail(`variável ${prefix}_${name} não definida (ambiente ou .env)`);
+};
+
+const conn = {
+  url: req("SAP_URL"),
+  client: req("SAP_CLIENT"),
+  user: req("SAP_USER").toUpperCase(),
+  password: req("SAP_PASSWORD"),
+};
+const mandante = String(conn.client).padStart(3, "0");
+const sidDeclarado = v("SAP_SID")?.toUpperCase();
+try {
+  validarUrlSap(conn.url);
+} catch (e) {
+  fail(`${prefix}_SAP_URL: ${e.message}`);
+}
+// Certificado fixado para a conexão (ADR-0013): âncora única do probe e do ARC-1.
+let caCert;
+if (v("SAP_CA_CERT")) {
+  try {
+    const { arquivo, pem } = lerCertificado(ROOT, v("SAP_CA_CERT"));
+    caCert = arquivo;
+    conn.ca = pem;
+  } catch (e) {
+    fail(`${prefix}_SAP_CA_CERT: ${e.message}. Rode node scripts/setup.mjs para baixar e conferir o certificado de novo.`);
+  }
+}
+
+// ---------------------------------------------------------------- executáveis (antes de tocar no SAP)
+const GUIA = "docs/setup-mcp-abap.md";
+function verificarBinario(cmd, variavel, passo) {
+  const c = politica(() => comandoParaSpawn(cmd, ["--version"], process.platform));
+  const r = spawnSync(c.command, c.args, { encoding: "utf8", timeout: 15000, windowsHide: true, shell: c.shell });
+  if (r.error?.code === "ENOENT")
+    fail(`"${cmd}" não encontrado. Instale-o ou defina ${variavel} com o caminho completo (${GUIA}, ${passo}).`);
+  if (r.error?.code === "EINVAL")
+    fail(`"${cmd}" não pôde ser executado (EINVAL). Confira se ${variavel} aponta para o executável e não para uma pasta ou atalho (${GUIA}, ${passo}).`);
+  if (r.error) fail(`"${cmd}" não pôde ser executado (${r.error.code || r.error.message}). Se foi baixado agora, o sistema pode tê-lo bloqueado — no Windows, "Desbloquear" nas propriedades do arquivo; no macOS, xattr -d com.apple.quarantine (${GUIA}, ${passo}).`);
+  if (r.status !== 0) fail(`"${cmd} --version" terminou com código ${r.status}; confira se é o binário correto (${GUIA}, ${passo}).`);
+  return (r.stdout || r.stderr || "").trim().split(/\r?\n/)[0];
+}
+let arc1;
+if (tool === "vsp") {
+  // VSP_BIN explícito tem precedência; sem ele, binário gerenciado (última estável + SHA-256).
+  if (!process.env.VSP_BIN) {
+    try {
+      process.env.VSP_BIN = (await garantirVsp({ log })).caminho;
+    } catch (e) {
+      if (e instanceof FalhaVsp) fail(`${e.message} (${GUIA}, passo 2)`);
+      throw e;
+    }
+  }
+  const versao = verificarBinario(process.env.VSP_BIN, "VSP_BIN", "passo 2");
+  log(`vsp encontrado: ${versao}`);
+  // Sem versão fixada, uma release nova pode renomear uma flag de segurança: confere antes de usar.
+  const c = politica(() => comandoParaSpawn(process.env.VSP_BIN, ["--help"], process.platform));
+  const ajuda = spawnSync(c.command, c.args, { encoding: "utf8", timeout: 15000, windowsHide: true, shell: c.shell });
+  const ausentes = flagsAusentes(`${ajuda.stdout || ""}\n${ajuda.stderr || ""}`);
+  if (ausentes.length)
+    fail(`o vsp em uso (${versao}) não tem as flags ${ausentes.join(", ")}, que o launcher usa para aplicar a política. `
+      + `Fixe uma versão anterior com VSP_VERSION no .env (${GUIA}, passo 2).`);
+} else if (process.env.ARC1_BIN) {
+  verificarBinario(process.env.ARC1_BIN, "ARC1_BIN", "variáveis opcionais");
+} else {
+  // ARC-1 gerenciado: última estável do npm, com Node (engines) e variáveis de segurança conferidos.
+  try {
+    arc1 = garantirArc1({ log });
+    log(`ARC-1 em uso: v${arc1.versao}`);
+  } catch (e) {
+    if (e instanceof FalhaArc1) fail(`${e.message} (${GUIA}, passo 1)`);
+    throw e;
+  }
+}
+
+// ---------------------------------------------------------------- detecção no próprio SAP
+let det;
+try {
+  det = await detectar(conn);
+} catch (e) {
+  const codigo = e?.cause?.code || e?.code;
+  const dica = ehErroCertificado(e)
+    ? caCert
+      ? `. O certificado do servidor não confere com ${prefix}_SAP_CA_CERT: ele foi trocado (renovação no STRUST) ou a conexão está sendo interceptada. Confira com o Basis e rode node scripts/setup.mjs para fixar o novo`
+      : `. Certificado não confiável (autoassinado ou de CA interna): rode node scripts/setup.mjs para baixar, conferir e fixar o certificado desta conexão`
+    : "";
+  fail(`não foi possível identificar o sistema em ${conn.url}: ${e.message}${codigo ? ` (${codigo})` : ""}${dica}`);
+}
+det.avisos.forEach((a) => log(`aviso: ${a}`));
+
+const sidInfo = politica(() => resolverSid(det, sidDeclarado, prefix));
+sidInfo.avisos.forEach((a) => log(`aviso: ${a}`));
+const sid = sidInfo.sid;
+if (det.client && det.client !== mandante) fail(`o mandante conectado é ${det.client}, não ${conn.client}`);
+
+// ---------------------------------------------------------------- registro opcional (só restringe)
+let ambiente = det.ambiente;
+let motivo = det.motivo;
+const arquivoRegistro = path.join(ROOT, REGISTRO);
+if (fs.existsSync(arquivoRegistro)) {
+  const { restricoes, avisos } = politica(() => lerRegistro(fs.readFileSync(arquivoRegistro, "utf8"), REGISTRO));
+  const aplicado = aplicarRegistro({ sid, mandante, ambiente, motivo }, restricoes, REGISTRO);
+  [...avisos, ...aplicado.avisos].forEach((a) => log(`aviso: ${a}`));
+  ({ ambiente, motivo } = aplicado);
+}
+
+// ---------------------------------------------------------------- idioma do projeto
+// project.idiomaLogon de standards/naming-conventions.json é o idioma de logon quando a conexão
+// não define <P>_SAP_LANGUAGE. Valor inválido recusa; campo ausente ou arquivo ilegível usa
+// IDIOMA_PADRAO, com aviso.
+let projeto;
+try {
+  projeto = JSON.parse(fs.readFileSync(path.join(ROOT, "standards", "naming-conventions.json"), "utf8"))?.project;
+} catch (e) {
+  log(`aviso: não foi possível ler standards/naming-conventions.json (${e.message}); idioma de logon ${IDIOMA_PADRAO}`);
+}
+const idiomaInfo = projeto ? politica(() => idiomaDoProjeto(projeto)) : { idioma: IDIOMA_PADRAO, avisos: [] };
+idiomaInfo.avisos.forEach((a) => log(`aviso: ${a}`));
+const idiomaProjeto = idiomaInfo.idioma;
+
+// ---------------------------------------------------------------- decisão por ferramenta
+const sistema = { sid, sidPendente: sidInfo.sidPendente, mandante, ambiente, motivo, sapBasis: det.sapBasis, produto: det.produto };
+const { command, args, shell, modo, tls, idioma, acoesNegadas, childEnv, avisos } = politica(() =>
+  decidir({ tool, prefix, sistema, conn, v, env: process.env, platform: process.platform, arc1, caCert, idiomaProjeto }));
+avisos.forEach((a) => log(`aviso: ${a}`));
+
+const estado = {
+  servidor: server, ferramenta: tool, sid, mandante, usuario: conn.user,
+  sapBasis: det.sapBasis, produto: det.produto, ambiente, motivo, modo, tls, idioma,
+  ...(acoesNegadas ? { acoesNegadas } : {}),
+  sidConfirmado: sidInfo.sidConfirmado, sidOrigem: sidInfo.sidOrigem,
+  detectadoEm: new Date().toISOString(), pid: process.pid,
+};
+log(`${server} -> ${sid}/${mandante} · ${det.produto} · ${ambiente} (${motivo}) · ${modo} · idioma ${idioma} · TLS: ${tls}`);
+
+if (DIAGNOSTICO) {
+  console.error(JSON.stringify({ ...estado, t000: det.t000, args: tool === "vsp" ? args : undefined }, null, 2));
+  process.exit(0);
+}
+
+// ---------------------------------------------------------------- execução
+gravarEstado(RUNTIME_DIR, estado);
+const child = spawn(command, args, { env: childEnv, cwd: os.tmpdir(), stdio: "inherit", shell });
+child.on("error", (e) => { limparRuntime(); fail(`não foi possível iniciar "${command}": ${e.message}`); });
+for (const sig of ["SIGINT", "SIGTERM"]) process.on(sig, () => child.kill(sig));
+child.on("exit", (code, signal) => { limparRuntime(); process.exit(signal ? 1 : code ?? 1); });

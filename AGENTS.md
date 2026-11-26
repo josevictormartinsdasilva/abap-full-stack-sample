@@ -8,13 +8,31 @@ Este projeto utiliza uma arquitetura multiagente especializada para o desenvolvi
 
 A sessão principal atua como **Orquestrador Central**.
 
-1. **Planejar antes de executar**: avalie o requisito, consulte [standards/naming-conventions.json](standards/naming-conventions.json) e [standards/padrao-desenvolvimento.md](standards/padrao-desenvolvimento.md), e apresente um plano com os nomes dos objetos para aprovação do usuário antes de criar/alterar objetos no SAP.
-2. **Parâmetros do cliente**: sigla, pacotes, variante ATC, namespace Fiori e sistema de desenvolvimento estão no bloco `cliente` de `standards/naming-conventions.json`. Se algum valor necessário ainda for placeholder (`<...>`), pergunte ao usuário — nunca suponha.
-3. **Somente no sistema de desenvolvimento**: antes de criar, alterar ou ativar qualquer objeto no SAP, confirme que o sistema conectado ao `abap-adt` é o `sistemaDesenvolvimento` do bloco `cliente` (compare o SID informado pelo servidor). Se for outro sistema, ou se não for possível confirmar, **pare**: não crie nem ative nada e avise o usuário com o SID encontrado. Consultas de leitura não precisam dessa confirmação.
-4. **Delegar ao especialista**: acione o subagente correspondente (abaixo). O subagente só conhece o que estiver no prompt — informe módulo (`<MD>`), pacote, request, nomes aprovados, objetos já existentes e o `sistemaDesenvolvimento` já confirmado. Tarefas pequenas (uma ou duas linhas, consultas) podem ser feitas diretamente, sem delegar.
-5. **Ordem de precedência** em entregas ponta a ponta: `abap-rap-dev` (ou `abap-classic-dev`) → `fiori-elements-dev` → `abap-qa-auditor`. Etapas independentes podem rodar em paralelo.
-6. **Qualidade obrigatória**: nenhuma entrega é concluída sem o `abap-qa-auditor` reportar ATC sem erros (tópico 13 de `standards/padrao-desenvolvimento.md`).
-7. **Relatar fielmente**: repasse ao usuário os resultados dos subagentes (objetos, ativação, ATC, lint), inclusive falhas.
+1. **Planejar antes de executar**: avalie o requisito, consulte [standards/naming-conventions.json](standards/naming-conventions.json) e [standards/padrao-desenvolvimento.md](standards/padrao-desenvolvimento.md), e apresente um plano com os nomes dos objetos para aprovação do usuário antes de criar/alterar objetos no SAP. Antes de pedir a aprovação, confira o comprimento de cada nome contra o limite do tipo de objeto (ex.: tabela transparente e objeto de bloqueio até 16 caracteres; CDS e classe até 30; app e BSP pelos limites do tópico 9 do padrão). Nome aprovado que o SAP recusa por tamanho obriga a refazer o plano.
+2. **Parâmetros do cliente**: sigla, pacotes, variante ATC, namespace Fiori e sistema de desenvolvimento estão no bloco `cliente` de `standards/naming-conventions.json`. Se algum valor necessário ainda for placeholder (`<...>`), pergunte ao usuário — nunca suponha. Um valor "não se aplica" (ex.: `requests.projetoCTS`, quando o cliente não atribui projeto CTS às requests) indica que o item não existe neste cliente: não pergunte nem invente um valor.
+3. **Selecionar o MCP pela política**: antes de qualquer chamada ao SAP, siga [standards/politica-mcp-abap.md](standards/politica-mcp-abap.md). O ambiente e o release de cada sistema são **detectados no próprio SAP** pelo launcher e gravados em `.agents/runtime/`. Rode `node scripts/mcp-runtime.mjs` (lista só os servidores vivos) e localize ali o servidor conectado ao sistema-alvo; para o `abap-adt`, use a informação de sistema do próprio servidor. Use **somente** o servidor que a matriz indica:
+   - S/4HANA 2025+ → `abap-adt`;
+   - S/4HANA ≤ 2023 em QAS → `arc-1`, somente análise;
+   - S/4HANA ≤ 2023 em DEV/SANDBOX → `vsp`;
+   - **PRD, em qualquer versão → nenhum servidor.** Não acesse o ambiente produtivo, nem para leitura (regra absoluta 6, [ADR-0014](docs/adr/0014-ambiente-produtivo-fora-do-alcance-dos-agentes.md)). No `abap-adt`, confira o sistema antes de qualquer outra chamada e pare se for PRD. Para incidente em produção, trabalhe sobre o que o usuário trouxer (dump, log, código) ou reproduza no QAS/DEV.
+
+   Em S/4HANA 2025+ DEV/SANDBOX, se o `abap-adt` **não oferecer** uma operação de desenvolvimento, siga a cadeia de fallback da seção 4.4 da política: `vsp` → `arc-1` → execução manual (código e passos para o ADT, só com autorização do usuário). Só conta como operação ausente o sinal previsto na tabela da seção 4.4; erro do objeto ou do sistema não é motivo para trocar de servidor. A cada passo da cadeia, mostre ao usuário a evidência (ferramenta consultada ou mensagem de erro literal) e só siga com a confirmação dele.
+
+   Em S/4HANA ≤ 2023 DEV/SANDBOX, se o `vsp` **não oferecer** criar ou editar um tipo de objeto, o `arc-1-dev` executa **só essa operação**, no mesmo sistema (seção 4.2 da política, [ADR-0015](docs/adr/0015-arc-1-complemento-do-vsp-para-tipos-nao-suportados.md)). Tipos conhecidos: DCLS e DDLX. Ativação do restante, ATC e ABAP Unit continuam no `vsp`. Exige o opt-in do `arc-1-dev` com o pacote da entrega (nunca `Z*`) e a confirmação do usuário, que vale para a entrega inteira nos tipos já listados. Um tipo novo entra na lista só com a mensagem literal do `vsp`. Não afirme que um servidor suporta um tipo de objeto sem que a ferramenta tenha confirmado.
+
+   Em S/4HANA 2025+ QAS, se o `abap-adt` estiver no ar mas **não oferecer** uma operação de análise, siga o fallback da seção 4.5 da política: `arc-1` somente leitura no mesmo sistema (`arc-1-qas`, SID e mandante iguais aos do `abap-adt`); se ele também não atender, pare e informe. Mesmo critério de sinais, evidência e confirmação do fallback de desenvolvimento. O `vsp` nunca entra.
+
+   Vale sempre o ambiente detectado, não o que o usuário ou o prompt afirmam; se divergirem, informe. Se nenhum servidor ativo estiver conectado ao sistema-alvo, pare e avise. O QAS é sempre somente leitura, com qualquer servidor; o PRD não é acessado.
+4. **Somente no sistema de desenvolvimento**: antes de criar, alterar ou ativar qualquer objeto no SAP, confirme que o sistema conectado ao servidor MCP selecionado é o `sistemaDesenvolvimento` do bloco `cliente` (compare o SID informado pelo servidor). Se for outro sistema, ou se não for possível confirmar, **pare**: não crie nem ative nada e avise o usuário com o SID encontrado. Consultas de leitura não precisam dessa confirmação.
+5. **Delegar ao especialista**: acione o subagente correspondente (abaixo). O subagente só conhece o que estiver no prompt. Informe:
+   - módulo (`<MD>`), pacote, request, nomes aprovados e objetos já existentes;
+   - o sistema-alvo com o ambiente detectado e o servidor MCP (regra 3);
+   - o `sistemaDesenvolvimento` já confirmado.
+
+   Tarefas pequenas (uma ou duas linhas, consultas) podem ser feitas diretamente, sem delegar.
+6. **Ordem de precedência** em entregas ponta a ponta: `abap-rap-dev` (ou `abap-classic-dev`) → `fiori-elements-dev` → `abap-qa-auditor`. Etapas independentes podem rodar em paralelo.
+7. **Qualidade obrigatória**: nenhuma entrega é concluída sem o `abap-qa-auditor` reportar ATC sem erros (tópico 13 de `standards/padrao-desenvolvimento.md`). "0 achados" só vale para os objetos que o ATC de fato processou: o auditor relata a cobertura (objetos enviados × processados, por tipo), e objeto não processado fica como pendência a verificar por outro meio, nunca como aprovado.
+8. **Relatar fielmente**: repasse ao usuário os resultados dos subagentes (objetos, ativação, ATC, lint), inclusive falhas. Informe também o sistema e o servidor MCP usados e as ações recusadas pela política.
 
 ## Papéis & Subagentes
 
@@ -29,7 +47,7 @@ Definição de cada subagente: `.agents/agents/<nome>.md`. Skill: `.agents/skill
   - Value Helps (`ZI_<MD>_VH_*` e `@Consumption.valueHelpDefinition`)
   - Tabelas de Banco e de Draft (`ZT<MD>_*`, `ZT<MD>_*_D`), estruturas (`ZS<MD>_*`), elementos de dados (`ZE_*`), domínios (`ZD_*`) e objetos de bloqueio (`EZ<MD>_*`)
   - Service Definitions (`ZUI_*`, `ZAPI_<MD>_*`) e Service Bindings (`ZUI_O4_*`, `ZAPI_O4_*`)
-- **Ferramentas**: MCP `abap-adt` (`abap_object_*`, `abap_repository_*`)
+- **Ferramentas**: MCP do sistema-alvo conforme a política: `abap-adt` (`abap_object_*`, `abap_repository_*`) em S/4HANA 2025+; `vsp` (`SAP`) em DEV/SANDBOX ≤ 2023
 - **Skill**: [.agents/skills/abap-rap-dev/SKILL.md](.agents/skills/abap-rap-dev/SKILL.md)
 
 ---
@@ -44,7 +62,7 @@ Definição de cada subagente: `.agents/agents/<nome>.md`. Skill: `.agents/skill
   - Telas Dynpro / Module Pool (faixa 9000-9999), Batch Inputs e integrações IDoc/ALE (`Z<MD>TI_*`, `Z<MD>TM_*`, `Z<MD>SI_*`)
   - Formulários (`ZSF<MD>_*`, `ZAF<MD>_*`, `ZSS<MD>_*`)
   - Estimativa e dimensionamento de demandas RICEFW
-- **Ferramentas**: MCP `abap-adt` (`abap_object_*`)
+- **Ferramentas**: MCP do sistema-alvo conforme a política: `abap-adt` (`abap_object_*`) em S/4HANA 2025+; `vsp` (`SAP`) em DEV/SANDBOX ≤ 2023
 - **Skill**: [.agents/skills/abap-classic-dev/SKILL.md](.agents/skills/abap-classic-dev/SKILL.md)
 
 ---
@@ -72,16 +90,27 @@ Definição de cada subagente: `.agents/agents/<nome>.md`. Skill: `.agents/skill
   - Aplicação automatizada de QuickFixes via ADT
   - Execução de testes unitários ABAP Unit (`abap_unit_run_tests`)
   - Verificação de ESLint no frontend
-- **Ferramentas**: MCP `abap-adt` (`abap_atc_*`, `abap_unit_*`), terminal
+- **Ferramentas**: MCP do sistema-alvo conforme a política: `abap-adt` (`abap_atc_*`, `abap_unit_*`), `vsp` (`SAP`) ou, para análise em QAS ≤ 2023, `arc-1` (`SAPDiagnose`); terminal
 - **Skill**: [.agents/skills/abap-qa-auditor/SKILL.md](.agents/skills/abap-qa-auditor/SKILL.md)
 
 ---
 
 ## MCP
 
-Servidores definidos em `.agents/mcp.servers.json` (fonte única): `abap-adt` (HTTP em `localhost:2236`, token na variável `ABAP_ADT_TOKEN`) e `fiori-mcp` (stdio via npx). Os nomes das ferramentas citados acima são os nomes MCP originais; cada ferramenta de IA pode exibi-los com um prefixo próprio (ex.: `mcp__abap-adt__abap_object_check` no Claude Code).
+Servidores definidos em `.agents/mcp.servers.json` (fonte única):
+
+| Servidor | Uso | Como inicia |
+|---|---|---|
+| `abap-adt` | MCP oficial SAP, para S/4HANA 2025+ | HTTP em `localhost:2236`, token na variável `ABAP_ADT_TOKEN` |
+| `arc-1-qas` | Análise somente leitura em QAS ≤ 2023 (em 2025+, contingência e fallback de análise). Não há entrada para PRD (ADR-0014) | stdio via `scripts/mcp-launch.mjs`, variáveis `ARC1_QAS_*` |
+| `arc-1-dev` | Opcional: DEV pelo ARC-1 (exceção da política 4.2, complemento do `vsp` para tipos não suportados em ≤ 2023 pelo ADR-0015, ou 2º fallback em 2025+, seção 4.4) | stdio via `scripts/mcp-launch.mjs`, variáveis `ARC1_DEV_*` |
+| `vsp` | Desenvolvimento em DEV/SANDBOX ≤ 2023 | stdio via `scripts/mcp-launch.mjs`, variáveis `VSP_*` |
+| `fiori-mcp` | Apps Fiori | stdio via npx, por `scripts/com-certificados.mjs` (certificados fixados, ADR-0016) |
+
+`arc-1` e `vsp` só podem ser iniciados pelo launcher, que aplica as travas técnicas da política (ver [ADR-0009](docs/adr/0009-selecao-de-mcp-abap-por-versao-e-ambiente.md)). Se ele recusar iniciar, repasse a mensagem ao usuário e não troque de servidor. Os nomes das ferramentas citados acima são os nomes MCP originais. Cada ferramenta de IA pode exibi-los com um prefixo próprio (ex.: `mcp__abap-adt__abap_object_check`, `mcp__vsp__SAP` no Claude Code). As equivalências de operações entre servidores estão na seção 5 da política.
 
 ## Configuração & Padrões Oficiais
 - Todos os agentes seguem estritamente as convenções corporativas de desenvolvimento detalhadas em:
   - Documento mestre: [standards/padrao-desenvolvimento.md](standards/padrao-desenvolvimento.md)
+  - Política de seleção de MCP ABAP: [standards/politica-mcp-abap.md](standards/politica-mcp-abap.md)
   - Mapeamento JSON e parâmetros do cliente: [standards/naming-conventions.json](standards/naming-conventions.json)

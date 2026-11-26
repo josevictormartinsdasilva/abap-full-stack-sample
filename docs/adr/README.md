@@ -22,6 +22,14 @@ Formato: MADR simplificado, em português. Um arquivo por decisão: `NNNN-titulo
 | [0006](0006-atc-tolerancia-zero-como-criterio-de-entrega.md) | ATC com tolerância zero como critério de entrega | Aceito |
 | [0007](0007-mcp-como-camada-de-acesso-ao-sap-e-ao-fiori.md) | MCP como camada de acesso ao SAP e ao Fiori | Aceito |
 | [0008](0008-parametros-do-cliente-centralizados-sem-suposicao.md) | Parâmetros do cliente centralizados, sem suposição | Aceito |
+| [0009](0009-selecao-de-mcp-abap-por-versao-e-ambiente.md) | Seleção de MCP ABAP por versão e ambiente | Aceito (alterado pelo ADR-0014) |
+| [0010](0010-material-de-referencia-de-terceiros-nas-skills.md) | Material de referência de terceiros nas skills | Aceito |
+| [0011](0011-fallback-de-desenvolvimento-em-s4hana-2025.md) | Fallback de desenvolvimento em S/4HANA 2025+ | Aceito |
+| [0012](0012-fallback-de-analise-em-qas-prd-s4hana-2025.md) | Fallback de análise em QAS/PRD S/4HANA 2025+ | Aceito (alterado pelo ADR-0014) |
+| [0013](0013-certificado-fixado-e-tls-do-vsp.md) | Certificado fixado por conexão e opt-in de TLS sem verificação no vsp | Aceito (estendido pelo ADR-0016) |
+| [0014](0014-ambiente-produtivo-fora-do-alcance-dos-agentes.md) | Ambiente produtivo fora do alcance dos agentes | Aceito |
+| [0015](0015-arc-1-complemento-do-vsp-para-tipos-nao-suportados.md) | ARC-1 como complemento do vsp para tipos não suportados em S/4HANA ≤ 2023 | Aceito (atualizado em 2026-11-26) |
+| [0016](0016-certificado-fixado-no-fiori-mcp-e-no-preview.md) | Certificado fixado também no fiori-mcp e no preview dos apps Fiori | Aceito |
 
 ## Modelo
 

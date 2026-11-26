@@ -4,10 +4,42 @@
       "url": "http://localhost:2236/mcp",
       "bearerTokenEnvVar": "ABAP_ADT_TOKEN"
     },
+    "arc-1-qas": {
+      "command": "cmd",
+      "args": [
+        "/c",
+        "node",
+        "scripts/mcp-launch.mjs",
+        "arc-1-qas"
+      ],
+      "startupTimeoutMs": 300000
+    },
+    "arc-1-dev": {
+      "command": "cmd",
+      "args": [
+        "/c",
+        "node",
+        "scripts/mcp-launch.mjs",
+        "arc-1-dev"
+      ],
+      "startupTimeoutMs": 300000
+    },
+    "vsp": {
+      "command": "cmd",
+      "args": [
+        "/c",
+        "node",
+        "scripts/mcp-launch.mjs",
+        "vsp"
+      ],
+      "startupTimeoutMs": 120000
+    },
     "fiori-mcp": {
       "command": "cmd",
       "args": [
         "/c",
+        "node",
+        "scripts/com-certificados.mjs",
         "npx",
         "--yes",
         "@sap-ux/fiori-mcp-server@1.15.19",

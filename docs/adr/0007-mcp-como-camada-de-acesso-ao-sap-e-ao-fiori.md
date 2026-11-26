@@ -1,6 +1,6 @@
 # ADR-0007: MCP como camada de acesso ao SAP e ao Fiori
 
-- **Status:** Aceito
+- **Status:** Aceito (complementado pelo [ADR-0009](0009-selecao-de-mcp-abap-por-versao-e-ambiente.md), que acrescenta `arc-1` e `vsp` para S/4HANA ≤ 2023)
 - **Data:** 2026-11-05
 
 ## Contexto
@@ -16,7 +16,7 @@ O acesso é feito por servidores MCP, definidos em `.agents/mcp.servers.json` (f
 | `abap-adt` | HTTP em `http://localhost:2236/mcp` | Objetos ABAP, repositório, ATC, ABAP Unit |
 | `fiori-mcp` | stdio via `npx` (`@sap-ux/fiori-mcp-server@1.15.19`) | Descoberta, geração e alteração de apps Fiori |
 
-- O token do `abap-adt` **nunca é versionado**. Vem da variável de ambiente `ABAP_ADT_TOKEN` (modelo em `.env.example`).
+- O token do `abap-adt` **nunca é versionado**. Vem da variável de ambiente `ABAP_ADT_TOKEN`, gravada nas variáveis do usuário e não no `.env`, que as ferramentas de IA não leem (passo a passo em [docs/primeiros-passos.md, etapa 4](../primeiros-passos.md#4-s4hana-2025-habilitar-o-abap-adt)).
 - A versão do `fiori-mcp-server` é fixada.
 - Cada subagente só usa as ferramentas do seu escopo.
 

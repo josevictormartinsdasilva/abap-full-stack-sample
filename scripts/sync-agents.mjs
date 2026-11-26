@@ -71,7 +71,22 @@ function parseFrontmatter(text, file) {
   return { meta, body: m[2] };
 }
 const flat = (v) => (typeof v === "object" ? v.folded.join(" ") : v);
-const yamlDesc = (v) => (typeof v === "object" ? ["description: >-", ...v.folded.map((l) => "  " + l)].join("\n") : `description: ${v}`);
+// Uma linha vai entre aspas duplas: sem elas, um ": " ou um "#" no texto quebra o YAML. A string
+// JSON é um escalar YAML entre aspas duplas válido.
+const yamlDesc = (v) => (typeof v === "object" ? ["description: >-", ...v.folded.map((l) => "  " + l)].join("\n") : `description: ${JSON.stringify(v)}`);
+
+// Arquivos de skill que não são texto UTF-8 (imagens, PDFs) são copiados byte a byte; os de
+// texto têm o CRLF normalizado. Binário = contém byte 0 ou não é UTF-8 válido.
+const utf8Estrito = new TextDecoder("utf-8", { fatal: true });
+function ehBinario(buf) {
+  if (buf.includes(0)) return true;
+  try {
+    utf8Estrito.decode(buf);
+    return false;
+  } catch {
+    return true;
+  }
+}
 
 // Remove o marcador {{skill}} ou o substitui pela instrução de carregar a skill.
 function renderBody(body, skillSection) {
@@ -105,7 +120,7 @@ const maxTimeoutSec = Math.max(0, ...Object.values(mcp).map((s) => s.timeoutSec 
 const stdioCmd = (s) => (PLATFORM === "windows" ? { command: "cmd", args: ["/c", s.command, ...(s.args || [])] } : { command: s.command, args: s.args || [] });
 
 // ---------------------------------------------------------------- saídas
-const out = new Map(); // caminho relativo -> conteúdo
+const out = new Map(); // caminho relativo -> conteúdo (string de texto ou Buffer de arquivo binário)
 const managedDirs = [".claude/agents", ".claude/skills", ".codex/agents", ".kimi-code/agents"]; // arquivos órfãos aqui são removidos
 
 // Claude Code
@@ -119,7 +134,12 @@ for (const s of skills) {
   const srcDir = path.join(ROOT, ".agents/skills", s);
   for (const f of walk(srcDir)) {
     const r = path.relative(srcDir, f).split(path.sep).join("/");
-    let content = read(f);
+    const bruto = fs.readFileSync(f);
+    if (ehBinario(bruto)) {
+      out.set(`.claude/skills/${s}/${r}`, bruto);
+      continue;
+    }
+    let content = bruto.toString("utf8").replace(/\r\n/g, "\n");
     if (r === "SKILL.md") content = content.replace(/^(---\n[\s\S]*?\n---\n)/, `$1\n<!-- ${GEN} -->\n`);
     out.set(`.claude/skills/${s}/${r}`, content);
   }
@@ -196,14 +216,16 @@ out.set(
   out.set(".kimi-code/mcp.json", json(k));
 }
 
-// Antigravity (não lê variável de ambiente: o token é substituído localmente, sem commit)
+// Antigravity (não lê variável de ambiente: o token é substituído localmente, sem commit).
+// timeoutSeconds é a chave documentada (https://antigravity.google/docs/mcp); um valor positivo
+// substitui tanto o limite de conexão (padrão 300 s) quanto o de chamada de ferramenta (180 s).
 {
   const g = { mcpServers: {} };
   for (const [n, s] of Object.entries(mcp)) {
     g.mcpServers[n] =
       s.transport === "http"
         ? { type: "streamableHttp", url: s.url, ...(s.tokenEnvVar ? { headers: { Authorization: "Bearer <SEU_TOKEN>" } } : {}), disabled: false }
-        : { type: "stdio", ...(s.timeoutSec ? { timeout: s.timeoutSec } : {}), command: s.command, args: s.args || [], disabled: false };
+        : { type: "stdio", ...(s.timeoutSec ? { timeoutSeconds: s.timeoutSec } : {}), command: s.command, args: s.args || [], disabled: false };
   }
   out.set(".agents/mcp_config.json", json(g));
 }
@@ -213,8 +235,8 @@ const stale = [];
 const orphans = [];
 for (const [r, content] of out) {
   const p = path.join(ROOT, r);
-  const current = fs.existsSync(p) ? read(p) : null;
-  if (current !== content) stale.push(r);
+  if (!fs.existsSync(p)) stale.push(r);
+  else if (Buffer.isBuffer(content) ? !content.equals(fs.readFileSync(p)) : read(p) !== content) stale.push(r);
 }
 for (const d of managedDirs) {
   for (const f of walk(path.join(ROOT, d))) if (!out.has(rel(f))) orphans.push(rel(f));

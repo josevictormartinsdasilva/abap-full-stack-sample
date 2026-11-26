@@ -1,0 +1,4 @@
+{
+  "_instrucao": "OPCIONAL. O launcher (scripts/mcp-launch.mjs) detecta SID, mandante, release e ambiente lendo o próprio SAP (T000/SCC4 e componentes instalados). Use esta lista só para tornar um sistema MAIS restritivo do que o detectado — por exemplo, um QAS cujo mandante está cadastrado como customizing (C) na SCC4. Uma entrada nunca libera nada: vale sempre o mais restritivo entre o detectado e o declarado (DEV < SANDBOX < QAS < PRD). Formato: { \"sid\": \"QS4\", \"mandante\": \"400\", \"ambiente\": \"QAS\", \"observacao\": \"...\" }. sid e ambiente (DEV, SANDBOX, QAS ou PRD) são obrigatórios; sem mandante, a restrição vale para todos os mandantes do SID. JSON malformado ou entrada inválida fazem o launcher recusar iniciar.",
+  "restricoes": []
+}

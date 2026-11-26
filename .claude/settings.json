@@ -1,6 +1,9 @@
 {
   "enabledMcpjsonServers": [
     "abap-adt",
+    "arc-1-qas",
+    "arc-1-dev",
+    "vsp",
     "fiori-mcp"
   ],
   "env": {

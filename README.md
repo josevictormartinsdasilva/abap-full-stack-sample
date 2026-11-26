@@ -4,6 +4,8 @@ Bem-vindo ao ambiente de desenvolvimento integrado para o ecossistema SAP. Este 
 
 Todos os agentes seguem rigorosamente os padrões corporativos de desenvolvimento documentados em [padrao-desenvolvimento.md](standards/padrao-desenvolvimento.md) e mapeados em [naming-conventions.json](standards/naming-conventions.json).
 
+> **Primeira vez aqui?** Comece por [docs/primeiros-passos.md](docs/primeiros-passos.md): do zero ao primeiro objeto criado pelos agentes.
+
 ---
 
 ## 🧭 Visão Geral dos Agentes
@@ -25,10 +27,13 @@ flowchart TD
         Lead -->|ATC / QuickFixes / Testes Unitários| QA["abap-qa-auditor"]
     end
 
-    RAP --- ADT_MCP[(abap-adt MCP)]
-    Classic --- ADT_MCP
+    RAP --- SAP_MCP{{"Política MCP ABAP<br/>(por versão e ambiente)"}}
+    Classic --- SAP_MCP
+    QA --- SAP_MCP
+    SAP_MCP -->|S/4HANA 2025+| ADT_MCP[(abap-adt<br/>MCP oficial SAP)]
+    SAP_MCP -->|≤ 2023 · DEV/Sandbox| VSP_MCP[(vsp)]
+    SAP_MCP -->|≤ 2023 · QAS · leitura| ARC_MCP[(arc-1)]
     Fiori --- FIORI_MCP[(fiori-mcp MCP)]
-    QA --- ADT_MCP
 ```
 
 ---
@@ -37,10 +42,12 @@ flowchart TD
 
 | Agente | Especialidade | Escopo de Atuação | Ferramentas MCP | Skill |
 |---|---|---|---|---|
-| **`abap-rap-dev`** | Backend Cloud & RAP | CDS View Entities (`ZI_*`, `ZC_*`), Metadata Extensions (`DDLX`), Behavior Definitions (`BDEF`), Classes de Comportamento (`ZCL<MD>_BP_*`), Value Helps e tabelas de banco/draft. | `abap-adt` | [SKILL.md](.agents/skills/abap-rap-dev/SKILL.md) |
-| **`abap-classic-dev`** | ABAP Clássico & RICEFW | Reports (`PROG`), Includes (`_TOP`, `_SEL`, `_F01`), Function Groups/Modules (`FUGR/F`, `FUGR/FF`), BAPIs, Telas Dynpro (9000-9999), SE11 e estimativas de esforço. | `abap-adt` | [SKILL.md](.agents/skills/abap-classic-dev/SKILL.md) |
+| **`abap-rap-dev`** | Backend Cloud & RAP | CDS View Entities (`ZI_*`, `ZC_*`), Metadata Extensions (`DDLX`), Behavior Definitions (`BDEF`), Classes de Comportamento (`ZCL<MD>_BP_*`), Value Helps e tabelas de banco/draft. | `abap-adt` ou `vsp`¹ | [SKILL.md](.agents/skills/abap-rap-dev/SKILL.md) |
+| **`abap-classic-dev`** | ABAP Clássico & RICEFW | Reports (`PROG`), Includes (`_TOP`, `_SEL`, `_F01`), Function Groups/Modules (`FUGR/F`, `FUGR/FF`), BAPIs, Telas Dynpro (9000-9999), SE11 e estimativas de esforço. | `abap-adt` ou `vsp`¹ | [SKILL.md](.agents/skills/abap-classic-dev/SKILL.md) |
 | **`fiori-elements-dev`** | Frontend Fiori & UI5 | Gerenciamento agnóstico de apps Fiori (LROP, ALP, OVP, FCL), Page Map no `manifest.json`, rotas, alvos, anotações XML locais e scripts UI5. | `fiori-mcp`, Terminal UI5/npm | [SKILL.md](.agents/skills/fiori-elements-dev/SKILL.md) |
-| **`abap-qa-auditor`** | Qualidade & Governança | Execução de inspeções ATC, aplicação de QuickFixes automatizados, testes ABAP Unit e validação estática de código frontend (`eslint`). | `abap-adt`, Terminal | [SKILL.md](.agents/skills/abap-qa-auditor/SKILL.md) |
+| **`abap-qa-auditor`** | Qualidade & Governança | Execução de inspeções ATC, aplicação de QuickFixes automatizados, testes ABAP Unit e validação estática de código frontend (`eslint`). | `abap-adt`, `vsp` ou `arc-1`¹, Terminal | [SKILL.md](.agents/skills/abap-qa-auditor/SKILL.md) |
+
+¹ O servidor MCP SAP é escolhido por sistema, conforme a [política de MCP ABAP](standards/politica-mcp-abap.md): `abap-adt` em S/4HANA 2025+, `vsp` em DEV/Sandbox ≤ 2023 e `arc-1` (somente leitura) em QAS ≤ 2023. Nenhum servidor acessa o PRD ([ADR-0014](docs/adr/0014-ambiente-produtivo-fora-do-alcance-dos-agentes.md)).
 
 ---
 
@@ -134,8 +141,8 @@ Quando uma nova funcionalidade completa precisa ser entregue, o **Orquestrador C
   (Plano aprovado)     (CDS/DDLX ativos)     (Page Map / Rotas)       (ATC 100% limpo)
 ```
 
-1. **Orquestrador**: Avalia o requisito, consulta [naming-conventions.json](standards/naming-conventions.json) e submete um plano de ação para sua confirmação.
-2. **`abap-rap-dev`**: Implementa os objetos no backend, valida sintaxe (`abap_object_check`) e ativa no sistema SAP BTP.
+1. **Orquestrador**: Avalia o requisito, consulta [naming-conventions.json](standards/naming-conventions.json), identifica o sistema-alvo e o servidor MCP pela [política](standards/politica-mcp-abap.md) e submete um plano com os nomes dos objetos para sua aprovação.
+2. **`abap-rap-dev`** (ou **`abap-classic-dev`**): Implementa os objetos no backend, valida sintaxe (`abap_object_check` ou o equivalente do servidor) e ativa, somente no sistema de desenvolvimento confirmado.
 3. **`fiori-elements-dev`**: Atualiza o descritor `manifest.json`, sincroniza navegações e valida o linter.
 4. **`abap-qa-auditor`**: Dispara o ATC no backend, executa testes unitários e confirma que não existem desvios nem erros residuais.
 
@@ -145,6 +152,14 @@ Quando uma nova funcionalidade completa precisa ser entregue, o **Orquestrador C
 
 - **[standards/padrao-desenvolvimento.md](standards/padrao-desenvolvimento.md)**: Manual normativo corporativo de desenvolvimento SAP (Módulos, Pacotes, Requests, Dicionário SE11, ABAP OO, CDS, Fiori e Regras de ATC).
 - **[standards/naming-conventions.json](standards/naming-conventions.json)**: Mapeamento técnico estruturado com todos os prefixos e padrões de nomenclatura, mais o bloco `cliente` com os parâmetros do projeto.
+- **[standards/politica-mcp-abap.md](standards/politica-mcp-abap.md)**: Qual servidor MCP acessa cada sistema SAP (por versão e ambiente) e o que cada um pode fazer.
+- **[docs/primeiros-passos.md](docs/primeiros-passos.md)**: Guia de início para o desenvolvedor: liberações a pedir, instalação, conexão ao SAP e primeiro teste de ponta a ponta.
+- **[docs/setup-mcp-abap.md](docs/setup-mcp-abap.md)**: Passo a passo para configurar o `vsp` e o `arc-1` na máquina do desenvolvedor, com a tabela de problemas comuns.
+- **[docs/glossario.md](docs/glossario.md)**: Os termos do projeto (MCP, orquestrador, SID, ATC, RAP...) em linguagem simples, para quem está começando.
+- **[docs/parece-erro-mas-e-normal.md](docs/parece-erro-mas-e-normal.md)**: Recusas e mensagens que parecem defeito, mas são travas de propósito, com o que fazer em cada uma.
+- **[docs/revisar-o-plano.md](docs/revisar-o-plano.md)**: Checklist de 8 perguntas para revisar o plano da IA antes de aprovar, e o que conferir depois da entrega.
+- **[docs/adr/](docs/adr/README.md)**: Registros de decisão de arquitetura (ADR-0001 a ADR-0014).
+- **[standards/sistemas-sap.json](standards/sistemas-sap.json)**: Opcional. Restrições adicionais por sistema; o ambiente é detectado no próprio SAP e esta lista só pode torná-lo mais restritivo.
 - **[AGENTS.md](AGENTS.md)**: Regras do orquestrador e papéis dos subagentes — fonte única para todas as ferramentas.
 - **[CLAUDE.md](CLAUDE.md)**: Importa o `AGENTS.md` e adiciona só o que é específico do Claude Code.
 
@@ -152,10 +167,16 @@ Quando uma nova funcionalidade completa precisa ser entregue, o **Orquestrador C
 
 ## 🚀 Adotando o template num projeto
 
-1. Preencha o bloco `cliente` de [standards/naming-conventions.json](standards/naming-conventions.json): empresa, sigla, pacote e variante ATC, namespace Fiori, pasta dos apps e sistema de desenvolvimento. Enquanto houver placeholders `<...>`, os agentes perguntam em vez de supor.
-2. Preencha os placeholders restantes de [standards/padrao-desenvolvimento.md](standards/padrao-desenvolvimento.md) (`<VARIANTE_ATC>`, `<PROJETO_CTS>`, `<ID_PROJETO_CTS>`, `<DESCRICAO_PROJETO_CTS>` e `[EMPRESA]`) ou substitua o documento pelo padrão do cliente.
-3. Configure o token MCP (seção abaixo) e confirme a conexão com `/mcp`.
-4. **Libere os agentes apenas no sistema de desenvolvimento.** Eles criam e ativam objetos diretamente via `abap-adt`; use um usuário com autorizações restritas a DEV/sandbox.
+1. Rode o assistente na raiz do projeto:
+
+   ```powershell
+   node scripts/setup.mjs
+   ```
+
+   Ele pede só a conexão de cada sistema (URL, mandante, usuário, senha), detecta no próprio SAP o SID, o release e o ambiente, e grava o `.env`. Depois pede os parâmetros do cliente e preenche o bloco `cliente` de [standards/naming-conventions.json](standards/naming-conventions.json) e os placeholders de [standards/padrao-desenvolvimento.md](standards/padrao-desenvolvimento.md). O `sistemaDesenvolvimento` vem do SID detectado no DEV. Em S/4HANA 2025+, oferece gravar o token do `abap-adt`. Para refazer uma etapa: `--apenas=dev` (ou `qas`, `cliente`, `token`; `dev-arc1` configura a conexão opcional `arc-1-dev`).
+2. Confira tudo com `node scripts/doctor.mjs` (o setup já roda no fim). Ele verifica Node, arquivos gerados, testes das travas, parâmetros do cliente, cada conexão (pelo diagnóstico do launcher), o `abap-adt` e o `fiori-mcp`, e diz o que fazer em cada falha.
+3. Abra a ferramenta de IA na raiz e confirme com `/mcp`. Os detalhes de cada servidor estão em [Configuração do Token MCP](#-configuração-do-token-mcp-abap-adt) e no [passo a passo do vsp/arc-1](docs/setup-mcp-abap.md).
+4. **Libere os agentes apenas no sistema de desenvolvimento.** Eles criam e ativam objetos diretamente via `abap-adt` ou `vsp`; use um usuário com autorizações restritas a DEV/sandbox. Para `arc-1` no QAS, use um usuário somente leitura. Não configure credenciais do PRD: nenhum servidor acessa o ambiente produtivo.
 
 ---
 
@@ -178,23 +199,46 @@ No Codex, abra o projeto na raiz e marque-o como confiável (o `.codex/config.to
 
 ## 🔑 Configuração do Token MCP (`abap-adt`)
 
-O token do servidor `abap-adt` **não é versionado**. Cada desenvolvedor configura o seu:
+O token do servidor `abap-adt` **não é versionado** e **não fica no `.env`**: Claude Code, Codex e Kimi o leem das variáveis de ambiente do sistema, e não carregam o `.env`. Cada desenvolvedor configura o seu:
 
-1. Copie `.env.example` para `.env` e preencha `ABAP_ADT_TOKEN` (o `.env` está no `.gitignore`).
-2. **Claude Code, Codex e Kimi** leem `ABAP_ADT_TOKEN` das variáveis de ambiente do sistema — eles **não carregam o `.env` sozinhos**. Defina a variável antes de abrir a ferramenta:
+1. **Obtenha o token** ao habilitar o servidor MCP do ADT, no Eclipse ou no VS Code. O passo a passo está em [docs/primeiros-passos.md, etapa 4](docs/primeiros-passos.md#4-s4hana-2025-habilitar-o-abap-adt).
+2. **Grave nas variáveis do usuário** com `node scripts/setup.mjs --apenas=token`. O setup oferece essa etapa sozinho quando detecta um S/4HANA 2025+ e pergunta se o cliente tem 2025+ quando não detecta nenhum sistema. Também move para lá um token esquecido no `.env` e o apaga do arquivo. Para fazer à mão:
    - **Windows (PowerShell, permanente)**: `[Environment]::SetEnvironmentVariable('ABAP_ADT_TOKEN','<SEU_TOKEN>','User')` e reinicie o terminal.
    - **Windows (sessão atual)**: `$env:ABAP_ADT_TOKEN = '<SEU_TOKEN>'`.
    - **macOS / Linux (zsh, permanente)**: `echo "export ABAP_ADT_TOKEN='<SEU_TOKEN>'" >> ~/.zshrc` e abra um terminal novo (no bash, use `~/.bashrc`).
    - **macOS / Linux (sessão atual)**: `export ABAP_ADT_TOKEN='<SEU_TOKEN>'`.
    - No macOS, inicie a ferramenta **pelo terminal**. Apps abertos pelo ícone não enxergam o `~/.zshrc`.
 3. **Antigravity**: substitua `<SEU_TOKEN>` em `.agents/mcp_config.json` apenas na sua cópia local, **sem fazer commit** desse valor.
-4. Confirme a conexão com `/mcp`.
+4. Feche e abra a ferramenta de IA e confirme a conexão com `/mcp` (ou `node scripts/doctor.mjs`).
 
-> O servidor `abap-adt` (HTTP em `localhost:2236`) precisa estar rodando na sua máquina. Nunca grave o token real em arquivos versionados.
+> O servidor `abap-adt` (HTTP em `localhost:2236`) só responde com a IDE do ADT aberta e conectada ao DEV: no VS Code, com a destination do SAP no workspace; no Eclipse, com o projeto ABAP logado. Os arquivos de MCP do projeto já o declaram com o header `Authorization: Bearer ${ABAP_ADT_TOKEN}`: não é preciso `claude mcp add`. Nunca grave o token real em arquivos versionados.
+
+## 🧩 Servidores `arc-1` e `vsp` (S/4HANA ≤ 2023)
+
+Definidos pela [política de MCP ABAP](standards/politica-mcp-abap.md) ([ADR-0009](docs/adr/0009-selecao-de-mcp-abap-por-versao-e-ambiente.md)). Os dois são iniciados por `scripts/mcp-launch.mjs`, nunca diretamente. O launcher:
+
+- identifica o sistema lendo o próprio SAP: SID, release (SAP_BASIS) e ambiente pelo papel do mandante na SCC4 (T000). Não depende do que o operador declarou, e o que não puder ler é tratado como PRD, que é recusado;
+- impõe as travas técnicas: `vsp` só em DEV/Sandbox, com `--expect`, `--allowed-packages` e `--block-free-sql`; `arc-1` somente leitura em QAS, sem prévia de dados nem SQL; PRD recusado para os dois (ADR-0014); SAP_BASIS < 750 recusado; conexão só por `https://` e sem TLS desligado;
+- isola as credenciais de cada servidor.
+
+**Fallback em S/4HANA 2025+:** se o `abap-adt` não oferecer uma operação de desenvolvimento num DEV/Sandbox 2025+, a cadeia é `abap-adt` → `vsp` → `arc-1` → execução manual (código e passos para o ADT, só com sua autorização). O `vsp` e o `arc-1` só sobem num sistema 2025+ com opt-in no `.env` (`VSP_FALLBACK_2025=true`; para o `arc-1`, a entrada `arc-1-dev` com `ARC1_DEV_FALLBACK_2025=true`), que fica desligado por padrão. No QAS 2025+ não há fallback de desenvolvimento; se o `abap-adt` não oferecer uma operação de **análise**, ela segue pelo `arc-1` somente leitura no mesmo sistema, sem flag. No PRD, nenhum servidor ([política, seção 4.5](standards/politica-mcp-abap.md), [ADR-0012](docs/adr/0012-fallback-de-analise-em-qas-prd-s4hana-2025.md)). Passo a passo em [docs/setup-mcp-abap.md](docs/setup-mcp-abap.md#fallback-do-abap-adt-em-s4hana-2025) e regras na [política, seção 4.4](standards/politica-mcp-abap.md) ([ADR-0011](docs/adr/0011-fallback-de-desenvolvimento-em-s4hana-2025.md)).
+
+As decisões ficam em `scripts/mcp-politica.mjs` e são cobertas por testes (`node --test scripts/test/*.test.mjs`), que a CI executa. O launcher já foi validado com o `vsp` num DEV S/4HANA 2023 real; o que falta validar está em [Validações pendentes](docs/setup-mcp-abap.md#validações-pendentes).
+
+**Configuração na máquina:** siga o passo a passo em [docs/setup-mcp-abap.md](docs/setup-mcp-abap.md). Ele cobre:
+
+- os requisitos: só Node.js ≥ 22.19. O binário do `vsp` e o pacote do ARC-1 não exigem instalação manual: o launcher baixa a última versão estável de cada um para um cache do usuário, confere a integridade (SHA-256 no `vsp`, hash do registry npm no ARC-1) e recusa iniciar se uma versão nova perder alguma flag ou variável de segurança (`VSP_VERSION`/`ARC1_VERSION` fixam uma versão);
+- o `.env`, com uma conexão por sistema do cliente: `VSP_*` (DEV) e `ARC1_QAS_*` (QAS); não há conexão com o PRD;
+- o teste com `node scripts/mcp-launch.mjs <servidor> --diagnostico`;
+- vários sistemas do mesmo tipo;
+- macOS/Linux;
+- a tabela de problemas comuns.
+
+> Antes de usar `arc-1` ou `vsp` em ambiente de cliente, obtenha o aceite formal do cliente. A política de APIs da SAP classifica as APIs ADT como internas (ver seção 7 da política).
 
 ### ⚠️ Usando no macOS / Linux
 
-Os arquivos versionados usam o wrapper `cmd /c` para o `fiori-mcp`, que só existe no Windows. Na sua cópia local, gere a variante Unix (requer Node.js):
+Os arquivos versionados usam o wrapper `cmd /c` nos servidores stdio (`fiori-mcp`, `arc-1` e `vsp`), que só existe no Windows. Na sua cópia local, gere a variante Unix (requer Node.js):
 
 ```bash
 node scripts/sync-agents.mjs --platform=unix
@@ -213,20 +257,38 @@ AGENTS.md                       ← regras do orquestrador (fonte)
 CLAUDE.md                       ← @AGENTS.md + específico do Claude (fonte)
 standards/
   padrao-desenvolvimento.md     ← padrão corporativo (fonte)
+  politica-mcp-abap.md          ← qual MCP acessa cada sistema SAP (fonte)
+  sistemas-sap.json             ← restrições opcionais por sistema (fonte)
   naming-conventions.json       ← prefixos + bloco "cliente" (fonte)
 .agents/
   agents/<nome>.md              ← subagentes (fonte)
   skills/<nome>/SKILL.md        ← skills (fonte)
+  skills/<nome>/references/     ← material técnico de apoio das skills (fonte; ver THIRD_PARTY_NOTICES.md)
   mcp.servers.json              ← servidores MCP (fonte)
   mcp_config.json               ← gerado (Antigravity)
+scripts/setup.mjs               ← assistente de configuração do projeto (.env, parâmetros do cliente, token)
+scripts/doctor.mjs              ← verificação de tudo de uma vez, com a ação para cada falha
+scripts/config-local.mjs        ← leitura/escrita do .env e do bloco cliente (funções puras)
 scripts/sync-agents.mjs         ← gerador
+scripts/mcp-launch.mjs          ← launcher de arc-1/vsp com as travas da política
+scripts/sap-probe.mjs           ← detecção de SID, release e ambiente no próprio SAP
+scripts/mcp-politica.mjs        ← decisões do launcher (funções puras, testáveis)
+scripts/mcp-runtime.mjs         ← lista os servidores arc-1/vsp vivos (usado pelo orquestrador)
+scripts/vsp-binario.mjs         ← download e conferência (SHA-256, flags) do binário do vsp
+scripts/arc1-pacote.mjs         ← instalação e conferência (variáveis, Node) do ARC-1 via npm
+scripts/test/                   ← testes das travas (node --test)
+docs/                           ← primeiros passos, setup do MCP ABAP e ADRs (docs/adr/)
+imagens/                        ← figuras do padrao-desenvolvimento.md
+.github/workflows/              ← CI: --check do gerador + testes
+.env.example                    ← modelo do .env local (o .env não é versionado)
+.agents/runtime/                ← estado dos servidores arc-1/vsp em execução (não versionado)
 .claude/                        ← gerado (Claude Code: agents, skills, settings.json)
 .mcp.json                       ← gerado (Claude Code: servidores MCP, na raiz)
 .codex/                         ← gerado (Codex)
 .kimi-code/                     ← gerado (Kimi Code)
 ```
 
-Os arquivos gerados são versionados (quem clona usa direto) e trazem o aviso `GERADO por scripts/sync-agents.mjs`. Em `.claude/settings.json` o script só gerencia `enabledMcpjsonServers` e `env.MCP_TIMEOUT`; as demais chaves (permissões etc.) podem ser editadas à mão.
+Os scripts não têm dependências além do Node.js (≥ 18 para o gerador e os testes; ≥ 22.19 para o ARC-1). Os arquivos gerados são versionados (quem clona usa direto) e trazem o aviso `GERADO por scripts/sync-agents.mjs`. Em `.claude/settings.json` o script só gerencia `enabledMcpjsonServers` e `env.MCP_TIMEOUT`; as demais chaves (permissões etc.) podem ser editadas à mão.
 
 ### Servidores MCP: qual arquivo editar?
 
@@ -240,7 +302,7 @@ Edite **somente** `.agents/mcp.servers.json`. Os demais arquivos de MCP são ger
 | `.kimi-code/mcp.json` | Kimi Code | gerado |
 | `.agents/mcp_config.json` | Antigravity | gerado |
 
-Os gerados podem parecer cópias da fonte, mas o formato muda por ferramenta. No `.mcp.json`, por exemplo: `transport` vira `type`; `tokenEnvVar` vira o header `Authorization: Bearer ${ABAP_ADT_TOKEN}`; o `npx` ganha o prefixo `cmd /c` no Windows; e `timeoutSec` vai para `env.MCP_TIMEOUT` em `.claude/settings.json`.
+Os gerados podem parecer cópias da fonte, mas o formato muda por ferramenta. No `.mcp.json`, por exemplo: `transport` vira `type`; `tokenEnvVar` vira o header `Authorization: Bearer ${ABAP_ADT_TOKEN}`; os comandos stdio (`npx` e `node`) ganham o prefixo `cmd /c` no Windows; e `timeoutSec` vai para `env.MCP_TIMEOUT` em `.claude/settings.json`.
 
 > Os `.json` gerados **não** trazem o aviso `GERADO`, porque JSON não aceita comentários. Na dúvida, consulte esta tabela. Uma edição manual num gerado é reprovada pelo `--check` da CI e sobrescrita na próxima execução do script.
 
@@ -284,14 +346,18 @@ O marcador `{{skill}}` vira a instrução de carregar a skill na sintaxe de cada
   node scripts/sync-agents.mjs
   ```
   Faça commit da fonte **e** dos arquivos gerados juntos.
-- **A CI** (`.github/workflows/sync-agents.yml`) roda `node scripts/sync-agents.mjs --check` e reprova o PR se algum arquivo gerado foi editado à mão ou ficou desatualizado.
+- **A CI** (`.github/workflows/sync-agents.yml`) roda `node scripts/sync-agents.mjs --check` e reprova o PR se algum arquivo gerado foi editado à mão ou ficou desatualizado. Também roda os testes das travas do launcher (`node --test scripts/test/*.test.mjs`).
 - **Novo agente?** Crie `.agents/agents/<nome>.md` e `.agents/skills/<nome>/SKILL.md`, registre-o no `AGENTS.md` e rode o script. Os arquivos de todas as ferramentas são criados automaticamente.
 - **Removeu um agente?** Apague a fonte e rode o script: os arquivos gerados órfãos são removidos.
 - **Não use valores de cliente nas skills.** Pacotes, variantes e pastas vêm do bloco `cliente` de `standards/naming-conventions.json`.
 - **Padrões corporativos** (`standards/`) são a fonte única de verdade — não duplique regras dentro das skills.
+- **Material de terceiros** em `.agents/skills/*/references/` leva no cabeçalho a origem, o commit e a licença, e é registrado em `THIRD_PARTY_NOTICES.md` ([ADR-0010](docs/adr/0010-material-de-referencia-de-terceiros-nas-skills.md)).
 
 ---
 
 ## 🤝 Contribuidores
 
-Quem contribuir deve registrar a atividade em [CONTRIBUTORS.md](CONTRIBUTORS.md) (uma linha por contribuição).
+- **José Victor Martins da Silva** ([@josevictormartinsdasilva](https://github.com/josevictormartinsdasilva))
+- **Luciano Filho** ([@lucianocasado88](https://github.com/lucianocasado88))
+
+Quem contribuir deve registrar a atividade em [CONTRIBUTORS.md](CONTRIBUTORS.md) (uma linha por contribuição). Antes do PR, rode `node scripts/sync-agents.mjs --check` e `node --test scripts/test/*.test.mjs`, os mesmos passos da CI.

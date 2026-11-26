@@ -5,13 +5,13 @@
     "description": "Convenções oficiais de nomenclatura baseadas no documento padrao-desenvolvimento.md para ABAP Cloud / RAP, ABAP Clássico / RICEFW e SAP Fiori",
     "referencia": "standards/padrao-desenvolvimento.md",
     "idiomaPadrao": "Português (PT) - Códigos, objetos e descrições",
+    "idiomaLogon": "PT",
     "objetosLocais": "Prefixo Y (em vez de $TMP)"
   },
   "cliente": {
-    "_instrucao": "Preencha ao adotar o template. Os agentes leem estes valores; enquanto houver <...>, devem perguntar ao usuário em vez de supor.",
+    "_instrucao": "Preencha com `node scripts/setup.mjs` ao adotar o template. Os agentes leem estes valores; enquanto houver <...>, devem perguntar ao usuário em vez de supor.",
     "empresa": "<EMPRESA>",
     "sigla": "<SIGLA>",
-    "pacotePadraoATC": "<PACOTE_ATC>",
     "varianteATC": "<VARIANTE_ATC>",
     "namespaceFiori": "br.com.<cliente>",
     "pastaAppsFiori": "<PASTA_APPS_FIORI>",
@@ -41,7 +41,7 @@
     "pacoteReutilizaveis": "ZCA / ZCA_UTILITARIO"
   },
   "requests": {
-    "escopo": "Uma request por GAP, atribuída ao projeto CTS. Pacotes e objetos reutilizáveis são salvos na request do desenvolvimento que os criou; não existe request separada para objetos iniciais",
+    "escopo": "Uma request por GAP, atribuída ao projeto CTS quando o cliente usa (ver projetoCTS). Pacotes e objetos reutilizáveis são salvos na request do desenvolvimento que os criou; não existe request separada para objetos iniciais",
     "padrao": "<GAP>-<Descricao>",
     "exemplo": "FIAA-01-Inclusão de denominação no material",
     "projetoCTS": {
