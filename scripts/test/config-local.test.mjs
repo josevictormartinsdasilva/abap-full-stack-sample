@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import {
   NAO_SE_APLICA_CTS, atualizarCliente, atualizarDotEnv, atualizarProjetoCTS, camposPendentes, formatarValorEnv,
   lerDiagnostico, lerDotEnv, situacaoProjetoCTS, valoresComComentario,
-  placeholdersPadrao, preencherPadrao, prefixoDoServidor, recusaEsperada2025, situacaoConexao,
+  placeholdersPadrao, preencherPadrao, prefixoDoServidor, recusaEsperada2025, situacaoConexao, leitorComHeranca,
 } from "../config-local.mjs";
 
 describe("prefixoDoServidor", () => {
@@ -215,4 +215,25 @@ describe("valoresComComentario", () => {
     assert.ok(!valoresComComentario(dotenv, "ARC1_DEV").includes("ARC1_DEV_SAP_PASSWORD"));
   });
   test("prefixo é exato", () => assert.deepEqual(valoresComComentario(dotenv, "VSP"), ["VSP_READ_ONLY"]));
+});
+
+describe("leitorComHeranca (arc-1-dev herda a conexão do vsp)", () => {
+  const vars = {
+    VSP_SAP_URL: "https://dev:44300", VSP_SAP_CLIENT: "100", VSP_SAP_USER: "DEV", VSP_SAP_PASSWORD: "s",
+    VSP_SAP_SID: "DS4", VSP_SAP_CA_CERT: ".agents/certs/vsp.pem", VSP_ALLOWED_PACKAGES: "$TMP,Z*",
+    ARC1_DEV_SAP_USER: "ARC1", ARC1_DEV_SAP_URL: "<https://host:porta>",
+  };
+  const ler = (n) => vars[n];
+  const atual = leitorComHeranca("ARC1_DEV", "VSP", ler);
+  test("valor próprio prevalece", () => assert.equal(atual("SAP_USER"), "ARC1"));
+  test("sem valor próprio (ou com placeholder), usa o da origem", () => {
+    assert.equal(atual("SAP_URL"), "https://dev:44300");
+    assert.equal(atual("SAP_SID"), "DS4");
+    assert.equal(atual("SAP_CA_CERT"), ".agents/certs/vsp.pem");
+  });
+  test("flags de comportamento nunca são herdadas", () => {
+    assert.equal(atual("ALLOWED_PACKAGES"), undefined);
+    assert.equal(atual("ALLOW_DEV_WRITES"), undefined);
+  });
+  test("sem origem, só o próprio", () => assert.equal(leitorComHeranca("ARC1_DEV", null, ler)("SAP_URL"), undefined));
 });

@@ -74,7 +74,7 @@ O assistente:
 
 Senhas e token ficam só na sua máquina: o assistente é um script local e não passa nada pela ferramenta de IA. Nada é gravado sem a sua confirmação. Depois de alterar o `.env` ou uma variável do usuário, **feche e abra de novo** o terminal e a ferramenta de IA.
 
-Para refazer uma etapa: `node scripts/setup.mjs --apenas=dev` (ou `qas`, `cliente`, `token`, separados por vírgula). Para só conferir, a qualquer momento: `node scripts/doctor.mjs`.
+Para refazer uma etapa: `node scripts/setup.mjs --apenas=dev` (ou `qas`, `cliente`, `token`, separados por vírgula). A conexão opcional `arc-1-dev` só é configurada quando pedida: `--apenas=dev-arc1`. Para só conferir, a qualquer momento: `node scripts/doctor.mjs`.
 
 **O que o assistente decide pelo release detectado:**
 

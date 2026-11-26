@@ -211,7 +211,7 @@ Falta, antes de levar a `develop` para a `main`:
 
 O `vsp` não cria nem edita controle de acesso (DCLS: `unsupported object type: DCLS/DL`) nem metadata extension (DDLX: `unsupported object type: DDLX/EX`). Pela [política, seção 4.2](../standards/politica-mcp-abap.md), e pelo [ADR-0015](adr/0015-arc-1-complemento-do-vsp-para-tipos-nao-suportados.md), o `arc-1-dev` grava **só esses objetos**, no mesmo DEV. Ativação do restante, ATC e ABAP Unit continuam no `vsp`.
 
-1. **Preencha a conexão `ARC1_DEV_*` à mão** no `.env`, com o **mesmo DEV** do `vsp` e o SID dele. O `setup.mjs` não configura essa entrada.
+1. **Configure a conexão** com `node scripts/setup.mjs --apenas=dev-arc1`. O assistente oferece os valores do `vsp` como padrão (o usuário pode ser outro), detecta o sistema e aponta o problema se o SID for diferente do `VSP_SAP_SID` (gravar assim exige confirmação explícita). Ele grava só a conexão, nunca as flags de escrita. Também dá para preencher `ARC1_DEV_*` à mão no `.env`.
 2. **Ligue o opt-in só durante a entrega**, com o pacote dela:
 
    ```
@@ -268,7 +268,7 @@ O `vsp` e o `arc-1` ficam **desligados por padrão** num sistema 2025+ (opt-in):
    ```
 
 3. **Reinicie a sessão** da ferramenta de IA e confira com `/mcp` que o `vsp` conectou. Peça de novo a operação. O orquestrador usa o `vsp` só para ela; o restante, inclusive o ATC, continua no `abap-adt`.
-4. **Se o `vsp` também não atender, use o `arc-1` no DEV.** Use a entrada `arc-1-dev`, que já vem no template (a `arc-1-qas` aponta para outro sistema). Preencha `ARC1_DEV_SAP_*` com o **mesmo DEV** e descomente as variáveis abaixo. Repita os passos 2 e 3 com `arc-1-dev`. O modo esperado é `escrita restrita a pacotes (fallback do abap-adt)`.
+4. **Se o `vsp` também não atender, use o `arc-1` no DEV.** Use a entrada `arc-1-dev`, que já vem no template (a `arc-1-qas` aponta para outro sistema). Configure a conexão com `node scripts/setup.mjs --apenas=dev-arc1` (ou preencha `ARC1_DEV_SAP_*` à mão com o **mesmo DEV**) e descomente as variáveis abaixo. Repita os passos 2 e 3 com `arc-1-dev`. O modo esperado é `escrita restrita a pacotes (fallback do abap-adt)`.
 
    ```env
    ARC1_DEV_FALLBACK_2025=true

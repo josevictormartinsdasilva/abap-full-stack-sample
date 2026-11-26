@@ -92,6 +92,18 @@ export function situacaoConexao(prefix, ler) {
   return { situacao: faltando.length ? "incompleta" : "completa", faltando: faltando.map((n) => `${prefix}_${n}`) };
 }
 
+// Conexão que aponta para o mesmo sistema de outra (arc-1-dev = o DEV do vsp): devolve um leitor
+// que usa o valor próprio e, sem ele, o da conexão de origem, só para os campos da conexão.
+// Flags de comportamento (ALLOW_DEV_WRITES, ALLOWED_PACKAGES...) nunca são herdadas.
+export const VARIAVEIS_HERDAVEIS = [...VARIAVEIS_CONEXAO, "SAP_SID", "SAP_CA_CERT"];
+export function leitorComHeranca(prefix, prefixOrigem, ler) {
+  return (nome) => {
+    const proprio = valorDeVariavel(`${prefix}_${nome}`, ler(`${prefix}_${nome}`)).valor;
+    if (proprio !== undefined || !prefixOrigem || !VARIAVEIS_HERDAVEIS.includes(nome)) return proprio;
+    return valorDeVariavel(`${prefixOrigem}_${nome}`, ler(`${prefixOrigem}_${nome}`)).valor;
+  };
+}
+
 // ---------------------------------------------------------------- bloco "cliente"
 export const ehPlaceholder = (valor) => typeof valor !== "string" || valor.trim() === "" || PLACEHOLDER.test(valor);
 
