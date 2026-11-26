@@ -226,6 +226,23 @@ O `vsp` não cria nem edita controle de acesso (DCLS: `unsupported object type: 
 
 Validado numa POC em S/4HANA 2023 (SAP_BASIS 758): o ARC-1 1.11.0 gravou na request existente com `SAP_ALLOW_TRANSPORT_WRITES=false`. Objeto e campo de autorização (SU20/SU21), descrição de SRVD/MSAG e publicação de service binding em mandante de customizing seguem manuais. Detalhes em [Parece erro, mas é normal](parece-erro-mas-e-normal.md).
 
+### Limitações conhecidas do `vsp`
+
+Encontradas com o `vsp` v2.62.1 num DEV S/4HANA 2023 (SAP_BASIS 758). Uma versão nova pode resolver alguma delas: confira a mensagem antes de seguir o caminho da tabela.
+
+| Operação | Resultado (mensagem literal) | Caminho |
+|---|---|---|
+| Criar DCL | `unsupported object type: DCLS/DL` | `arc-1-dev` (ADR-0015) |
+| Criar ou editar DDLX | `unsupported object type: DDLX/EX` | `arc-1-dev` (ADR-0015) |
+| Objeto ou campo de autorização (SU21/SU20) | `unsupported object type: SUSO/B` / `AUTH` | Manual: ADT (Authorization Object/Field) ou SU20/SU21. O ARC-1 só lê `AUTH` |
+| Descrição de SRVD ou MSAG | `SetDescription failed: no description handling for object type "SRVD"` | Manual: ADT ou SE91 |
+| Publicar SRVB em mandante de customizing | `(Un-)Publishing of SRVB … in Customizing Client not allowed` | Recusa do próprio SAP: `/IWFND/V4_ADMIN` ou Basis |
+| ATC de pacote | Só devolve classes, BDEF e TABL. CDS, DCL, DDLX, SRVD e DDIC voltam com `totalObjects: 0` | Cobertura parcial: relate quais tipos não foram verificados. O ATC do ARC-1 também voltou `processedObjectCount: 0`; confira a variante ATC no sistema |
+| Ativação de pacote | `Activated 0 objects`, com objetos ainda inativos | Confira sempre com `analyze type=inactive_objects` e ative os objetos um a um |
+| Leitura de TADIR ou do idioma original | `RunQuery … blocked by safety configuration` | Esperado: o SQL livre fica bloqueado (`--block-free-sql`) |
+| Criar objeto a partir de arquivo | Descrição gravada como `Generated from <arquivo>` | Passe a descrição na criação ou corrija com `set_description` |
+| `edit` com `activate: false` | O objeto é ativado mesmo assim | Conte com o objeto ativo num estado intermediário; grave versões que ativem |
+
 ---
 
 ## Fallback do `abap-adt` em S/4HANA 2025+
@@ -339,6 +356,11 @@ Todas as mensagens do launcher começam com `mcp-launch:`. Para vê-las, rode o 
 | `o T000-LOGSYS indica o SID QS4, mas VSP_SAP_SID diz DS4` | A URL está trocada, ou o LOGSYS ficou errado depois de uma cópia de mandante. Confira a URL; se for o LOGSYS, peça a correção ao Basis. |
 | `a URL do SAP precisa ser https://` | Use a porta HTTPS do ICM (ex.: `https://host:44300`). `http://` só é aceito para `localhost`. |
 | `NODE_TLS_REJECT_UNAUTHORIZED=0 desliga a verificação TLS` | Remova a variável do ambiente. Para certificado autoassinado ou de CA interna, fixe o certificado pelo setup (passo 3). |
+| `aviso: <VARIÁVEL> no .env parece ter comentário no fim da linha` | O `.env` não tem comentário no fim da linha: o texto depois do valor entrou no valor, e uma flag como `true   # ...` fica desligada. Ponha o comentário numa linha própria. |
+| `ENOTFOUND` em **todos** os servidores ao mesmo tempo | Queda de VPN ou de DNS, não configuração. Reconecte a VPN e reconecte os servidores no `/mcp`. |
+| `fiori-mcp`: `self-signed certificate` | O certificado do SAP não está fixado, ou o `fiori-mcp` não foi iniciado pelo `scripts/com-certificados.mjs`. Fixe pelo setup (passo 3) e rode `node scripts/sync-agents.mjs` se o `.mcp.json` estiver antigo. No preview, use o wrapper (passo 3). |
+| `fiori-mcp` não lista o sistema, ou devolve uma página HTML de login | No SAP Fiori tools, o sistema foi salvo como "OData Service URL" (`odata_service`), e não como **ABAP On-Premise** (`abap_catalog`). Salve-o de novo como ABAP On-Premise. O `list_sap_systems` só relê a lista quando o servidor reinicia: reconecte o `fiori-mcp` no `/mcp`. |
+| Variável de ambiente nova não chega ao servidor depois de reconectar no `/mcp` (Windows) | O reconnect reinicia o servidor com o ambiente do processo da ferramenta de IA, que é o do terminal em que ela abriu. Abra a ferramenta num terminal novo (no VS Code, reinicie o VS Code). Já uma mudança no `.mcp.json` ou no `.env` vale com o reconnect. |
 | `standards/sistemas-sap.json ...` | O registro de restrições tem JSON inválido ou uma entrada sem `sid`/`ambiente` válidos. A mensagem aponta a entrada (`restricoes[n]`). |
 | `não foi possível baixar .../vsp-...` | A rede bloqueou o GitHub ou exige proxy (o download do launcher não usa proxy). Baixe o arquivo manualmente e defina `VSP_BIN` (passo 2). |
 | `não foi possível consultar a última versão do vsp ... e não há versão no cache` | Primeiro uso sem acesso ao GitHub. Baixe o arquivo manualmente e defina `VSP_BIN` (passo 2). |
