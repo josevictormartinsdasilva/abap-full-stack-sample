@@ -8,7 +8,7 @@ Este projeto utiliza uma arquitetura multiagente especializada para o desenvolvi
 
 A sessão principal atua como **Orquestrador Central**.
 
-1. **Planejar antes de executar**: avalie o requisito, consulte [standards/naming-conventions.json](standards/naming-conventions.json) e [standards/padrao-desenvolvimento.md](standards/padrao-desenvolvimento.md), e apresente um plano com os nomes dos objetos para aprovação do usuário antes de criar/alterar objetos no SAP.
+1. **Planejar antes de executar**: avalie o requisito, consulte [standards/naming-conventions.json](standards/naming-conventions.json) e [standards/padrao-desenvolvimento.md](standards/padrao-desenvolvimento.md), e apresente um plano com os nomes dos objetos para aprovação do usuário antes de criar/alterar objetos no SAP. Antes de pedir a aprovação, confira o comprimento de cada nome contra o limite do tipo de objeto (ex.: tabela transparente e objeto de bloqueio até 16 caracteres; CDS e classe até 30; app e BSP pelos limites do tópico 9 do padrão). Nome aprovado que o SAP recusa por tamanho obriga a refazer o plano.
 2. **Parâmetros do cliente**: sigla, pacotes, variante ATC, namespace Fiori e sistema de desenvolvimento estão no bloco `cliente` de `standards/naming-conventions.json`. Se algum valor necessário ainda for placeholder (`<...>`), pergunte ao usuário — nunca suponha. Um valor "não se aplica" (ex.: `requests.projetoCTS`, quando o cliente não atribui projeto CTS às requests) indica que o item não existe neste cliente: não pergunte nem invente um valor.
 3. **Selecionar o MCP pela política**: antes de qualquer chamada ao SAP, siga [standards/politica-mcp-abap.md](standards/politica-mcp-abap.md). O ambiente e o release de cada sistema são **detectados no próprio SAP** pelo launcher e gravados em `.agents/runtime/`. Rode `node scripts/mcp-runtime.mjs` (lista só os servidores vivos) e localize ali o servidor conectado ao sistema-alvo; para o `abap-adt`, use a informação de sistema do próprio servidor. Use **somente** o servidor que a matriz indica:
    - S/4HANA 2025+ → `abap-adt`;
@@ -31,7 +31,7 @@ A sessão principal atua como **Orquestrador Central**.
 
    Tarefas pequenas (uma ou duas linhas, consultas) podem ser feitas diretamente, sem delegar.
 6. **Ordem de precedência** em entregas ponta a ponta: `abap-rap-dev` (ou `abap-classic-dev`) → `fiori-elements-dev` → `abap-qa-auditor`. Etapas independentes podem rodar em paralelo.
-7. **Qualidade obrigatória**: nenhuma entrega é concluída sem o `abap-qa-auditor` reportar ATC sem erros (tópico 13 de `standards/padrao-desenvolvimento.md`).
+7. **Qualidade obrigatória**: nenhuma entrega é concluída sem o `abap-qa-auditor` reportar ATC sem erros (tópico 13 de `standards/padrao-desenvolvimento.md`). "0 achados" só vale para os objetos que o ATC de fato processou: o auditor relata a cobertura (objetos enviados × processados, por tipo), e objeto não processado fica como pendência a verificar por outro meio, nunca como aprovado.
 8. **Relatar fielmente**: repasse ao usuário os resultados dos subagentes (objetos, ativação, ATC, lint), inclusive falhas. Informe também o sistema e o servidor MCP usados e as ações recusadas pela política.
 
 ## Papéis & Subagentes

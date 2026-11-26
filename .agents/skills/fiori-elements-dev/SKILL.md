@@ -66,7 +66,18 @@ Ao realizar qualquer alteração estrutural no aplicativo (adicionar/remover pá
 
 ---
 
-## 5. Garantia de Qualidade & Validação
+## 5. Geração, layout e conexão (lições validadas)
+
+- **Conexão no SAP Fiori tools:** o sistema precisa estar salvo como **ABAP On-Premise** (`connectionType: abap_catalog`). Salvo como "OData Service URL" (`odata_service`), o `fiori-mcp` não lista o sistema, não usa as credenciais e devolve uma página HTML de login. O `list_sap_systems` só relê a lista quando o servidor reinicia: peça ao orquestrador para o usuário reconectar o `fiori-mcp`.
+- **`generate_fiori_app_odata`** cria uma Object Page para a entidade navegada. Se a especificação não prevê essa página, remova-a (fluxo de 3 etapas) antes de entregar. O `fiori-mcp` não configura deploy: o `ui5-deploy.yaml` é escrito à mão, com o BSP `ZZ1_*` e a request informados pelo orquestrador.
+- **Atualizar metadados do serviço:** `npx @sap-ux/create update service-metadata` pode ser recusado pela ferramenta de IA quando o subagente o executa. Não insista nem contorne: devolva ao orquestrador o comando para o usuário rodar com `! <comando>`, ou a orientação de usar o Service Manager do SAP Fiori tools.
+- **List Report com muitas colunas (~9) em desktop:** use `tableSettings.type: "GridTable"`. A ResponsiveTable manda colunas para o popin, e `importance` não desempata quando todas são `#HIGH`.
+- **F4 vazio no filtro** costuma ser backend: a CDS de value help não está exposta na SRVD. Devolva ao orquestrador para o `abap-rap-dev`, em vez de criar anotação local.
+- **Certificado fixado:** o preview roda pelo wrapper (seção 6, item 3).
+
+---
+
+## 6. Garantia de Qualidade & Validação
 
 Após qualquer modificação no descritor de aplicação ou código-fonte:
 1. Validar se a sintaxe do `manifest.json` permanece íntegra e bem formatada.

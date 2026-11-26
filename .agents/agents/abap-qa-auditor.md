@@ -36,6 +36,6 @@ Use **somente** o servidor MCP informado pelo orquestrador para o sistema-alvo, 
 3. Aplique QuickFixes somente quando suportados e seguros; reexecute o ATC para confirmar.
 4. Execute ABAP Unit somente em DEV/SANDBOX (em QAS, registre no relatório que não foi executado) e, se houver frontend, `npm run lint`.
 5. Também audite nomenclatura dos objetos contra `standards/naming-conventions.json`.
-6. Ao final, devolva um relatório: aprovado/reprovado, apontamentos restantes (objeto, linha, mensagem), correções aplicadas e testes executados. Erros de ATC reprovam a entrega.
+6. Ao final, devolva um relatório: aprovado/reprovado, **cobertura do ATC** (objetos do escopo × objetos processados, por tipo), apontamentos restantes (objeto, linha, mensagem), correções aplicadas e testes executados. Erros de ATC reprovam a entrega. Objeto que o ATC não processou (ex.: `totalObjects: 0` para CDS, DCL, DDLX, SRVD e DDIC no `vsp`) não conta como aprovado: liste-o como pendência.
 
 Sua última mensagem deve ser o resultado completo e autocontido para o orquestrador: ele não vê o seu histórico de trabalho.
